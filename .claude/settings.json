@@ -20,7 +20,12 @@
       "Bash(php migrate.php --status)",
       "Bash(php migrate.php)",
       "Bash(bash /c/PROGRA~1/KMSpico/temp/claude/c--Shanfix-System/2d91c0a0-40fb-4767-b95f-1d5fbb19a53d/scratchpad/jobs_test.sh)",
-      "WebFetch(domain:system.shanfixtechnology.com)"
+      "WebFetch(domain:system.shanfixtechnology.com)",
+      "Bash(powershell -NoProfile -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; $z=[IO.Compression.ZipFile]::OpenRead\\('\\\\''C:\\\\Shanfix System\\\\shanfix-cpanel.zip'\\\\''\\); $z.Entries | Where-Object { $_.FullName -notmatch '\\\\''/'\\\\'' -or $_.FullName -match '\\\\''^[^/]+/$'\\\\'' } | Select-Object -ExpandProperty FullName; $z.Dispose\\(\\)')",
+      "Bash(php -r \"var_dump\\(extension_loaded\\('zip'\\)\\);\")",
+      "Bash(rm -f shanfix-cpanel.zip)",
+      "Bash(php -r ' *)",
+      "Bash(awk '{print \"size: \" $5}')"
     ],
     "additionalDirectories": [
       "C:\\Shanfix System\\storage\\logs"
