@@ -19,17 +19,31 @@ if (!function_exists('e')) {
 
 if (!function_exists('base_path')) {
     /**
-     * Sub-directory the app is installed under, '' when at the domain root.
+     * Sub-directory the app is served from, '' when at the domain root.
      * Lets the system work at both example.com/ and example.com/erp/.
+     *
+     * Normally detected from SCRIPT_NAME. Set app.base_path in config.php to
+     * override — needed when a rewrite maps the domain root onto public/, so
+     * SCRIPT_NAME says "/public/index.php" while visitors are on "/".
      */
     function base_path(): string
     {
         static $base = null;
 
-        if ($base === null) {
-            $script = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
-            $base   = ($script === '/' || $script === '.') ? '' : rtrim($script, '/');
+        if ($base !== null) {
+            return $base;
         }
+
+        $configured = Config::get('app.base_path');
+
+        if ($configured !== null) {
+            $configured = trim((string) $configured, '/');
+            $base = $configured === '' ? '' : '/' . $configured;
+            return $base;
+        }
+
+        $script = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+        $base   = ($script === '/' || $script === '.') ? '' : rtrim($script, '/');
 
         return $base;
     }
