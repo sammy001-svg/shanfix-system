@@ -192,12 +192,21 @@ If it fails, the exact server reply is shown, which is usually enough to diagnos
 
 ### SMS
 
-Sign up at [africastalking.com](https://africastalking.com), then take the username
-and API key from the dashboard. Enter `sandbox` as the username to test without
-spending credit.
+SMS goes through our own platform, [Shanfix Bulk SMS](https://sms.shanfixtechnology.com).
+Sign in there and open **API** to copy the two credentials:
 
-SMS is billed per 160 characters — the settings page shows the length and credit
-count for each template as you edit it.
+| Field | Where it comes from |
+|---|---|
+| Client ID | API page — identifies the account |
+| API key | API page — keep it secret, it is encrypted at rest here |
+| Sender ID | One of your **approved** sender IDs, e.g. `SHANFIX` |
+
+An unapproved sender ID is rejected by the gateway, so register it in the portal
+first. Once saved, **Check credentials &amp; balance** on the settings page confirms
+the connection and shows your remaining units without spending one.
+
+SMS is billed in units per 160 characters — the settings page shows the length and
+credit count for each template as you edit it.
 
 ### Scheduled sending
 

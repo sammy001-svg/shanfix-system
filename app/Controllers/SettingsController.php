@@ -295,12 +295,20 @@ class SettingsController extends Controller
         }
 
         if ($smsOn) {
-            if (trim((string) $request->input('sms_username', '')) === '') {
-                $v->custom('sms_username', false, 'The gateway username is required to enable SMS.');
+            if (trim((string) $request->input('sms_client_id', '')) === '') {
+                $v->custom('sms_client_id', false, 'The Client ID from Shanfix Bulk SMS is required to enable SMS.');
             }
             if (trim((string) $request->input('sms_api_key', '')) === '' && !Settings::hasSecret('sms_api_key')) {
                 $v->custom('sms_api_key', false, 'The API key is required to enable SMS.');
             }
+            if (trim((string) $request->input('sms_sender_id', '')) === '') {
+                $v->custom('sms_sender_id', false, 'A sender ID approved on your Shanfix Bulk SMS account is required.');
+            }
+        }
+
+        $smsBase = trim((string) $request->input('sms_base_url', ''));
+        if ($smsBase !== '' && !str_starts_with($smsBase, 'https://')) {
+            $v->custom('sms_base_url', false, 'The SMS portal address must start with https://');
         }
 
         if (($emailOn || $smsOn) && (string) Config::get('security.app_key', '') === '') {
@@ -333,8 +341,10 @@ class SettingsController extends Controller
             'smtp_reply_to'   => trim((string) $request->input('smtp_reply_to', '')),
 
             'sms_enabled'     => $smsOn ? '1' : '0',
-            'sms_username'    => trim((string) $request->input('sms_username', '')),
+            'sms_provider'    => 'shanfix',
+            'sms_client_id'   => trim((string) $request->input('sms_client_id', '')),
             'sms_sender_id'   => trim((string) $request->input('sms_sender_id', '')),
+            'sms_base_url'    => $smsBase !== '' ? rtrim($smsBase, '/') : \App\Services\Sms::DEFAULT_BASE_URL,
 
             'notify_overdue_days' => $days !== '' ? preg_replace('/\s+/', '', $days) : '1,7,14',
             'notify_send_window'  => $window,
