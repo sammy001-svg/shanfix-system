@@ -292,18 +292,32 @@ class DocumentController extends Controller
             ['id' => $doc['id']]
         );
 
+        $emailOn = Settings::bool('smtp_enabled');
+        $smsOn   = Settings::bool('sms_enabled');
+
+        // Only mint a share link for documents that have actually been issued.
+        $publicLink = null;
+        if ($doc['status'] !== 'draft') {
+            $token = \App\Services\Notifier::ensureToken((int) $doc['id'], $doc['public_token'] ?? null);
+            $publicLink = \App\Services\Notifier::publicUrl($token);
+        }
+
         $this->view('documents/show', [
-            'title'      => $doc['doc_number'],
-            'type'       => $type,
-            'meta'       => self::TYPES[$type],
-            'statuses'   => self::STATUSES[$type],
-            'doc'        => $doc,
-            'items'      => $items,
-            'payments'   => $payments,
-            'related'    => $related,
-            'pendingStk' => $pendingStk,
-            'job'        => $job,
-            'stkEnabled' => Settings::bool('kopokopo_enabled'),
+            'title'       => $doc['doc_number'],
+            'type'        => $type,
+            'meta'        => self::TYPES[$type],
+            'statuses'    => self::STATUSES[$type],
+            'doc'         => $doc,
+            'items'       => $items,
+            'payments'    => $payments,
+            'related'     => $related,
+            'pendingStk'  => $pendingStk,
+            'job'         => $job,
+            'stkEnabled'  => Settings::bool('kopokopo_enabled'),
+            'emailOn'     => $emailOn,
+            'smsOn'       => $smsOn,
+            'messagingOn' => $emailOn || $smsOn,
+            'publicLink'  => $publicLink,
         ]);
     }
 

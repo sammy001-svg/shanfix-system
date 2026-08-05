@@ -22,6 +22,9 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     <a class="tab <?= $tab === 'payments'   ? 'is-active' : '' ?>" href="<?= e($tabUrl('payments')) ?>">
       <?= icon('smartphone') ?> M-Pesa / KopoKopo
     </a>
+    <a class="tab <?= $tab === 'messaging'  ? 'is-active' : '' ?>" href="<?= e($tabUrl('messaging')) ?>">
+      <?= icon('send') ?> Email &amp; SMS
+    </a>
     <a class="tab <?= $tab === 'categories' ? 'is-active' : '' ?>" href="<?= e($tabUrl('categories')) ?>">
       <?= icon('layers') ?> Categories
     </a>
@@ -415,6 +418,372 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
         </form>
         <p class="field-hint mt-8 mb-0">Run this once after going live, or if the callback URL changes.</p>
       </div>
+    </div>
+  </div>
+
+<?php elseif ($tab === 'messaging'): ?>
+
+  <?php if (!$appKeySet): ?>
+    <div class="alert alert--warning">
+      <?= icon('alert-triangle') ?>
+      <div class="alert__body">
+        <strong>Set an application key first.</strong>
+        Mail and SMS credentials are encrypted before storage, which needs
+        <code>security.app_key</code> in <code>config/config.php</code>.
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <form method="post" action="<?= url('/settings/messaging') ?>">
+    <?= csrf_field() ?>
+
+    <div class="grid-2">
+      <!-- Email -->
+      <div class="card">
+        <div class="card__head">
+          <?= icon('mail') ?>
+          <div>
+            <div class="card__title">Email (SMTP)</div>
+            <div class="card__sub">Use the mailbox details from cPanel → Email Accounts</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <div class="form-grid form-grid--2">
+            <div class="field field--full">
+              <label class="label" for="smtp_host">SMTP host</label>
+              <input class="input <?= isset($errors['smtp_host']) ? 'has-error' : '' ?>"
+                     id="smtp_host" name="smtp_host" maxlength="180"
+                     value="<?= e(setting('smtp_host', '')) ?>" placeholder="mail.shanfix.co.ke">
+              <?= error_for($errors ?? [], 'smtp_host') ?>
+            </div>
+
+            <div class="field">
+              <label class="label" for="smtp_port">Port</label>
+              <input class="input" type="number" id="smtp_port" name="smtp_port"
+                     value="<?= e(setting('smtp_port', '587')) ?>">
+              <span class="field-hint">587 for TLS, 465 for SSL, 25 unencrypted.</span>
+            </div>
+
+            <div class="field">
+              <label class="label" for="smtp_encryption">Encryption</label>
+              <select class="select" id="smtp_encryption" name="smtp_encryption">
+                <?php $enc = setting('smtp_encryption', 'tls'); ?>
+                <option value="tls"  <?= $enc === 'tls'  ? 'selected' : '' ?>>STARTTLS (recommended)</option>
+                <option value="ssl"  <?= $enc === 'ssl'  ? 'selected' : '' ?>>SSL / implicit TLS</option>
+                <option value="none" <?= $enc === 'none' ? 'selected' : '' ?>>None</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label class="label" for="smtp_username">Username</label>
+              <input class="input" id="smtp_username" name="smtp_username" autocomplete="off"
+                     value="<?= e(setting('smtp_username', '')) ?>" placeholder="invoices@shanfix.co.ke">
+              <span class="field-hint">Usually the full email address.</span>
+            </div>
+
+            <div class="field">
+              <label class="label" for="smtp_password">
+                Password
+                <?php if ($hasSecret['smtp_password']): ?>
+                  <span class="badge badge--green text-xs">Stored</span>
+                <?php endif; ?>
+              </label>
+              <input class="input <?= isset($errors['smtp_password']) ? 'has-error' : '' ?>"
+                     type="password" id="smtp_password" name="smtp_password" autocomplete="new-password"
+                     placeholder="<?= $hasSecret['smtp_password'] ? 'Leave blank to keep' : 'Mailbox password' ?>">
+              <?= error_for($errors ?? [], 'smtp_password') ?>
+            </div>
+
+            <div class="field">
+              <label class="label" for="smtp_from_email">Send from</label>
+              <input class="input <?= isset($errors['smtp_from_email']) ? 'has-error' : '' ?>"
+                     type="email" id="smtp_from_email" name="smtp_from_email"
+                     value="<?= e(setting('smtp_from_email', '')) ?>" placeholder="invoices@shanfix.co.ke">
+              <?= error_for($errors ?? [], 'smtp_from_email') ?>
+            </div>
+
+            <div class="field">
+              <label class="label" for="smtp_from_name">From name</label>
+              <input class="input" id="smtp_from_name" name="smtp_from_name" maxlength="120"
+                     value="<?= e(setting('smtp_from_name', 'Shanfix Technology')) ?>">
+            </div>
+
+            <div class="field field--full">
+              <label class="label" for="smtp_reply_to">Reply-to address</label>
+              <input class="input" type="email" id="smtp_reply_to" name="smtp_reply_to"
+                     value="<?= e(setting('smtp_reply_to', '')) ?>" placeholder="Optional">
+              <span class="field-hint">Where client replies should land, if different from the sender.</span>
+            </div>
+          </div>
+
+          <hr>
+
+          <label class="check">
+            <input type="checkbox" name="smtp_enabled" value="1" <?= setting('smtp_enabled') === '1' ? 'checked' : '' ?>>
+            <span class="check__text">
+              <strong>Enable email sending</strong>
+              <span>Adds “Email to client” buttons on quotations and invoices.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- SMS -->
+      <div class="card">
+        <div class="card__head">
+          <?= icon('message') ?>
+          <div>
+            <div class="card__title">SMS (Africa's Talking)</div>
+            <div class="card__sub">Credentials from your Africa's Talking dashboard</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <div class="form-grid form-grid--2">
+            <div class="field field--full">
+              <label class="label" for="sms_username">Gateway username</label>
+              <input class="input <?= isset($errors['sms_username']) ? 'has-error' : '' ?>"
+                     id="sms_username" name="sms_username" autocomplete="off"
+                     value="<?= e(setting('sms_username', '')) ?>" placeholder="shanfix">
+              <span class="field-hint">Type <code>sandbox</code> to test without spending credit.</span>
+              <?= error_for($errors ?? [], 'sms_username') ?>
+            </div>
+
+            <div class="field field--full">
+              <label class="label" for="sms_api_key">
+                API key
+                <?php if ($hasSecret['sms_api_key']): ?>
+                  <span class="badge badge--green text-xs">Stored</span>
+                <?php endif; ?>
+              </label>
+              <input class="input <?= isset($errors['sms_api_key']) ? 'has-error' : '' ?>"
+                     type="password" id="sms_api_key" name="sms_api_key" autocomplete="new-password"
+                     placeholder="<?= $hasSecret['sms_api_key'] ? 'Leave blank to keep' : 'Paste your API key' ?>">
+              <?= error_for($errors ?? [], 'sms_api_key') ?>
+            </div>
+
+            <div class="field field--full">
+              <label class="label" for="sms_sender_id">Sender ID</label>
+              <input class="input" id="sms_sender_id" name="sms_sender_id" maxlength="20"
+                     value="<?= e(setting('sms_sender_id', '')) ?>" placeholder="SHANFIX">
+              <span class="field-hint">
+                Your registered alphanumeric sender or shortcode. Leave blank to use the shared pool.
+              </span>
+            </div>
+          </div>
+
+          <hr>
+
+          <label class="check">
+            <input type="checkbox" name="sms_enabled" value="1" <?= setting('sms_enabled') === '1' ? 'checked' : '' ?>>
+            <span class="check__text">
+              <strong>Enable SMS sending</strong>
+              <span>SMS is charged per 160 characters — keep templates short.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Which events send -->
+    <div class="card">
+      <div class="card__head">
+        <?= icon('sliders') ?>
+        <div>
+          <div class="card__title">What gets sent automatically</div>
+          <div class="card__sub">You can always send manually regardless of these switches</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Event</th><th style="width:120px">Email</th><th style="width:120px">SMS</th></tr>
+          </thead>
+          <tbody>
+            <?php foreach ($events as $key => $label): ?>
+              <tr>
+                <td><?= e($label) ?></td>
+                <td>
+                  <label class="check">
+                    <input type="checkbox" name="notify_<?= e($key) ?>_email" value="1"
+                           <?= setting("notify_{$key}_email") === '1' ? 'checked' : '' ?>>
+                    <span class="check__text"><span>Send</span></span>
+                  </label>
+                </td>
+                <td>
+                  <label class="check">
+                    <input type="checkbox" name="notify_<?= e($key) ?>_sms" value="1"
+                           <?= setting("notify_{$key}_sms") === '1' ? 'checked' : '' ?>>
+                    <span class="check__text"><span>Send</span></span>
+                  </label>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card__body" style="border-top:1px solid var(--border)">
+        <div class="form-grid form-grid--3">
+          <div class="field">
+            <label class="label" for="notify_overdue_days">Chase overdue invoices after</label>
+            <input class="input <?= isset($errors['notify_overdue_days']) ? 'has-error' : '' ?>"
+                   id="notify_overdue_days" name="notify_overdue_days"
+                   value="<?= e(setting('notify_overdue_days', '1,7,14')) ?>">
+            <span class="field-hint">Days past due, comma separated. Each invoice is chased once per figure.</span>
+            <?= error_for($errors ?? [], 'notify_overdue_days') ?>
+          </div>
+
+          <div class="field">
+            <label class="label" for="notify_send_window">Only send between</label>
+            <input class="input <?= isset($errors['notify_send_window']) ? 'has-error' : '' ?>"
+                   id="notify_send_window" name="notify_send_window"
+                   value="<?= e(setting('notify_send_window', '08:00-18:00')) ?>" placeholder="08:00-18:00">
+            <span class="field-hint">Stops clients being messaged overnight. Blank = any time.</span>
+            <?= error_for($errors ?? [], 'notify_send_window') ?>
+          </div>
+
+          <div class="field">
+            <label class="label" for="notify_max_attempts">Retry attempts</label>
+            <input class="input" type="number" min="1" max="10" id="notify_max_attempts" name="notify_max_attempts"
+                   value="<?= e(setting('notify_max_attempts', '3')) ?>">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Templates -->
+    <div class="card">
+      <div class="card__head">
+        <?= icon('file-text') ?>
+        <div>
+          <div class="card__title">Message templates</div>
+          <div class="card__sub">
+            Placeholders: <code>{client_name}</code> <code>{contact_name}</code> <code>{company_name}</code>
+            <code>{doc_number}</code> <code>{amount}</code> <code>{balance}</code> <code>{due_date}</code>
+            <code>{valid_until}</code> <code>{link}</code> <code>{job_number}</code> <code>{job_title}</code>
+          </div>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="text-xs uppercase fw-700 text-muted mb-12">Email</div>
+        <?php foreach ([
+            'quotation_sent'   => 'Quotation sent',
+            'invoice_sent'     => 'Invoice sent',
+            'payment_received' => 'Payment received',
+            'invoice_overdue'  => 'Overdue reminder',
+            'job_ready'        => 'Job ready for collection',
+        ] as $key => $label): ?>
+          <div class="form-grid form-grid--2 mb-16">
+            <div class="field">
+              <label class="label" for="tpl_<?= e($key) ?>_subject"><?= e($label) ?> — subject</label>
+              <input class="input" id="tpl_<?= e($key) ?>_subject" name="tpl_<?= e($key) ?>_subject"
+                     value="<?= e(setting("tpl_{$key}_subject", '')) ?>">
+            </div>
+            <div class="field">
+              <label class="label" for="tpl_<?= e($key) ?>_intro"><?= e($label) ?> — opening line</label>
+              <textarea class="textarea" id="tpl_<?= e($key) ?>_intro" name="tpl_<?= e($key) ?>_intro"
+                        rows="2"><?= e(setting("tpl_{$key}_intro", '')) ?></textarea>
+            </div>
+          </div>
+        <?php endforeach; ?>
+
+        <hr>
+
+        <div class="text-xs uppercase fw-700 text-muted mb-12">
+          SMS <span class="text-muted" style="font-weight:400;text-transform:none">— keep under 160 characters to stay at one credit</span>
+        </div>
+        <div class="form-grid form-grid--2">
+          <?php foreach ([
+              'invoice_sent'     => 'Invoice sent',
+              'payment_received' => 'Payment received',
+              'invoice_overdue'  => 'Overdue reminder',
+              'job_ready'        => 'Job ready',
+          ] as $key => $label): ?>
+            <?php $tpl = (string) setting("tpl_sms_{$key}", ''); ?>
+            <div class="field">
+              <label class="label" for="tpl_sms_<?= e($key) ?>">
+                <?= e($label) ?>
+                <span class="label__hint">— <?= mb_strlen($tpl) ?> chars, <?= \App\Services\Sms::parts($tpl) ?> credit(s)</span>
+              </label>
+              <textarea class="textarea" id="tpl_sms_<?= e($key) ?>" name="tpl_sms_<?= e($key) ?>"
+                        rows="3"><?= e($tpl) ?></textarea>
+            </div>
+          <?php endforeach; ?>
+        </div>
+
+        <hr>
+
+        <div class="field">
+          <label class="label" for="email_footer_note">Email footer note</label>
+          <input class="input" id="email_footer_note" name="email_footer_note" maxlength="255"
+                 value="<?= e(setting('email_footer_note', '')) ?>">
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn--primary" type="submit"><?= icon('save') ?> Save messaging settings</button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <!-- Test sends -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card__head"><div class="card__title">Send a test email</div></div>
+      <div class="card__body">
+        <form method="post" action="<?= url('/settings/messaging/test') ?>">
+          <?= csrf_field() ?>
+          <input type="hidden" name="channel" value="email">
+          <div class="field mb-12">
+            <label class="label" for="test_email">To</label>
+            <input class="input" type="email" id="test_email" name="to"
+                   value="<?= e(auth()['email'] ?? '') ?>">
+          </div>
+          <button class="btn btn--outline btn--block" type="submit" <?= setting('smtp_host') ? '' : 'disabled' ?>>
+            <?= icon('mail') ?> Send test email
+          </button>
+        </form>
+        <p class="field-hint mt-8 mb-0">Connects, authenticates and delivers a real message.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head"><div class="card__title">Send a test SMS</div></div>
+      <div class="card__body">
+        <form method="post" action="<?= url('/settings/messaging/test') ?>">
+          <?= csrf_field() ?>
+          <input type="hidden" name="channel" value="sms">
+          <div class="field mb-12">
+            <label class="label" for="test_sms">To</label>
+            <input class="input" id="test_sms" name="to"
+                   value="<?= e(auth()['phone'] ?? '') ?>" placeholder="0712345678">
+          </div>
+          <button class="btn btn--outline btn--block" type="submit" <?= setting('sms_username') ? '' : 'disabled' ?>>
+            <?= icon('message') ?> Send test SMS
+          </button>
+        </form>
+        <p class="field-hint mt-8 mb-0">Costs one SMS credit unless you are on sandbox.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <?= icon('clock') ?>
+      <div>
+        <div class="card__title">Scheduled sending</div>
+        <div class="card__sub">Reminders and queued messages need a cron job</div>
+      </div>
+    </div>
+    <div class="card__body">
+      <p class="text-sm text-muted">
+        In cPanel → <strong>Cron Jobs</strong>, add a job running <strong>every 5 minutes</strong>:
+      </p>
+      <pre style="background:var(--navy-900);color:var(--green-100);padding:12px 14px;border-radius:var(--r);overflow-x:auto;font-size:12.5px">/usr/local/bin/php <?= e(BASE_PATH) ?>/cron.php >/dev/null 2>&amp;1</pre>
+      <p class="field-hint mb-0">
+        Without it, messages still send immediately when you press a button —
+        but overdue reminders and retries will not run on their own.
+      </p>
     </div>
   </div>
 

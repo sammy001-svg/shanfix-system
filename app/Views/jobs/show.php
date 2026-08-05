@@ -58,6 +58,16 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
       <?= icon('printer') ?> Job card
     </a>
 
+    <?php if (can('jobs.manage') && $job['stage'] === 'ready' && ($messagingOn ?? false)): ?>
+      <form method="post" action="<?= url('/jobs/' . $job['id'] . '/notify-ready') ?>" style="display:inline">
+        <?= csrf_field() ?>
+        <button class="btn btn--navy" type="submit"
+                <?= ($job['client_email'] || $job['client_phone']) ? '' : 'disabled' ?>>
+          <?= icon('send') ?> Tell client it's ready
+        </button>
+      </form>
+    <?php endif; ?>
+
     <?php if (can('delivery.manage') && in_array($job['stage'], ['ready', 'finishing', 'production'], true)): ?>
       <form method="post" action="<?= url('/jobs/' . $job['id'] . '/delivery-note') ?>" style="display:inline">
         <?= csrf_field() ?>

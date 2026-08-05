@@ -22,7 +22,9 @@ use App\Controllers\InventoryController;
 use App\Controllers\JobController;
 use App\Controllers\JobFileController;
 use App\Controllers\LeadController;
+use App\Controllers\NotificationController;
 use App\Controllers\PaymentController;
+use App\Controllers\PublicDocumentController;
 use App\Controllers\ReminderController;
 use App\Controllers\ReportController;
 use App\Controllers\ServiceController;
@@ -43,6 +45,9 @@ $r->post('/logout', [AuthController::class, 'logout'],   ['csrf']);
 
 // KopoKopo webhook — no session, no CSRF. Authenticated by HMAC signature.
 $r->post('/webhooks/kopokopo', [PaymentController::class, 'kopokopoCallback']);
+
+// Client-facing document view. No login: the 48-char token is the credential.
+$r->get('/view/{token}', [PublicDocumentController::class, 'show']);
 
 // Serve files from storage/ (uploads live outside the web root).
 // {path*} matches across slashes, e.g. uploads/receipts/abc123.pdf
@@ -277,6 +282,23 @@ $r->group(['auth'], function ($r) {
         $r->post('/expenses',             [ExpenseController::class, 'store']);
         $r->post('/expenses/{id}',        [ExpenseController::class, 'update']);
         $r->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy']);
+    });
+
+    // -- Messages (email & SMS)
+    $r->get('/notifications',      [NotificationController::class, 'index'], ['permission:documents.view']);
+    $r->get('/notifications/{id}', [NotificationController::class, 'show'],  ['permission:documents.view']);
+
+    $r->post('/documents/{id}/send', [NotificationController::class, 'sendDocument'],
+             ['permission:documents.manage', 'csrf']);
+    $r->post('/jobs/{id}/notify-ready', [NotificationController::class, 'sendJobReady'],
+             ['permission:jobs.manage', 'csrf']);
+
+    $r->group(['permission:settings.manage', 'csrf'], function ($r) {
+        $r->post('/notifications/run',           [NotificationController::class, 'runQueue']);
+        $r->post('/notifications/{id}/retry',    [NotificationController::class, 'retry']);
+        $r->post('/notifications/{id}/cancel',   [NotificationController::class, 'cancel']);
+        $r->post('/settings/messaging',          [SettingsController::class, 'saveMessaging']);
+        $r->post('/settings/messaging/test',     [NotificationController::class, 'sendTest']);
     });
 
     // -- Reports

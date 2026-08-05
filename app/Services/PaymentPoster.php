@@ -3,6 +3,7 @@ namespace App\Services;
 
 use App\Core\ActivityLog;
 use App\Core\Database;
+use App\Core\Logger;
 use App\Core\Numbering;
 
 /**
@@ -55,6 +56,63 @@ class PaymentPoster
 
             return ['payment_id' => $paymentId, 'payment_number' => $paymentNumber];
         });
+    }
+
+    /**
+     * Tell the client their payment landed.
+     *
+     * Called after post() rather than inside it, so a mail server problem
+     * can never roll back a payment that genuinely happened.
+     */
+    public static function notifyClient(int $paymentId): void
+    {
+        try {
+            $payment = Database::first(
+                'SELECT p.*, c.name AS client_name, c.email AS client_email,
+                        c.phone AS client_phone, c.contact_person AS client_contact
+                   FROM payments p JOIN clients c ON c.id = p.client_id
+                  WHERE p.id = :id',
+                ['id' => $paymentId]
+            );
+
+            if (!$payment || $payment['status'] !== 'completed') {
+                return;
+            }
+
+            $doc = $payment['document_id']
+                ? Database::first('SELECT * FROM documents WHERE id = :id', ['id' => $payment['document_id']])
+                : null;
+
+            $context = $doc
+                ? Notifier::documentContext(array_merge($doc, [
+                    'client_name'    => $payment['client_name'],
+                    'client_email'   => $payment['client_email'],
+                    'client_phone'   => $payment['client_phone'],
+                    'client_contact' => $payment['client_contact'],
+                  ]))
+                : [
+                    'entity_type'  => 'payment',
+                    'entity_id'    => $paymentId,
+                    'client_id'    => (int) $payment['client_id'],
+                    'client_name'  => $payment['client_name'],
+                    'contact_name' => $payment['client_contact'] ?: $payment['client_name'],
+                    'email'        => $payment['client_email'],
+                    'phone'        => $payment['client_phone'],
+                    'doc_number'   => $payment['payment_number'],
+                  ];
+
+            // The amount on a receipt is what was just paid, not the invoice total.
+            $context['amount']      = money($payment['amount']);
+            $context['payment_ref'] = $payment['reference'] ?? '';
+
+            Notifier::dispatch('payment_received', $context);
+            Notifier::processQueue(5);
+        } catch (\Throwable $e) {
+            // A failed confirmation must never break payment recording.
+            Logger::error('Payment confirmation failed to send: ' . $e->getMessage(), [
+                'payment_id' => $paymentId,
+            ]);
+        }
     }
 
     /**

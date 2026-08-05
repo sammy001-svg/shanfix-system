@@ -144,6 +144,15 @@
   }
 
   /* ------------------------------------------------------------------
+     Click-to-select fields (share links)
+     ------------------------------------------------------------------ */
+  function initSelectOnFocus() {
+    document.addEventListener('focusin', (e) => {
+      if (e.target.matches('[data-select-on-focus]')) e.target.select();
+    });
+  }
+
+  /* ------------------------------------------------------------------
      Print triggers (inline handlers are blocked by the CSP)
      ------------------------------------------------------------------ */
   function initPrint() {
@@ -734,6 +743,7 @@
     initFlashDismiss();
     initConfirm();
     initPrint();
+    initSelectOnFocus();
     initAutoFilters();
     initSubmitGuard();
     initLineItems();

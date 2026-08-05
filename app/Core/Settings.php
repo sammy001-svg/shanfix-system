@@ -14,6 +14,8 @@ class Settings
     private const SECRETS = [
         'kopokopo_client_secret',
         'kopokopo_api_key',
+        'smtp_password',
+        'sms_api_key',
     ];
 
     private static function load(): array

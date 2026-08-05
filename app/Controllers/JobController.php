@@ -382,6 +382,7 @@ class JobController extends Controller
 
         $this->view('jobs/show', [
             'title'         => $job['job_number'],
+            'messagingOn'   => Settings::bool('smtp_enabled') || Settings::bool('sms_enabled'),
             'job'           => $job,
             'items'         => $items,
             'history'       => $history,

@@ -213,6 +213,8 @@ class PaymentController extends Controller
             'Recorded ' . money($amount) . ' via ' . label_of((string) $request->input('method'))
         );
 
+        PaymentPoster::notifyClient($result['payment_id']);
+
         Session::success('Payment ' . $result['payment_number'] . ' recorded (' . money($amount) . ').');
 
         Response::to($documentId ? '/invoices/' . $documentId : '/payments');
@@ -553,6 +555,9 @@ class PaymentController extends Controller
             'M-Pesa payment of ' . money($amount) . ' received'
             . ($parsed['receipt'] ? ' (ref ' . $parsed['receipt'] . ')' : '')
         );
+
+        // Confirm to the client. Runs after the payment is safely committed.
+        PaymentPoster::notifyClient($result['payment_id']);
     }
 
     /** Callback URL KopoKopo posts back to. */

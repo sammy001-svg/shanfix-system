@@ -21,6 +21,16 @@ if ($me) {
     );
 }
 
+// Messages that gave up after all retries — worth chasing.
+$failedMessages = 0;
+if ($me && can('documents.view')) {
+    $failedMessages = (int) Database::scalar(
+        "SELECT COUNT(*) FROM notifications WHERE status = 'failed'",
+        [],
+        0
+    );
+}
+
 // Jobs badge: what this user still has to produce.
 $openJobs = 0;
 if ($me && can('jobs.view')) {
@@ -146,6 +156,14 @@ if ($me && can('jobs.view')) {
       <a class="nav-link <?= is_active_nav('/reminders') ? 'is-active' : '' ?>" href="<?= url('/reminders') ?>">
         <?= icon('bell', 'nav-link__icon') ?> My Reminders
       </a>
+      <?php if (can('documents.view')): ?>
+        <a class="nav-link <?= is_active_nav('/notifications') ? 'is-active' : '' ?>" href="<?= url('/notifications') ?>">
+          <?= icon('send', 'nav-link__icon') ?> Messages
+          <?php if (!empty($failedMessages)): ?>
+            <span class="nav-link__badge" style="background:var(--red-600)"><?= (int) $failedMessages ?></span>
+          <?php endif; ?>
+        </a>
+      <?php endif; ?>
 
       <?php if (can('users.view') || can('settings.manage')): ?>
         <div class="nav-group__label">Administration</div>

@@ -18,7 +18,7 @@ class SettingsController extends Controller
     {
         $tab = (string) $request->query('tab', 'company');
 
-        if (!in_array($tab, ['company', 'documents', 'payments', 'categories'], true)) {
+        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'categories'], true)) {
             $tab = 'company';
         }
 
@@ -45,7 +45,10 @@ class SettingsController extends Controller
             'hasSecret'      => [
                 'client_secret' => Settings::hasSecret('kopokopo_client_secret'),
                 'api_key'       => Settings::hasSecret('kopokopo_api_key'),
+                'smtp_password' => Settings::hasSecret('smtp_password'),
+                'sms_api_key'   => Settings::hasSecret('sms_api_key'),
             ],
+            'events'         => \App\Services\Notifier::EVENTS,
             'defaultCallback' => rtrim((string) Config::get('app.url', ''), '/') . base_path() . '/webhooks/kopokopo',
             'appKeySet'       => (string) Config::get('security.app_key', '') !== '',
         ]);
@@ -266,6 +269,117 @@ class SettingsController extends Controller
         }
 
         Response::to('/settings?tab=payments');
+    }
+
+    public function saveMessaging(Request $request): void
+    {
+        $v = new Validator($request->all());
+        $v->in('smtp_encryption', ['tls', 'ssl', 'none'], 'Encryption')
+          ->email('smtp_from_email', 'From address')
+          ->email('smtp_reply_to', 'Reply-to address')
+          ->maxLen('smtp_host', 180, 'SMTP host')
+          ->maxLen('smtp_from_name', 120, 'From name')
+          ->maxLen('sms_sender_id', 20, 'Sender ID')
+          ->numeric('notify_max_attempts', 'Retry attempts');
+
+        $emailOn = $request->bool('smtp_enabled');
+        $smsOn   = $request->bool('sms_enabled');
+
+        if ($emailOn) {
+            if (trim((string) $request->input('smtp_host', '')) === '') {
+                $v->custom('smtp_host', false, 'The SMTP host is required to enable email.');
+            }
+            if (trim((string) $request->input('smtp_from_email', '')) === '') {
+                $v->custom('smtp_from_email', false, 'A from address is required to enable email.');
+            }
+        }
+
+        if ($smsOn) {
+            if (trim((string) $request->input('sms_username', '')) === '') {
+                $v->custom('sms_username', false, 'The gateway username is required to enable SMS.');
+            }
+            if (trim((string) $request->input('sms_api_key', '')) === '' && !Settings::hasSecret('sms_api_key')) {
+                $v->custom('sms_api_key', false, 'The API key is required to enable SMS.');
+            }
+        }
+
+        if (($emailOn || $smsOn) && (string) Config::get('security.app_key', '') === '') {
+            $v->custom('smtp_password', false,
+                'Set security.app_key in config/config.php before storing mail or SMS credentials.');
+        }
+
+        $window = trim((string) $request->input('notify_send_window', ''));
+        if ($window !== '' && !preg_match('/^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$/', $window)) {
+            $v->custom('notify_send_window', false, 'Use the format 08:00-18:00, or leave it blank to send any time.');
+        }
+
+        $days = trim((string) $request->input('notify_overdue_days', ''));
+        if ($days !== '' && !preg_match('/^\d+(\s*,\s*\d+)*$/', $days)) {
+            $v->custom('notify_overdue_days', false, 'Enter day numbers separated by commas, e.g. 1,7,14');
+        }
+
+        if ($v->fails()) {
+            $v->redirectBack('/settings?tab=messaging');
+        }
+
+        $updates = [
+            'smtp_enabled'    => $emailOn ? '1' : '0',
+            'smtp_host'       => trim((string) $request->input('smtp_host', '')),
+            'smtp_port'       => $request->int('smtp_port', 587),
+            'smtp_encryption' => (string) $request->input('smtp_encryption', 'tls'),
+            'smtp_username'   => trim((string) $request->input('smtp_username', '')),
+            'smtp_from_email' => trim((string) $request->input('smtp_from_email', '')),
+            'smtp_from_name'  => trim((string) $request->input('smtp_from_name', '')),
+            'smtp_reply_to'   => trim((string) $request->input('smtp_reply_to', '')),
+
+            'sms_enabled'     => $smsOn ? '1' : '0',
+            'sms_username'    => trim((string) $request->input('sms_username', '')),
+            'sms_sender_id'   => trim((string) $request->input('sms_sender_id', '')),
+
+            'notify_overdue_days' => $days !== '' ? preg_replace('/\s+/', '', $days) : '1,7,14',
+            'notify_send_window'  => $window,
+            'notify_max_attempts' => max(1, min(10, $request->int('notify_max_attempts', 3))),
+
+            'email_footer_note' => (string) $request->input('email_footer_note', ''),
+        ];
+
+        // Blank secret fields mean "keep what is stored".
+        $smtpPassword = (string) $request->input('smtp_password', '');
+        if (trim($smtpPassword) !== '') {
+            $updates['smtp_password'] = $smtpPassword;
+        }
+
+        $smsKey = trim((string) $request->input('sms_api_key', ''));
+        if ($smsKey !== '') {
+            $updates['sms_api_key'] = $smsKey;
+        }
+
+        // Per-event channel toggles
+        foreach (array_keys(\App\Services\Notifier::EVENTS) as $event) {
+            $updates["notify_{$event}_email"] = $request->bool("notify_{$event}_email") ? '1' : '0';
+            $updates["notify_{$event}_sms"]   = $request->bool("notify_{$event}_sms") ? '1' : '0';
+        }
+
+        // Templates
+        foreach ($request->all() as $key => $value) {
+            if (str_starts_with((string) $key, 'tpl_') && is_string($value)) {
+                $updates[$key] = $value;
+            }
+        }
+
+        Settings::setMany($updates);
+        Settings::flush();
+
+        ActivityLog::record(
+            'settings_updated',
+            'settings',
+            null,
+            'Updated messaging settings (email ' . ($emailOn ? 'on' : 'off')
+            . ', SMS ' . ($smsOn ? 'on' : 'off') . ')'
+        );
+
+        Session::success('Messaging settings saved. Send yourself a test to confirm they work.');
+        Response::to('/settings?tab=messaging');
     }
 
     // -- Categories ----------------------------------------------------

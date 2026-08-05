@@ -40,6 +40,12 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
       <?= icon('printer') ?> Print / PDF
     </a>
 
+    <?php if (can('documents.manage') && ($messagingOn ?? false)): ?>
+      <button class="btn btn--navy" type="button" data-modal-open="send-modal">
+        <?= icon('send') ?> Send to client
+      </button>
+    <?php endif; ?>
+
     <?php if (can('documents.manage')): ?>
       <?php if ($isQuotation && !in_array($doc['status'], ['cancelled', 'rejected'], true)): ?>
         <form method="post" action="<?= url('/quotations/' . $doc['id'] . '/convert') ?>" style="display:inline"
@@ -89,8 +95,24 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
         <?php if ($doc['client_email']): ?>
           <a class="dropdown__item"
              href="mailto:<?= e($doc['client_email']) ?>?subject=<?= e($meta['label'] . ' ' . $doc['doc_number']) ?>">
-            <?= icon('mail') ?> Email client
+            <?= icon('mail') ?> Open in mail app
           </a>
+        <?php endif; ?>
+
+        <?php if (!empty($publicLink)): ?>
+          <a class="dropdown__item" href="<?= e($publicLink) ?>" target="_blank" rel="noopener">
+            <?= icon('external') ?> Open client's view
+          </a>
+        <?php endif; ?>
+
+        <?php if ($doc['sent_at']): ?>
+          <span class="dropdown__item" style="cursor:default">
+            <?= icon('check') ?>
+            <span class="text-xs">
+              Sent <?= e(time_ago($doc['sent_at'])) ?>
+              <?= $doc['viewed_at'] ? '· opened ' . e(time_ago($doc['viewed_at'])) : '· not opened yet' ?>
+            </span>
+          </span>
         <?php endif; ?>
 
         <?php if (can('documents.delete')): ?>
@@ -382,6 +404,31 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
       </div>
     <?php endif; ?>
 
+    <?php if (!empty($publicLink)): ?>
+      <div class="card">
+        <div class="card__head">
+          <?= icon('globe') ?>
+          <div>
+            <div class="card__title">Client link</div>
+            <div class="card__sub">Opens without a login</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <input class="input text-xs" value="<?= e($publicLink) ?>" readonly
+                 data-select-on-focus aria-label="Public document link">
+          <div class="text-xs text-muted mt-8">
+            <?php if ($doc['viewed_at']): ?>
+              <span class="text-green fw-600"><?= icon('check') ?> Opened <?= e(time_ago($doc['viewed_at'])) ?></span>
+            <?php elseif ($doc['sent_at']): ?>
+              Sent <?= e(time_ago($doc['sent_at'])) ?>, not opened yet.
+            <?php else: ?>
+              Not sent yet.
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+    <?php endif; ?>
+
     <?php if ($related): ?>
       <div class="card">
         <div class="card__head"><div class="card__title">Related documents</div></div>
@@ -406,3 +453,80 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
     <?php endif; ?>
   </aside>
 </div>
+
+<?php if (can('documents.manage') && ($messagingOn ?? false)): ?>
+<div class="modal-backdrop" id="send-modal">
+  <div class="modal">
+    <form method="post" action="<?= url('/documents/' . $doc['id'] . '/send') ?>">
+      <?= csrf_field() ?>
+      <div class="modal__head">
+        <div class="modal__title">Send <?= e($doc['doc_number']) ?> to <?= e($doc['client_name']) ?></div>
+        <button class="modal__close" type="button" data-modal-close aria-label="Close"><?= icon('x') ?></button>
+      </div>
+
+      <div class="modal__body">
+        <p class="text-sm text-muted mb-16">
+          The client receives the <?= e(strtolower($meta['label'])) ?> in the message body, plus a
+          link to view and print it — no login needed.
+        </p>
+
+        <div class="field mb-12">
+          <label class="check <?= $doc['client_email'] ? '' : 'text-muted' ?>">
+            <input type="checkbox" name="channels[]" value="email"
+                   <?= $doc['client_email'] && ($emailOn ?? false) ? 'checked' : 'disabled' ?>>
+            <span class="check__text">
+              <strong>Email</strong>
+              <span>
+                <?php if (!($emailOn ?? false)): ?>
+                  Email is switched off in Settings.
+                <?php elseif ($doc['client_email']): ?>
+                  <?= e($doc['client_email']) ?>
+                <?php else: ?>
+                  No email address on file for this client.
+                <?php endif; ?>
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="check <?= $doc['client_phone'] ? '' : 'text-muted' ?>">
+            <input type="checkbox" name="channels[]" value="sms"
+                   <?= $doc['client_phone'] && ($smsOn ?? false) ? '' : 'disabled' ?>>
+            <span class="check__text">
+              <strong>SMS</strong>
+              <span>
+                <?php if (!($smsOn ?? false)): ?>
+                  SMS is switched off in Settings.
+                <?php elseif ($doc['client_phone']): ?>
+                  <?= e($doc['client_phone']) ?> — uses SMS credit
+                <?php else: ?>
+                  No phone number on file for this client.
+                <?php endif; ?>
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <?php if (!$doc['client_email'] && !$doc['client_phone']): ?>
+          <div class="alert alert--warning mt-16 mb-0">
+            <?= icon('alert-triangle') ?>
+            <div class="alert__body">
+              This client has no contact details.
+              <a href="<?= url('/clients/' . $doc['client_id'] . '/edit') ?>">Add an email or phone number</a> first.
+            </div>
+          </div>
+        <?php endif; ?>
+      </div>
+
+      <div class="modal__foot">
+        <button class="btn btn--ghost" type="button" data-modal-close>Cancel</button>
+        <button class="btn btn--primary" type="submit"
+                <?= (!$doc['client_email'] && !$doc['client_phone']) ? 'disabled' : '' ?>>
+          <?= icon('send') ?> Send now
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<?php endif; ?>
