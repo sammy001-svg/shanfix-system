@@ -263,6 +263,9 @@ class Sms
             CURLOPT_CONNECTTIMEOUT => 12,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
+            // Without this cURL sends no User-Agent, which some edge
+            // protection answers with a bare 403.
+            CURLOPT_USERAGENT      => 'ShanfixBMS/1.0 (+PHP cURL)',
             CURLOPT_HTTPHEADER     => [
                 'Accept: application/json',
                 'Content-Type: application/json',
