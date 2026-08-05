@@ -190,6 +190,29 @@ If it fails, the exact server reply is shown, which is usually enough to diagnos
 > Send from an address on your own domain. Using a Gmail or Yahoo address as the
 > "from" while sending through your host's server gets messages marked as spam.
 
+#### Staying out of the spam folder
+
+Mail that is correctly formatted still lands in spam if the receiving server
+cannot verify that your host is allowed to send for your domain. That is DNS
+work, done once, in cPanel → *Zone Editor* (or *Email Deliverability*, which
+sets up the first two for you and flags anything missing):
+
+| Record | Why it matters |
+|---|---|
+| **SPF** | Lists the servers allowed to send for your domain. Without it, Gmail treats the mail as unverified. |
+| **DKIM** | Cryptographically signs each message. cPanel → *Email Deliverability* → **Install** generates the key and record. |
+| **DMARC** | Tells receivers what to do when SPF/DKIM fail. Start with `v=DMARC1; p=none; rua=mailto:you@yourdomain.co.ke`. |
+| **rDNS / PTR** | Your host's job. On shared cPanel it is normally already correct. |
+
+Then check the basics:
+
+- **From** must be on the domain those records cover — `invoices@yourdomain.co.ke`,
+  never a Gmail address.
+- Send yourself a test, open **Show original** in Gmail, and confirm SPF, DKIM
+  and DMARC all read `PASS`.
+- A brand-new domain has no sending reputation. Expect the first few days to be
+  shaky even with everything set correctly.
+
 ### SMS
 
 SMS goes through our own platform, [Shanfix Bulk SMS](https://sms.shanfixtechnology.com).
