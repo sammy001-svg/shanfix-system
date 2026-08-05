@@ -105,7 +105,9 @@ if ($hasConfig) {
         $dbDetail = 'config.php does not return a valid array with a db block.';
     } else {
         $db = $config['db'];
-        $appKey = !empty($config['security']['app_key']);
+        // Either source works — config.php wins, else the auto-generated file.
+        $appKey = !empty($config['security']['app_key'])
+               || is_file($base . '/storage/app.key');
 
         try {
             $pdo = new PDO(
@@ -132,7 +134,8 @@ check('Database connects', $dbOk, $dbDetail);
 check('Schema imported', $dbOk && $tables >= 20,
       $dbOk ? ($tables >= 20 ? '' : "Only {$tables} tables found. Import database/schema.sql, seed.sql, then run migrations.") : '');
 check('Encryption key set', $appKey,
-      $appKey ? '' : 'security.app_key is empty in config.php. Generate one: php -r "echo bin2hex(random_bytes(32));"', true);
+      $appKey ? '' : 'None yet — one is generated into storage/app.key the first time a secret is saved. '
+                   . 'Set security.app_key in config.php instead if you would rather pin it.', true);
 
 // ---------------------------------------------------------------------
 // Rewrite engine

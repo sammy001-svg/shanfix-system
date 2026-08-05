@@ -1,6 +1,9 @@
 # Holds the database password and the encryption key — never commit.
 /config/config.php
 
+# Auto-generated encryption key — losing it makes stored secrets unreadable.
+/storage/app.key
+
 # Runtime data
 /storage/logs/*
 !/storage/logs/.gitkeep

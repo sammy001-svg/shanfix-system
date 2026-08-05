@@ -38,7 +38,8 @@
         Fill in your cPanel MySQL database name, username and password.
       </li>
       <li>
-        Generate an application key and paste it into <code>security.app_key</code>:
+        <em>Optional.</em> Pin your own encryption key in <code>security.app_key</code> —
+        otherwise one is generated into <code>storage/app.key</code> when it is first needed:
         <pre>php -r "echo bin2hex(random_bytes(32));"</pre>
       </li>
       <li>

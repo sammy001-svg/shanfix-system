@@ -228,18 +228,6 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
 
 <?php elseif ($tab === 'payments'): ?>
 
-  <?php if (!$appKeySet): ?>
-    <div class="alert alert--warning">
-      <?= icon('alert-triangle') ?>
-      <div class="alert__body">
-        <strong>Set an application key first.</strong>
-        API secrets are encrypted before they are stored, which needs
-        <code>security.app_key</code> in <code>config/config.php</code>.
-        Generate one with <code>php -r "echo bin2hex(random_bytes(32));"</code>.
-      </div>
-    </div>
-  <?php endif; ?>
-
   <div class="alert alert--info">
     <?= icon('info') ?>
     <div class="alert__body">
@@ -422,17 +410,6 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
   </div>
 
 <?php elseif ($tab === 'messaging'): ?>
-
-  <?php if (!$appKeySet): ?>
-    <div class="alert alert--warning">
-      <?= icon('alert-triangle') ?>
-      <div class="alert__body">
-        <strong>Set an application key first.</strong>
-        Mail and SMS credentials are encrypted before storage, which needs
-        <code>security.app_key</code> in <code>config/config.php</code>.
-      </div>
-    </div>
-  <?php endif; ?>
 
   <form method="post" action="<?= url('/settings/messaging') ?>">
     <?= csrf_field() ?>

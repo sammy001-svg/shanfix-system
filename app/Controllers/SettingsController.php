@@ -50,7 +50,6 @@ class SettingsController extends Controller
             ],
             'events'         => \App\Services\Notifier::EVENTS,
             'defaultCallback' => rtrim((string) Config::get('app.url', ''), '/') . base_path() . '/webhooks/kopokopo',
-            'appKeySet'       => (string) Config::get('security.app_key', '') !== '',
         ]);
     }
 
@@ -161,12 +160,6 @@ class SettingsController extends Controller
             if (!$secretProvided)     { $v->custom('kopokopo_client_secret', false, 'Client Secret is required to enable KopoKopo.'); }
             if ($till === '')         { $v->custom('kopokopo_till_number', false, 'Till number is required to enable KopoKopo.'); }
             if (!$apiKeyProvided)     { $v->custom('kopokopo_api_key', false, 'The API key is required — it verifies webhook signatures.'); }
-
-            if ((string) Config::get('security.app_key', '') === '') {
-                $v->custom('kopokopo_client_secret', false,
-                    'Set security.app_key in config/config.php before storing API secrets. '
-                    . 'Generate one with: php -r "echo bin2hex(random_bytes(32));"');
-            }
 
             $callback = trim((string) $request->input('kopokopo_callback_url', ''));
             if ($callback !== '' && !str_starts_with($callback, 'https://')) {
@@ -309,11 +302,6 @@ class SettingsController extends Controller
         $smsBase = trim((string) $request->input('sms_base_url', ''));
         if ($smsBase !== '' && !str_starts_with($smsBase, 'https://')) {
             $v->custom('sms_base_url', false, 'The SMS portal address must start with https://');
-        }
-
-        if (($emailOn || $smsOn) && (string) Config::get('security.app_key', '') === '') {
-            $v->custom('smtp_password', false,
-                'Set security.app_key in config/config.php before storing mail or SMS credentials.');
         }
 
         $window = trim((string) $request->input('notify_send_window', ''));
