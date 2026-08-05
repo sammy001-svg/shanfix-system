@@ -42,7 +42,9 @@ INSERT INTO settings (setting_key, setting_value) VALUES
   ('invoice_due_days',    '14'),
   ('quotation_terms',     'Quotation valid for 30 days from date of issue. 60% deposit required to commence work. Prices are subject to change without prior notice.'),
   ('invoice_terms',       'Payment due within 14 days. Pay via M-Pesa Till or bank transfer using the invoice number as reference. Goods remain the property of Shanfix Technology until paid in full.'),
-  ('bank_details',        'Bank: — | Account Name: Shanfix Technology | Account No: — | Branch: —'),
+  -- Left blank on purpose: a half-filled "Account No: —" must never reach a
+  -- client. Fill this in under Settings > Documents before invoicing.
+  ('bank_details',        ''),
   ('mpesa_till',          ''),
   -- KopoKopo (fill these in from your KopoKopo dashboard)
   ('kopokopo_enabled',     '0'),

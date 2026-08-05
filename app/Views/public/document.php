@@ -214,12 +214,21 @@ $label = ucfirst($type);
   <?php endif; ?>
 
   <?php if ($isInvoice && $balance > 0.009): ?>
+    <?php
+      // Built as a list rather than inline markup: PHP eats the newline that
+      // follows a closing tag, which silently ran these lines together.
+      $payLines = [];
+      if (setting('mpesa_till')) {
+          $payLines[] = 'M-Pesa Buy Goods Till: ' . setting('mpesa_till');
+      }
+      if (setting('bank_details')) {
+          $payLines[] = (string) setting('bank_details');
+      }
+      $payLines[] = 'Please quote ' . $doc['doc_number'] . ' as your payment reference.';
+    ?>
     <section class="doc-section">
       <div class="doc-section__label">How to pay</div>
-      <div class="doc-section__body">
-<?php if (setting('mpesa_till')): ?>M-Pesa Buy Goods Till: <?= e(setting('mpesa_till')) ?>
-<?php endif; ?><?php if (setting('bank_details')): ?><?= e(setting('bank_details')) ?>
-<?php endif; ?>Please quote <strong><?= e($doc['doc_number']) ?></strong> as your payment reference.</div>
+      <div class="doc-section__body"><?= e(implode("\n", $payLines)) ?></div>
     </section>
   <?php endif; ?>
 
