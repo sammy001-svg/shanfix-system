@@ -186,8 +186,8 @@ $logoPath = $company['logo'] ? url('storage/' . $company['logo']) : null;
 
   <?php if ($isInvoice && !$isReceipt): ?>
     <?php
-      // See the note in public/document.php — PHP strips the newline after ?>,
-      // so these lines are assembled explicitly.
+      // Assembled as a list rather than inline markup: PHP swallows the newline
+      // that follows a closing tag, which silently ran these lines together.
       $payLines = [];
       if (setting('mpesa_till')) {
           $payLines[] = 'M-Pesa Buy Goods Till: ' . setting('mpesa_till');

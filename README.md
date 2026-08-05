@@ -16,6 +16,8 @@ cPanel by uploading files.
 | **Quotations → Invoices → Receipts** | One document engine. Convert a quote to an invoice in a click, issue a receipt once paid. A4 print/PDF view with your logo |
 | **Production** | Job cards from an invoice in one click. Board across Queued → Artwork → Proof Sent → Approved → In Production → Finishing → Ready → Delivered. Artwork/proof uploads with versioning, recorded client approval, shop-floor checklist, printable job card, per-job costing |
 | **Delivery Notes** | Raised from a job card, printed with a signature line. Confirming receipt closes the job automatically |
+| **Email & SMS** | Send quotations and invoices to clients, payment confirmations, automatic overdue chasing, and "your order is ready" texts. Every send is logged with its delivery status |
+| **Client links** | Each document gets an unguessable link the client can open with no login, print, or save as PDF. You can see when they first opened it |
 | **Inventory** | Stock items, cost vs selling price, margin, stock movement ledger, reorder alerts |
 | **Services** | Rate card for web development, custom software, design, branding, marketing — fixed, hourly, monthly or quoted-per-project |
 | **Payments** | M-Pesa STK Push via KopoKopo, plus manual bank/cash/cheque entry, reversals |
@@ -168,6 +170,57 @@ check these:
 
 ---
 
+## Email &amp; SMS setup
+
+### Email
+
+**Settings → Email &amp; SMS**. Use a mailbox you create in cPanel → *Email Accounts*:
+
+| Field | Typical cPanel value |
+|---|---|
+| SMTP host | `mail.yourdomain.co.ke` |
+| Port | `587` with STARTTLS, or `465` with SSL |
+| Username | the **full** email address |
+| Password | that mailbox's password |
+| Send from | the same address |
+
+Press **Send test email** — it connects, authenticates and delivers a real message.
+If it fails, the exact server reply is shown, which is usually enough to diagnose it.
+
+> Send from an address on your own domain. Using a Gmail or Yahoo address as the
+> "from" while sending through your host's server gets messages marked as spam.
+
+### SMS
+
+Sign up at [africastalking.com](https://africastalking.com), then take the username
+and API key from the dashboard. Enter `sandbox` as the username to test without
+spending credit.
+
+SMS is billed per 160 characters — the settings page shows the length and credit
+count for each template as you edit it.
+
+### Scheduled sending
+
+Messages send immediately when you press a button. Overdue reminders and retries
+need a cron job — cPanel → *Cron Jobs*, every 5 minutes:
+
+```
+/usr/local/bin/php /home/YOURUSER/shanfix/cron.php >/dev/null 2>&1
+```
+
+Run `php cron.php --verbose` by hand to watch what it does.
+
+### What clients receive
+
+An email containing the document itself — line items, totals, how to pay — plus a
+button linking to a page they can open with no login and save as PDF. Nothing else
+from your system is reachable from that link.
+
+Every attempt is recorded under **Messages**, with the failure reason if it did not
+arrive, and a retry button.
+
+---
+
 ## Roles
 
 | Role | Access |
@@ -276,9 +329,21 @@ in the database.
 
 - **PDFs** are produced through the browser's print dialog ("Save as PDF") from the A4 print
   view. No PDF library is bundled, which keeps the system Composer-free.
-- **Email sending** is not wired up. Quotations and invoices are printed or shared as PDFs;
-  the "Email client" links open your mail client with the subject prefilled.
+- **Emails carry the document in the body, not as a PDF attachment.** Since no PDF library is
+  bundled, the client gets a fully formatted invoice in the email plus a link to view and save
+  it as PDF themselves. This renders correctly in Gmail, Outlook and Apple Mail, and avoids the
+  spam filtering that attachments often attract.
 - **Chat** uses AJAX polling every few seconds, not websockets — shared cPanel hosting cannot
   hold long-lived socket connections.
 - **STK Push cannot be tested locally.** It needs a public HTTPS callback URL, so test it on
   the deployed site.
+
+### Known gaps, not yet built
+
+Two things worth knowing before you rely on the figures:
+
+- **Stock is not decremented automatically.** Invoicing 50 branded t-shirts does not reduce
+  inventory — the ledger only moves when someone adjusts it by hand. Stock levels, low-stock
+  alerts and the stock valuation will drift from reality until this is added.
+- **No recurring billing.** The monthly retainer services in the catalogue have to be invoiced
+  manually every month.

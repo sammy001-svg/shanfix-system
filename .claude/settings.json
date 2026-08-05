@@ -19,7 +19,8 @@
       "Bash(mkdir -p shots)",
       "Bash(php migrate.php --status)",
       "Bash(php migrate.php)",
-      "Bash(bash /c/PROGRA~1/KMSpico/temp/claude/c--Shanfix-System/2d91c0a0-40fb-4767-b95f-1d5fbb19a53d/scratchpad/jobs_test.sh)"
+      "Bash(bash /c/PROGRA~1/KMSpico/temp/claude/c--Shanfix-System/2d91c0a0-40fb-4767-b95f-1d5fbb19a53d/scratchpad/jobs_test.sh)",
+      "WebFetch(domain:system.shanfixtechnology.com)"
     ],
     "additionalDirectories": [
       "C:\\Shanfix System\\storage\\logs"
