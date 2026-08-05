@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mysql --version)",
+      "Bash(/c/xampp/mysql/bin/mysql.exe -u root -e \"DROP DATABASE IF EXISTS shanfix_test; CREATE DATABASE shanfix_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\")",
+      "Bash(/c/xampp/mysql/bin/mysql.exe -u root shanfix_test)",
+      "Bash(/c/xampp/mysql/bin/mysql.exe -u root shanfix_test -N -e \"SELECT CONCAT\\(COUNT\\(*\\),' users, '\\) FROM users; SELECT CONCAT\\(COUNT\\(*\\),' categories'\\) FROM categories;\")",
+      "Bash(taskkill //F //IM php.exe)",
+      "Bash(cd \"c:/Shanfix System\" && rm -f storage/logs/*.log && touch storage/logs/.gitkeep && echo \"logs cleared\" && echo \"\" && echo \"=== Deliverable ===\" && ls -1 && echo \"\" && echo \"app/Controllers:\" && ls -1 app/Controllers && echo \"\" && echo \"app/Services:\" && ls -1 app/Services)",
+      "Bash(sc query *)",
+      "Bash(/c/xampp/mysql/bin/mysql.exe -u root -e \"SELECT COUNT\\(*\\) AS shanfix_tables FROM information_schema.tables WHERE table_schema='shanfix_test';\")",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application/**)",
+      "Bash(npx playwright *)",
+      "Read(//c/PROGRA~1/KMSpico/temp/claude/c--Shanfix-System/2d91c0a0-40fb-4767-b95f-1d5fbb19a53d/scratchpad/**)",
+      "Bash(rm -rf node_modules)",
+      "Bash(cmd //c \"rmdir node_modules\")",
+      "Bash(export NODE_PATH='C:\\\\Users\\\\Shanfix\\\\AppData\\\\Local\\\\npm-cache\\\\_npx\\\\e41f203b7505f1fb\\\\node_modules')",
+      "Bash(mkdir -p shots)",
+      "Bash(php migrate.php --status)",
+      "Bash(php migrate.php)",
+      "Bash(bash /c/PROGRA~1/KMSpico/temp/claude/c--Shanfix-System/2d91c0a0-40fb-4767-b95f-1d5fbb19a53d/scratchpad/jobs_test.sh)"
+    ],
+    "additionalDirectories": [
+      "C:\\Shanfix System\\storage\\logs"
+    ]
+  }
+}

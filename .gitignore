@@ -1,0 +1,19 @@
+# Holds the database password and the encryption key — never commit.
+/config/config.php
+
+# Runtime data
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/uploads/*
+!/storage/uploads/.gitkeep
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Local dumps
+*.sql.gz
+*.bak
