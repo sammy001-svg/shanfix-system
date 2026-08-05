@@ -19,14 +19,21 @@ $muted = '#5A6B7D';
 $line  = '#DDE4EC';
 $bg    = '#F3F6F9';
 
-$doc   = $context['document'] ?? null;
-$job   = $context['job'] ?? null;
-$link  = $context['link'] ?? '';
+$doc      = $context['document'] ?? null;
+$job      = $context['job'] ?? null;
+$delivery = $context['delivery'] ?? null;
+$link     = $context['link'] ?? '';
 
-$isOverdue = $event === 'invoice_overdue';
-$isPaid    = $event === 'payment_received';
+$isOverdue = in_array($event, ['invoice_overdue', 'payment_reminder', 'quotation_expiring'], true);
+$isPaid    = in_array($event, ['payment_received', 'receipt_issued'], true);
+$isPartial = $event === 'payment_partial';
 
-$accent = $isOverdue ? '#A62A20' : ($isPaid ? $green : $navy);
+$accent = match (true) {
+    $event === 'invoice_overdue'  => '#A62A20',
+    $isOverdue                    => '#B87503',   // a nudge, not a warning
+    $isPaid, $isPartial           => $green,
+    default                       => $navy,
+};
 
 $items = [];
 if ($doc && !empty($doc['id'])) {
@@ -108,17 +115,33 @@ if ($doc && !empty($doc['id'])) {
           <?= nl2br(e($intro)) ?>
         </p>
 
-        <?php if ($isPaid): ?>
+        <?php if ($isPaid || $isPartial): ?>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                  style="background:#EDF8F2;border:1px solid #D5EFE0;border-radius:6px;margin-bottom:20px">
           <tr>
             <td style="padding:14px 16px;text-align:center">
               <div style="font-size:12px;color:#0B5730;text-transform:uppercase;letter-spacing:1px">Amount received</div>
               <div style="font-size:26px;font-weight:bold;color:<?= $green ?>;padding-top:4px">
-                <?= e($context['amount'] ?? '') ?>
+                <?= e($context['paid_now'] ?? ($context['amount'] ?? '')) ?>
+              </div>
+              <?php if (!empty($context['payment_ref'])): ?>
+                <div style="font-size:12px;color:<?= $muted ?>;padding-top:6px">
+                  <?= e($context['method'] ?? 'Payment') ?> reference
+                  <strong style="color:<?= $ink ?>"><?= e($context['payment_ref']) ?></strong>
+                </div>
+              <?php endif; ?>
+            </td>
+          </tr>
+          <?php if ($isPartial): ?>
+          <tr>
+            <td style="padding:0 16px 14px;text-align:center">
+              <div style="border-top:1px solid #D5EFE0;padding-top:10px;font-size:13px;color:<?= $muted ?>">
+                Balance still outstanding:
+                <strong style="color:#A62A20;font-size:15px"><?= e($context['balance'] ?? '') ?></strong>
               </div>
             </td>
           </tr>
+          <?php endif; ?>
           </table>
         <?php endif; ?>
 
@@ -227,20 +250,49 @@ if ($doc && !empty($doc['id'])) {
           <?php endif; ?>
         <?php endif; ?>
 
-        <?php if ($job): ?>
+        <?php
+        /**
+         * Detail rows for a job or a delivery. Built as a list first so the
+         * markup stays one table however many fields are actually present —
+         * an empty row in an email reads as a mistake.
+         */
+        $rows = [];
+
+        if ($job) {
+            $rows['Order number'] = $context['job_number'] ?? '';
+            $rows['Description']  = $context['job_title'] ?? '';
+            $rows['Stage']        = $context['job_stage'] ?? '';
+            $rows['Expected by']  = $context['due_date'] ?? '';
+            $rows['Invoice']      = $context['doc_number'] ?? '';
+        } elseif ($delivery) {
+            $rows['Delivery note'] = $context['dn_number'] ?? '';
+            $rows['Order number']  = $context['job_number'] ?? '';
+            $rows['Item']          = $context['job_title'] ?? '';
+            $rows['Delivery date'] = $context['delivery_date'] ?? '';
+            $rows['Deliver to']    = $context['delivered_to'] ?? '';
+            $rows['Address']       = $context['delivery_address'] ?? '';
+            $rows['Brought by']    = $context['delivered_by'] ?? '';
+            $rows['Vehicle']       = $context['vehicle_reg'] ?? '';
+            $rows['Received by']   = $context['received_by'] ?? '';
+        }
+
+        $rows = array_filter($rows, static fn($v): bool => trim((string) $v) !== '');
+        ?>
+
+        <?php if ($rows !== []): ?>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                  style="border:1px solid <?= $line ?>;border-radius:6px;margin-bottom:20px">
           <tr>
             <td style="padding:14px 16px;font-size:13px">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <?php $first = true; foreach ($rows as $label => $value): ?>
                 <tr>
-                  <td style="color:<?= $muted ?>;padding:3px 0">Order number</td>
-                  <td align="right" style="font-weight:bold;padding:3px 0"><?= e($context['job_number']) ?></td>
+                  <td style="color:<?= $muted ?>;padding:3px 0;vertical-align:top"><?= e($label) ?></td>
+                  <td align="right" style="padding:3px 0;<?= $first ? 'font-weight:bold' : '' ?>">
+                    <?= e($value) ?>
+                  </td>
                 </tr>
-                <tr>
-                  <td style="color:<?= $muted ?>;padding:3px 0">Description</td>
-                  <td align="right" style="padding:3px 0"><?= e($context['job_title']) ?></td>
-                </tr>
+                <?php $first = false; endforeach; ?>
               </table>
             </td>
           </tr>

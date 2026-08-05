@@ -12,6 +12,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
+use App\Services\Notifier;
 
 /**
  * Production job cards — the shop-floor workflow between "invoice raised"
@@ -551,6 +552,28 @@ class JobController extends Controller
 
         if ($stage === 'ready') {
             $message .= ' Raise a delivery note when it goes out.';
+        }
+
+        // Tell the client, on the stages they actually care about. These
+        // respect the per-event switches in Settings, so an operator who
+        // does not want a text on every stage can turn them off.
+        $clientEvent = match ($stage) {
+            'proof_sent'  => 'proof_ready',
+            'production'  => 'job_in_production',
+            'ready'       => 'job_ready',
+            default       => null,
+        };
+
+        if ($clientEvent !== null) {
+            // $job is the row as it was before the move, so tell the context
+            // about the stage we have just landed on.
+            $context = Notifier::jobContext(['stage' => $stage] + $job);
+            $queued  = Notifier::dispatch($clientEvent, $context)['queued'];
+
+            if ($queued > 0) {
+                Notifier::processQueue(10);
+                $message .= ' The client has been notified.';
+            }
         }
 
         Session::success($message);

@@ -12,6 +12,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
+use App\Services\Notifier;
 
 /**
  * Delivery notes — the signed proof that the client received the goods.
@@ -218,11 +219,31 @@ class DeliveryNoteController extends Controller
 
         ActivityLog::record('delivery_note_updated', 'delivery_note', (int) $note['id'], $note['dn_number'] . ' set to ' . $status);
 
-        Session::success(
-            $status === 'delivered'
-                ? 'Delivery confirmed. The job card has been closed.'
-                : 'Delivery note updated.'
-        );
+        $message = $status === 'delivered'
+            ? 'Delivery confirmed. The job card has been closed.'
+            : 'Delivery note updated.';
+
+        // Only on a real transition — re-saving a dispatched note should not
+        // text the client the same thing twice.
+        if ($status !== $note['status']) {
+            $clientEvent = match ($status) {
+                'dispatched' => 'delivery_dispatched',
+                'delivered'  => 'delivery_confirmed',
+                default      => null,
+            };
+
+            if ($clientEvent !== null) {
+                $context = Notifier::deliveryContext(array_merge($note, $data));
+                $queued  = Notifier::dispatch($clientEvent, $context)['queued'];
+
+                if ($queued > 0) {
+                    Notifier::processQueue(10);
+                    $message .= ' The client has been notified.';
+                }
+            }
+        }
+
+        Session::success($message);
 
         Response::to('/delivery-notes/' . $note['id']);
     }
@@ -265,7 +286,7 @@ class DeliveryNoteController extends Controller
     {
         $note = Database::first(
             'SELECT dn.*, c.name AS client_name, c.phone AS client_phone, c.email AS client_email,
-                    c.kra_pin AS client_kra_pin,
+                    c.kra_pin AS client_kra_pin, c.contact_person AS client_contact,
                     j.job_number, j.title AS job_title, d.doc_number,
                     u.name AS created_by_name
                FROM delivery_notes dn

@@ -314,6 +314,18 @@ class SettingsController extends Controller
             $v->custom('notify_overdue_days', false, 'Enter day numbers separated by commas, e.g. 1,7,14');
         }
 
+        // The two look-ahead windows take the same comma-separated form.
+        $lookAhead = [];
+        foreach (['notify_due_days', 'notify_expiry_days'] as $field) {
+            $value = trim((string) $request->input($field, ''));
+
+            if ($value !== '' && !preg_match('/^\d+(\s*,\s*\d+)*$/', $value)) {
+                $v->custom($field, false, 'Enter day numbers separated by commas, e.g. 3,1');
+            }
+
+            $lookAhead[$field] = $value === '' ? '' : preg_replace('/\s+/', '', $value);
+        }
+
         if ($v->fails()) {
             $v->redirectBack('/settings?tab=messaging');
         }
@@ -335,6 +347,8 @@ class SettingsController extends Controller
             'sms_base_url'    => $smsBase !== '' ? rtrim($smsBase, '/') : \App\Services\Sms::DEFAULT_BASE_URL,
 
             'notify_overdue_days' => $days !== '' ? preg_replace('/\s+/', '', $days) : '1,7,14',
+            'notify_due_days'     => $lookAhead['notify_due_days'],
+            'notify_expiry_days'  => $lookAhead['notify_expiry_days'],
             'notify_send_window'  => $window,
             'notify_max_attempts' => max(1, min(10, $request->int('notify_max_attempts', 3))),
 

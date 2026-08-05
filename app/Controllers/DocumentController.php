@@ -13,6 +13,7 @@ use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
 use App\Services\DocumentCalculator;
+use App\Services\Notifier;
 
 /**
  * Drives quotations, invoices and receipts from one table.
@@ -386,7 +387,19 @@ class DocumentController extends Controller
             $doc['doc_number'] . ': ' . $doc['status'] . ' → ' . $status
         );
 
-        Session::success($doc['doc_number'] . ' marked as ' . label_of($status) . '.');
+        $message = $doc['doc_number'] . ' marked as ' . label_of($status) . '.';
+
+        // Confirm to the client that we are proceeding on their quotation.
+        if ($type === 'quotation' && $status === 'accepted' && $doc['status'] !== 'accepted') {
+            $context = Notifier::documentContext(array_merge($doc, ['status' => $status]));
+
+            if (Notifier::dispatch('quotation_accepted', $context)['queued'] > 0) {
+                Notifier::processQueue(10);
+                $message .= ' The client has been sent a confirmation.';
+            }
+        }
+
+        Session::success($message);
         Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
     }
 
@@ -550,7 +563,29 @@ class DocumentController extends Controller
         });
 
         ActivityLog::record('receipt_generated', 'document', $receiptId, 'Receipt issued for ' . $invoice['doc_number']);
-        Session::success('Receipt issued.');
+
+        $message = 'Receipt issued.';
+
+        // Send the client their receipt, with a link they can open and print.
+        $receipt = Database::first(
+            'SELECT d.*, c.name AS client_name, c.email AS client_email,
+                    c.phone AS client_phone, c.contact_person AS client_contact
+               FROM documents d JOIN clients c ON c.id = d.client_id
+              WHERE d.id = :id',
+            ['id' => $receiptId]
+        );
+
+        if ($receipt) {
+            $context = Notifier::documentContext($receipt);
+            $context['paid_for'] = $invoice['doc_number'];
+
+            if (Notifier::dispatch('receipt_issued', $context)['queued'] > 0) {
+                Notifier::processQueue(10);
+                $message .= ' The client has been sent a copy.';
+            }
+        }
+
+        Session::success($message);
         Response::to('/receipts/' . $receiptId);
     }
 

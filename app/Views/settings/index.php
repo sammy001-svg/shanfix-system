@@ -625,6 +625,24 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           </div>
 
           <div class="field">
+            <label class="label" for="notify_due_days">Remind before an invoice is due</label>
+            <input class="input <?= isset($errors['notify_due_days']) ? 'has-error' : '' ?>"
+                   id="notify_due_days" name="notify_due_days"
+                   value="<?= e(setting('notify_due_days', '3')) ?>">
+            <span class="field-hint">Days before the due date. Blank turns the early reminder off.</span>
+            <?= error_for($errors ?? [], 'notify_due_days') ?>
+          </div>
+
+          <div class="field">
+            <label class="label" for="notify_expiry_days">Chase a quotation before it expires</label>
+            <input class="input <?= isset($errors['notify_expiry_days']) ? 'has-error' : '' ?>"
+                   id="notify_expiry_days" name="notify_expiry_days"
+                   value="<?= e(setting('notify_expiry_days', '3')) ?>">
+            <span class="field-hint">Days before it lapses. Only quotations still awaiting an answer.</span>
+            <?= error_for($errors ?? [], 'notify_expiry_days') ?>
+          </div>
+
+          <div class="field">
             <label class="label" for="notify_send_window">Only send between</label>
             <input class="input <?= isset($errors['notify_send_window']) ? 'has-error' : '' ?>"
                    id="notify_send_window" name="notify_send_window"
@@ -649,21 +667,24 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
         <div>
           <div class="card__title">Message templates</div>
           <div class="card__sub">
-            Placeholders: <code>{client_name}</code> <code>{contact_name}</code> <code>{company_name}</code>
-            <code>{doc_number}</code> <code>{amount}</code> <code>{balance}</code> <code>{due_date}</code>
-            <code>{valid_until}</code> <code>{link}</code> <code>{job_number}</code> <code>{job_title}</code>
+            <strong>Everyone:</strong> <code>{client_name}</code> <code>{contact_name}</code>
+            <code>{company_name}</code> <code>{company_phone}</code> <code>{link}</code><br>
+            <strong>Documents:</strong> <code>{doc_number}</code> <code>{doc_type}</code> <code>{title}</code>
+            <code>{amount}</code> <code>{subtotal}</code> <code>{vat}</code> <code>{paid}</code>
+            <code>{balance}</code> <code>{issue_date}</code> <code>{due_date}</code> <code>{valid_until}</code>
+            <code>{days_overdue}</code> <code>{days_to_due}</code> <code>{days_to_expiry}</code><br>
+            <strong>Payments:</strong> <code>{paid_now}</code> <code>{payment_ref}</code> <code>{method}</code>
+            <code>{paid_for}</code><br>
+            <strong>Jobs:</strong> <code>{job_number}</code> <code>{job_title}</code> <code>{job_stage}</code><br>
+            <strong>Deliveries:</strong> <code>{dn_number}</code> <code>{delivery_date}</code>
+            <code>{delivered_to}</code> <code>{delivery_address}</code> <code>{delivered_by}</code>
+            <code>{vehicle_reg}</code> <code>{received_by}</code>
           </div>
         </div>
       </div>
       <div class="card__body">
         <div class="text-xs uppercase fw-700 text-muted mb-12">Email</div>
-        <?php foreach ([
-            'quotation_sent'   => 'Quotation sent',
-            'invoice_sent'     => 'Invoice sent',
-            'payment_received' => 'Payment received',
-            'invoice_overdue'  => 'Overdue reminder',
-            'job_ready'        => 'Job ready for collection',
-        ] as $key => $label): ?>
+        <?php foreach ($events as $key => $label): ?>
           <div class="form-grid form-grid--2 mb-16">
             <div class="field">
               <label class="label" for="tpl_<?= e($key) ?>_subject"><?= e($label) ?> — subject</label>
@@ -684,12 +705,7 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           SMS <span class="text-muted" style="font-weight:400;text-transform:none">— keep under 160 characters to stay at one credit</span>
         </div>
         <div class="form-grid form-grid--2">
-          <?php foreach ([
-              'invoice_sent'     => 'Invoice sent',
-              'payment_received' => 'Payment received',
-              'invoice_overdue'  => 'Overdue reminder',
-              'job_ready'        => 'Job ready',
-          ] as $key => $label): ?>
+          <?php foreach ($events as $key => $label): ?>
             <?php $tpl = (string) setting("tpl_sms_{$key}", ''); ?>
             <div class="field">
               <label class="label" for="tpl_sms_<?= e($key) ?>">

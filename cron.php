@@ -99,14 +99,20 @@ try {
     }
 
     // -----------------------------------------------------------------
-    // 3. Queue overdue reminders — respecting the sending window so a
+    // 3. Queue the date-based chases — respecting the sending window so a
     //    client is never texted at 3am.
     // -----------------------------------------------------------------
     if (withinSendWindow()) {
-        $reminders = Notifier::queueOverdueReminders();
+        foreach ([
+            'overdue reminder'   => [Notifier::class, 'queueOverdueReminders'],
+            'due reminder'       => [Notifier::class, 'queueDueReminders'],
+            'expiring quotation' => [Notifier::class, 'queueExpiringQuotations'],
+        ] as $label => $chaser) {
+            $result = $chaser();
 
-        if ($reminders['queued'] > 0) {
-            say("Queued {$reminders['queued']} overdue reminder(s)");
+            if ($result['queued'] > 0) {
+                say("Queued {$result['queued']} {$label}(s)");
+            }
         }
     } else {
         say('Outside the sending window — reminders held back');

@@ -49,6 +49,10 @@ $r->post('/webhooks/kopokopo', [PaymentController::class, 'kopokopoCallback']);
 // Client-facing document view. No login: the 48-char token is the credential.
 $r->get('/view/{token}', [PublicDocumentController::class, 'show']);
 
+// The same page on a short URL, for SMS. The full link costs 79 of the 160
+// characters in a text, which turns routine messages into two billable parts.
+$r->get('/v/{token}', [PublicDocumentController::class, 'show']);
+
 // The company logo, served without a login.
 //
 // Everything else under /files needs a session, but a client opening their
