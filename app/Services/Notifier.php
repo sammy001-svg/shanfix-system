@@ -402,6 +402,46 @@ class Notifier
         return (string) $days;
     }
 
+    /**
+     * The newest proof still awaiting a decision on this job, with a share
+     * token minted if it does not have one yet.
+     *
+     * Returns null when there is nothing pending — a proof_ready message
+     * with no proof behind it would only confuse the client.
+     *
+     * @return array{id:int, token:string, link:string, short_link:string}|null
+     */
+    public static function pendingProof(int $jobId): ?array
+    {
+        $proof = Database::first(
+            "SELECT id, public_token, version
+               FROM job_files
+              WHERE job_id = :id AND file_type = 'proof' AND status = 'pending'
+           ORDER BY version DESC, id DESC
+              LIMIT 1",
+            ['id' => $jobId]
+        );
+
+        if (!$proof) {
+            return null;
+        }
+
+        $token = (string) ($proof['public_token'] ?? '');
+
+        if ($token === '') {
+            $token = bin2hex(random_bytes(24));   // 48 hex chars
+            Database::update('job_files', ['public_token' => $token], ['id' => $proof['id']]);
+        }
+
+        return [
+            'id'         => (int) $proof['id'],
+            'version'    => (int) $proof['version'],
+            'token'      => $token,
+            'link'       => self::absoluteUrl('/proof/' . $token),
+            'short_link' => self::absoluteUrl('/p/' . substr($token, 0, self::SHORT_TOKEN_LENGTH)),
+        ];
+    }
+
     /** Mint a share token the first time a document needs a public link. */
     public static function ensureToken(int $documentId, ?string $existing = null): string
     {

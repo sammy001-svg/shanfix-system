@@ -249,14 +249,41 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
                       <span class="badge <?= status_badge($f['status']) ?>"><?= e(label_of($f['status'])) ?></span>
                       <?php if ($f['approved_at']): ?>
                         <div class="text-xs text-muted mt-4">
-                          <?= e($f['approved_by_name'] ?: '') ?><br><?= e(fdate($f['approved_at'], 'd M H:i')) ?>
+                          <?= ($f['decided_via'] ?? '') === 'client'
+                                ? 'by the client online'
+                                : e($f['approved_by_name'] ?: '') ?><br>
+                          <?= e(fdate($f['approved_at'], 'd M H:i')) ?>
+                        </div>
+                      <?php elseif ($f['file_type'] === 'proof' && !empty($f['viewed_at'])): ?>
+                        <div class="text-xs text-muted mt-4">
+                          Opened <?= e(time_ago($f['viewed_at'])) ?>
                         </div>
                       <?php endif; ?>
                     </div>
                   </div>
 
                   <?php if ($f['file_type'] === 'proof' && $f['status'] === 'pending' && can('jobs.manage') && !$isClosed): ?>
+                    <?php if (!empty($f['public_token'])): ?>
+                      <?php $proofLink = \App\Services\Notifier::absoluteUrl('/proof/' . $f['public_token']); ?>
+                      <div class="mt-12" style="border-top:1px solid var(--border);padding-top:12px">
+                        <div class="text-xs uppercase fw-700 text-muted mb-4">Client approval link</div>
+                        <div class="flex gap-8 items-center flex-wrap">
+                          <input class="input flex-1" style="min-width:220px;font-size:12.5px"
+                                 value="<?= e($proofLink) ?>" readonly
+                                 onfocus="this.select()">
+                          <a class="btn btn--outline btn--sm" href="<?= e($proofLink) ?>"
+                             target="_blank" rel="noopener">Preview</a>
+                        </div>
+                        <span class="field-hint">
+                          Sent with the proof notification. Anyone with this link can approve — share it only with the client.
+                        </span>
+                      </div>
+                    <?php endif; ?>
+
                     <div class="flex gap-8 mt-12 flex-wrap" style="border-top:1px solid var(--border);padding-top:12px">
+                      <div class="text-xs text-muted" style="width:100%">
+                        Record the decision here if the client tells you by phone or in person:
+                      </div>
                       <form method="post" action="<?= url('/jobs/files/' . $f['id'] . '/decide') ?>" style="display:inline">
                         <?= csrf_field() ?>
                         <input type="hidden" name="decision" value="approved">

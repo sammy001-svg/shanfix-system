@@ -25,6 +25,7 @@ use App\Controllers\LeadController;
 use App\Controllers\NotificationController;
 use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
+use App\Controllers\PublicProofController;
 use App\Controllers\ReminderController;
 use App\Controllers\ReportController;
 use App\Controllers\ServiceController;
@@ -52,6 +53,16 @@ $r->get('/view/{token}', [PublicDocumentController::class, 'show']);
 // The same page on a short URL, for SMS. The full link costs 79 of the 160
 // characters in a text, which turns routine messages into two billable parts.
 $r->get('/v/{token}', [PublicDocumentController::class, 'show']);
+
+// Client-facing proof approval. Also no login — the token is the credential.
+// The client sees the artwork and approves it or asks for changes, which
+// moves the job exactly as a staff-recorded decision does.
+$r->get('/proof/{token}',          [PublicProofController::class, 'show']);
+$r->get('/proof/{token}/file',     [PublicProofController::class, 'file']);
+$r->post('/proof/{token}/decide',  [PublicProofController::class, 'decide'], ['csrf']);
+
+// Short form for SMS.
+$r->get('/p/{token}', [PublicProofController::class, 'show']);
 
 // The company logo, served without a login.
 //

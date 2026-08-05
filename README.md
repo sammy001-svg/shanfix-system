@@ -248,8 +248,29 @@ An email containing the document itself — line items, totals, how to pay — p
 button linking to a page they can open with no login and save as PDF. Nothing else
 from your system is reachable from that link.
 
+SMS carries a short version of the same link (`/v/…` rather than `/view/…`), which
+keeps routine texts inside one 160-character credit instead of two.
+
 Every attempt is recorded under **Messages**, with the failure reason if it did not
 arrive, and a retry button.
+
+### Proof approval
+
+Moving a job to **Proof sent** emails and texts the client a link to the proof
+itself. They open it with no login, check it, and either **Approve** or **Request
+changes** with a note saying what to fix:
+
+- Approving moves the job to *Approved* and clears it for production.
+- Requesting changes sends it back to *Artwork* with their comments attached to
+  the proof, ready for the designer.
+
+Either way the decision is on record, and the job card shows whether it came from
+the client online or was entered by a member of staff. The link is also shown on
+the job card so you can resend it by WhatsApp — treat it as confidential, since
+anyone holding it can approve the proof.
+
+If no proof is waiting for approval, moving the job to *Proof sent* will say so
+rather than asking the client to approve something that does not exist.
 
 ---
 

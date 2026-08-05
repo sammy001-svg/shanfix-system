@@ -568,7 +568,26 @@ class JobController extends Controller
             // $job is the row as it was before the move, so tell the context
             // about the stage we have just landed on.
             $context = Notifier::jobContext(['stage' => $stage] + $job);
-            $queued  = Notifier::dispatch($clientEvent, $context)['queued'];
+
+            if ($clientEvent === 'proof_ready') {
+                $proof = Notifier::pendingProof((int) $job['id']);
+
+                // Asking someone to approve a proof that does not exist is
+                // worse than saying nothing, so skip rather than send.
+                if ($proof === null) {
+                    Session::warning(
+                        $message . ' No proof is waiting for approval, so the client was not asked to approve one. '
+                        . 'Upload the proof, then move the job here again.'
+                    );
+                    Response::to('/jobs/' . $job['id']);
+                }
+
+                $context['link']       = $proof['link'];
+                $context['short_link'] = $proof['short_link'];
+                $context['version']    = (string) $proof['version'];
+            }
+
+            $queued = Notifier::dispatch($clientEvent, $context)['queued'];
 
             if ($queued > 0) {
                 Notifier::processQueue(10);
