@@ -48,7 +48,7 @@ class Router
      * /clients/{id}/documents  ->  #^/clients/(?P<id>[^/]+)/documents$#
      *
      * A trailing * makes the placeholder greedy across slashes, for routes
-     * like /storage/{path*} that receive a whole relative file path.
+     * like /files/{path*} that receive a whole relative file path.
      */
     private function compile(string $path): string
     {

@@ -223,7 +223,7 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
                     </span>
 
                     <div class="flex-1" style="min-width:180px">
-                      <a class="fw-600" href="<?= url('storage/' . $f['file_path']) ?>" target="_blank" rel="noopener">
+                      <a class="fw-600" href="<?= url('files/' . $f['file_path']) ?>" target="_blank" rel="noopener">
                         <?= e($f['file_name']) ?>
                       </a>
                       <div class="text-xs text-muted">

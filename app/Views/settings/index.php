@@ -107,7 +107,7 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           <?php if ($settings['logo']): ?>
             <div class="field field--full">
               <div class="text-xs uppercase fw-700 text-muted mb-8">Current logo</div>
-              <img src="<?= url('storage/' . $settings['logo']) ?>" alt="Company logo"
+              <img src="<?= url('files/' . $settings['logo']) ?>" alt="Company logo"
                    style="max-height:70px;background:#fff;padding:8px;border:1px solid var(--border);border-radius:var(--r)">
             </div>
           <?php endif; ?>

@@ -57,6 +57,17 @@ if ($doc && !empty($doc['id'])) {
   <table role="presentation" width="600" cellpadding="0" cellspacing="0"
          style="width:600px;max-width:100%;background:#ffffff;border:1px solid <?= $line ?>;border-radius:8px;overflow:hidden">
 
+    <?php if (!empty($company['logo_url'])): ?>
+    <!-- Letterhead. On white, because an uploaded logo may be any colour.
+         If the client blocks remote images the alt text stands in. -->
+    <tr>
+      <td align="left" style="background:#ffffff;padding:18px 28px 14px">
+        <img src="<?= e($company['logo_url']) ?>" alt="<?= e($company['name']) ?>"
+             height="44" style="height:44px;width:auto;max-width:220px;border:0;display:block">
+      </td>
+    </tr>
+    <?php endif; ?>
+
     <!-- Header -->
     <tr>
       <td style="background:<?= $navy ?>;padding:22px 28px">

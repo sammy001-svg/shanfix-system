@@ -49,9 +49,57 @@ $r->post('/webhooks/kopokopo', [PaymentController::class, 'kopokopoCallback']);
 // Client-facing document view. No login: the 48-char token is the credential.
 $r->get('/view/{token}', [PublicDocumentController::class, 'show']);
 
-// Serve files from storage/ (uploads live outside the web root).
+// The company logo, served without a login.
+//
+// Everything else under /files needs a session, but a client opening their
+// invoice on a share link is not signed in — and an emailed document is
+// fetched by the mail client with no session at all. The logo is public
+// branding, so it gets its own unauthenticated route rather than opening up
+// the whole uploads folder.
+$r->get('/brand/logo', function () {
+    $logo = (string) \App\Core\Settings::get('company_logo', '');
+
+    if ($logo === '' || str_contains($logo, '..')) {
+        throw new \App\Core\HttpException(404, 'No logo has been uploaded.');
+    }
+
+    $full = realpath(STORAGE_PATH . '/' . $logo);
+    $root = realpath(STORAGE_PATH . '/uploads/logos');
+
+    if (!$full || !$root || !str_starts_with($full, $root) || !is_file($full)) {
+        throw new \App\Core\HttpException(404, 'Logo file is missing.');
+    }
+
+    $mime = 'image/png';
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $full) ?: $mime;
+        finfo_close($finfo);
+    }
+
+    // Only ever serve real images from here.
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+        throw new \App\Core\HttpException(404, 'Logo file is not an image.');
+    }
+
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($full));
+    header('X-Content-Type-Options: nosniff');
+    // Cache briefly so a printed document does not refetch it per page.
+    header('Cache-Control: public, max-age=3600');
+    readfile($full);
+    exit;
+});
+
+// Serve uploaded files through PHP.
+//
+// The URL is deliberately NOT /storage/... — in the flat cPanel build the
+// storage/ folder physically sits in the web root, so Apache answers that
+// path itself (and denies it) before the front controller ever runs. /files
+// matches no real directory, so it always reaches this route.
+//
 // {path*} matches across slashes, e.g. uploads/receipts/abc123.pdf
-$r->get('/storage/{path*}', function (Request $request) {
+$r->get('/files/{path*}', function (Request $request) {
     $relative = (string) $request->param('path');
 
     // Reject traversal before touching the filesystem.

@@ -241,7 +241,7 @@ $lastDay = null;
                 <div class="msg__body"><?= e($m['body']) ?></div>
               <?php endif; ?>
               <?php if ($m['attachment_path']): ?>
-                <a class="msg__file" href="<?= url('storage/' . $m['attachment_path']) ?>"
+                <a class="msg__file" href="<?= url('files/' . $m['attachment_path']) ?>"
                    target="_blank" rel="noopener">
                   <?= icon('paperclip') ?> <?= e($m['attachment_name'] ?: 'Attachment') ?>
                 </a>

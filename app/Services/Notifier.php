@@ -86,11 +86,19 @@ class Notifier
         $subject = self::render(Settings::get("tpl_{$event}_subject", ucfirst($event)), $context);
         $intro   = self::render(Settings::get("tpl_{$event}_intro", ''), $context);
 
+        $company = Settings::company();
+
+        // Mail clients fetch images over the internet, so the logo needs an
+        // absolute URL and a route that does not require a session.
+        $company['logo_url'] = $company['logo'] !== ''
+            ? self::absoluteUrl('/brand/logo')
+            : '';
+
         $html = View::capture('emails/document', [
             'event'   => $event,
             'intro'   => $intro,
             'context' => $context,
-            'company' => Settings::company(),
+            'company' => $company,
             'footer'  => Settings::get('email_footer_note', ''),
         ], null);
 
@@ -303,15 +311,25 @@ class Notifier
 
     public static function publicUrl(string $token): string
     {
+        return self::absoluteUrl('/view/' . $token);
+    }
+
+    /**
+     * A full https://host/... URL. Email needs this: a mail client fetching
+     * an image has no idea what our base path is, and cron runs have no
+     * request to infer a host from — so set app.url in config.php.
+     */
+    public static function absoluteUrl(string $path): string
+    {
+        $path = '/' . ltrim($path, '/');
         $base = rtrim((string) Config::get('app.url', ''), '/');
 
         if ($base === '') {
             $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $base   = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-            return $base . url('/view/' . $token);
+            return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . url($path);
         }
 
-        return $base . base_path() . '/view/' . $token;
+        return $base . base_path() . $path;
     }
 
     /**

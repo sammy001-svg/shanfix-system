@@ -121,7 +121,7 @@ foreach ($byCategory as $c) {
                   <td class="actions">
                     <?php if ($ex['receipt_file']): ?>
                       <a class="btn btn--outline btn--sm" target="_blank" rel="noopener"
-                         href="<?= url('storage/' . $ex['receipt_file']) ?>" title="View receipt">
+                         href="<?= url('files/' . $ex['receipt_file']) ?>" title="View receipt">
                         <?= icon('paperclip') ?>
                       </a>
                     <?php endif; ?>

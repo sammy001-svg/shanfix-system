@@ -8,7 +8,7 @@ $isQuote   = $type === 'quotation';
 $balance = (float) $doc['balance'];
 $paid    = (float) $doc['amount_paid'];
 
-$logoPath = $company['logo'] ? url('storage/' . $company['logo']) : null;
+$logoPath = $company['logo'] ? url('files/' . $company['logo']) : null;
 ?>
 
 <div class="print-bar no-print">

@@ -61,7 +61,12 @@ if ($me && can('jobs.view')) {
 
   <aside class="sidebar">
     <a class="sidebar__brand" href="<?= url('/dashboard') ?>" style="text-decoration:none">
-      <span class="sidebar__mark">SF</span>
+      <?php if (setting('company_logo')): ?>
+        <img class="sidebar__logo" src="<?= url('brand/logo') ?>"
+             alt="<?= e(setting('company_name', 'Shanfix Technology')) ?>">
+      <?php else: ?>
+        <span class="sidebar__mark">SF</span>
+      <?php endif; ?>
       <span>
         <span class="sidebar__name">Shanfix</span>
         <span class="sidebar__sub">TECHNOLOGY</span>

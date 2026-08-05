@@ -149,6 +149,15 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
   letter-spacing: -.02em;
 }
 
+/* Uploaded logo, in place of the SF mark. Constrained both ways so a wide
+   or a tall logo both sit inside the brand row without shifting it. */
+.sidebar__logo {
+  width: auto; height: 32px;
+  max-width: 108px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
 .sidebar__name { font-weight: 650; font-size: 14.5px; color: #fff; line-height: 1.2; }
 .sidebar__sub  { font-size: 11px; color: rgba(255,255,255,.5); letter-spacing: .02em; }
 
