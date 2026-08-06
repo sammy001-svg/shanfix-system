@@ -418,8 +418,8 @@ class KopoKopo
     {
         $hint = match ($status) {
             401 => ' Check the Client ID and Secret, and that they belong to the environment selected above.',
-            403 => ' The request was refused before it reached the API. Usually this is production credentials'
-                 . ' being used against sandbox (or the reverse), or your server IP not being permitted.',
+            403 => ' Refused. Check that the credentials match the environment selected above, that your'
+                 . ' KopoKopo application is still active, and that your server IP is permitted.',
             404 => ' Check the environment setting — sandbox and production are different hosts.',
             429 => ' Too many requests. Wait a moment and try again.',
             default => '',
@@ -440,6 +440,16 @@ class KopoKopo
     {
         if (!empty($json['error_description'])) {
             return (string) $json['error_description'];
+        }
+
+        // KopoKopo answers an account-level refusal with error_code /
+        // error_message rather than the OAuth-style error_description.
+        // Missing this reports a plain "HTTP 403" and buries the one line
+        // that actually says what is wrong.
+        foreach (['error_message', 'message'] as $key) {
+            if (!empty($json[$key]) && is_string($json[$key])) {
+                return $json[$key];
+            }
         }
 
         if (!empty($json['error']) && is_string($json['error'])) {
