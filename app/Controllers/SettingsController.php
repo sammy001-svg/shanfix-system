@@ -50,6 +50,7 @@ class SettingsController extends Controller
             ],
             'events'         => \App\Services\Notifier::EVENTS,
             'defaultCallback' => rtrim((string) Config::get('app.url', ''), '/') . base_path() . '/webhooks/kopokopo',
+            'appUrlSet'       => rtrim((string) Config::get('app.url', ''), '/') !== '',
         ]);
     }
 

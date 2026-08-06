@@ -491,6 +491,24 @@ class Notifier
     }
 
     /**
+     * Can we build a link a client could actually click?
+     *
+     * In a web request the host header stands in for a missing app.url, so
+     * links come out right. Cron has no request: the fallback resolves to
+     * "localhost", and every share link, proof link and logo in a reminder
+     * would point at the server's own loopback address. Better to hold the
+     * message than to send a dead link to a customer.
+     */
+    public static function canBuildLinks(): bool
+    {
+        if (rtrim((string) Config::get('app.url', ''), '/') !== '') {
+            return true;
+        }
+
+        return !empty($_SERVER['HTTP_HOST']);
+    }
+
+    /**
      * Replace {placeholders}. Unknown ones are stripped rather than left
      * visible, so a stray token never reaches a client.
      */

@@ -97,6 +97,7 @@ $dbDetail = '';
 $dbOk     = false;
 $tables   = 0;
 $appKey   = false;
+$appUrl   = '';
 
 if ($hasConfig) {
     $config = @include $base . '/config/config.php';
@@ -108,6 +109,8 @@ if ($hasConfig) {
         // Either source works — config.php wins, else the auto-generated file.
         $appKey = !empty($config['security']['app_key'])
                || is_file($base . '/storage/app.key');
+
+        $appUrl = trim((string) ($config['app']['url'] ?? ''));
 
         try {
             $pdo = new PDO(
@@ -136,6 +139,17 @@ check('Schema imported', $dbOk && $tables >= 20,
 check('Encryption key set', $appKey,
       $appKey ? '' : 'None yet — one is generated into storage/app.key the first time a secret is saved. '
                    . 'Set security.app_key in config.php instead if you would rather pin it.', true);
+
+// Cron has no request to borrow a hostname from, so without this every link
+// in a reminder, receipt or proof approval points at localhost.
+check('Public URL set', $appUrl !== '' && str_starts_with($appUrl, 'http'),
+      $appUrl === ''
+          ? 'app.url is empty in config.php. Scheduled emails would send clients links to '
+            . 'localhost, so cron holds them back until it is set. Use your full public '
+            . 'address, e.g. https://erp.yourdomain.co.ke'
+          : ($appUrl !== '' && !str_starts_with($appUrl, 'http')
+                ? 'app.url should be a full URL starting with https://'
+                : ''));
 
 // ---------------------------------------------------------------------
 // Rewrite engine

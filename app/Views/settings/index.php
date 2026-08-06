@@ -411,6 +411,19 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
 
 <?php elseif ($tab === 'messaging'): ?>
 
+  <?php if (!$appUrlSet): ?>
+    <div class="alert alert--warning">
+      <?= icon('alert-triangle') ?>
+      <div class="alert__body">
+        <strong>Set your public address before relying on scheduled messages.</strong>
+        <code>app.url</code> is empty in <code>config/config.php</code>. Messages you send
+        by hand are fine, but cron has no web request to work from — so reminders,
+        receipts and proof approvals would carry links pointing at
+        <code>localhost</code>. Cron holds them back until this is set.
+      </div>
+    </div>
+  <?php endif; ?>
+
   <form method="post" action="<?= url('/settings/messaging') ?>">
     <?= csrf_field() ?>
 
