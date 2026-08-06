@@ -175,6 +175,11 @@ $r->group(['auth'], function ($r) {
         $r->post('/inventory/{id}',        [InventoryController::class, 'update']);
         $r->post('/inventory/{id}/stock',  [InventoryController::class, 'adjustStock']);
         $r->post('/inventory/{id}/delete', [InventoryController::class, 'destroy']);
+
+        // Product photos
+        $r->post('/inventory/{id}/images',                  [InventoryController::class, 'uploadImages']);
+        $r->post('/inventory/images/{imageId}/delete',      [InventoryController::class, 'deleteImage']);
+        $r->post('/inventory/images/{imageId}/primary',     [InventoryController::class, 'setPrimaryImage']);
     });
 
     // -- Services
