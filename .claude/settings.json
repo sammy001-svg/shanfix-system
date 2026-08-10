@@ -38,7 +38,9 @@
       "Bash(cd \"e:/projects/Bulk SMS/shanfix-bulk-sms\" && grep -rn \"api/v1/sendsms\\\\|APP_URL\\\\|BASE_URL\\\\|app_url\" config.php config.example.php client/*.php 2>/dev/null | head -30)",
       "Read(//e/projects/Bulk SMS/shanfix-bulk-sms/**)",
       "Bash(cd \"e:/projects/Bulk SMS/shanfix-bulk-sms\" && grep -n \"function normalizePhone\" -A 25 includes/actions/sms.php && echo \"--- CORS ---\" && cat api/v1/_cors.php)",
-      "Bash(sort -u -t: -k3)"
+      "Bash(sort -u -t: -k3)",
+      "Bash(rm -f storage/uploads/logos/test-wordmark.png)",
+      "Bash(php -l app/Views/auth/login.php)"
     ],
     "additionalDirectories": [
       "C:\\Shanfix System\\storage\\logs"

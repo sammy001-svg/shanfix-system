@@ -32,20 +32,29 @@ foreach (['jpg', 'jpeg', 'png', 'webp', 'svg'] as $ext) {
   <main class="login__panel">
     <div class="login__card">
 
-      <header class="login__brand">
-        <?php if ($logo): ?>
-          <?php // /brand/logo, not /storage — nobody is signed in on this page yet. ?>
+      <?php if ($logo): ?>
+        <?php
+          // A wordmark already carries the company name, so repeating it beside
+          // the image reads as a mistake. Logo alone, centred.
+          // /brand/logo rather than /files — nobody is signed in on this page.
+        ?>
+        <header class="login__brand login__brand--logo">
           <img class="login__logo" src="<?= url('/brand/logo') ?>" alt="<?= e($company) ?>">
-        <?php else: ?>
-          <span class="login__mark">SF</span>
-        <?php endif; ?>
-        <div>
-          <div class="login__company"><?= e($company) ?></div>
           <?php if ($tagline): ?>
             <div class="login__tagline"><?= e($tagline) ?></div>
           <?php endif; ?>
-        </div>
-      </header>
+        </header>
+      <?php else: ?>
+        <header class="login__brand">
+          <span class="login__mark">SF</span>
+          <div>
+            <div class="login__company"><?= e($company) ?></div>
+            <?php if ($tagline): ?>
+              <div class="login__tagline"><?= e($tagline) ?></div>
+            <?php endif; ?>
+          </div>
+        </header>
+      <?php endif; ?>
 
       <h1 class="login__title">Sign in</h1>
       <p class="login__intro">Welcome back. Enter your details to continue.</p>
