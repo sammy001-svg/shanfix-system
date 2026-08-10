@@ -3,6 +3,8 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 $editing = $item !== null;
 $action  = $editing ? url('/inventory/' . $item['id']) : url('/inventory');
+$images  = $images ?? [];
+$maxImages = max(1, (int) setting('product_images_max', 6));
 
 /** Prefer the value the user just typed (after a validation failure). */
 $val = static function (string $key, $fallback = '') use ($item) {
@@ -25,7 +27,7 @@ $val = static function (string $key, $fallback = '') use ($item) {
   </div>
 </div>
 
-<form method="post" action="<?= e($action) ?>">
+<form method="post" action="<?= e($action) ?>" enctype="multipart/form-data">
   <?= csrf_field() ?>
 
   <div class="grid-sidebar">
@@ -116,6 +118,58 @@ $val = static function (string $key, $fallback = '') use ($item) {
     </div>
 
     <aside>
+      <div class="card">
+        <div class="card__head">
+          <?= icon('image') ?>
+          <div>
+            <div class="card__title">Photos</div>
+            <div class="card__sub">
+              <?= count($images) ?> of <?= $maxImages ?> used
+            </div>
+          </div>
+        </div>
+        <div class="card__body">
+          <?php if ($images): ?>
+            <div class="thumb-grid mb-12">
+              <?php foreach ($images as $img): ?>
+                <span class="thumb <?= (int) $img['is_primary'] === 1 ? 'thumb--primary' : '' ?>">
+                  <img src="<?= url('storage/' . ($img['thumb_path'] ?: $img['file_path'])) ?>"
+                       alt="<?= e($img['alt_text'] ?: $item['name']) ?>" loading="lazy">
+                  <?php if ((int) $img['is_primary'] === 1): ?>
+                    <span class="thumb__badge">Main</span>
+                  <?php endif; ?>
+                </span>
+              <?php endforeach; ?>
+            </div>
+            <p class="field-hint mb-12">
+              Manage existing photos — set the main one or remove them —
+              on the <a href="<?= url('/inventory/' . $item['id']) ?>">item page</a>.
+            </p>
+          <?php endif; ?>
+
+          <?php if (count($images) < $maxImages): ?>
+            <div class="field">
+              <label class="label" for="images">
+                <?= $images ? 'Add more photos' : 'Product photos' ?>
+              </label>
+              <input class="input" type="file" id="images" name="images[]"
+                     accept="image/jpeg,image/png,image/gif,image/webp" multiple
+                     data-image-preview="#image-preview">
+              <span class="field-hint">
+                JPG, PNG, GIF or WebP. Select several at once.
+                Large photos are resized automatically.
+              </span>
+            </div>
+            <div class="thumb-grid mt-12" id="image-preview"></div>
+          <?php else: ?>
+            <p class="text-sm text-muted mb-0">
+              Maximum of <?= $maxImages ?> photos reached. Remove one on the
+              <a href="<?= url('/inventory/' . $item['id']) ?>">item page</a> to add another.
+            </p>
+          <?php endif; ?>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card__head"><div class="card__title">Stock</div></div>
         <div class="card__body">

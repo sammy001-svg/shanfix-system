@@ -5,44 +5,68 @@ use App\Core\Logger;
 use App\Core\Settings;
 
 /**
- * SMS via Africa's Talking — the usual gateway for Kenyan numbers.
+ * SMS via Shanfix Bulk SMS (https://sms.shanfixtechnology.com).
  *
- * Docs: https://developers.africastalking.com/docs/sms/sending/bulk
+ * Authentication is a Client ID + API key pair from the portal's
+ * Developer/API page, sent as X-Client-Id / X-Api-Key headers. Messages are
+ * charged in SMS units against the account balance, and the sender ID must
+ * already be approved on that account.
+ *
+ * Endpoints used (api/v1):
+ *   sendsms.php   one recipient          60 requests/minute
+ *   bulksend.php  up to 1 000 recipients 10 requests/minute
+ *   balance.php   remaining SMS units
  */
 class Sms
 {
-    private const LIVE_URL    = 'https://api.africastalking.com/version1/messaging';
-    private const SANDBOX_URL = 'https://api.sandbox.africastalking.com/version1/messaging';
+    public const DEFAULT_BASE_URL = 'https://sms.shanfixtechnology.com';
 
-    private string $username;
+    /** The gateway rejects anything longer — six 160-character segments. */
+    private const MAX_LENGTH = 918;
+
+    /** One bulksend.php call carries at most this many recipients. */
+    public const BULK_LIMIT = 1000;
+
+    private string $baseUrl;
+    private string $clientId;
     private string $apiKey;
     private string $senderId;
 
-    public function __construct(?string $username = null, ?string $apiKey = null, ?string $senderId = null)
-    {
-        $this->username = $username ?? (string) Settings::get('sms_username', '');
+    public function __construct(
+        ?string $clientId = null,
+        ?string $apiKey = null,
+        ?string $senderId = null,
+        ?string $baseUrl = null
+    ) {
+        $this->clientId = $clientId ?? (string) Settings::get('sms_client_id', '');
         $this->apiKey   = $apiKey   ?? (string) Settings::get('sms_api_key', '');
         $this->senderId = $senderId ?? (string) Settings::get('sms_sender_id', '');
+        $this->baseUrl  = rtrim($baseUrl ?? (string) Settings::get('sms_base_url', self::DEFAULT_BASE_URL), '/');
+
+        if ($this->baseUrl === '') {
+            $this->baseUrl = self::DEFAULT_BASE_URL;
+        }
     }
 
     public function isConfigured(): bool
     {
-        return $this->username !== '' && $this->apiKey !== '';
+        return $this->clientId !== '' && $this->apiKey !== '';
     }
 
-    /** Africa's Talking routes the "sandbox" username to its test endpoint. */
-    private function endpoint(): string
+    private function endpoint(string $script): string
     {
-        return strtolower($this->username) === 'sandbox' ? self::SANDBOX_URL : self::LIVE_URL;
+        return $this->baseUrl . '/api/v1/' . $script;
     }
 
     /**
-     * @return array{ok:bool, error?:string, ref?:string, cost?:float, status?:string}
+     * Send to one recipient.
+     *
+     * @return array{ok:bool, error?:string, ref?:string, cost?:float, status?:string, balance?:string}
      */
     public function send(string $phone, string $message): array
     {
         if (!$this->isConfigured()) {
-            return ['ok' => false, 'error' => 'SMS is not configured. Add your gateway credentials in Settings.'];
+            return ['ok' => false, 'error' => 'SMS is not configured. Add your Shanfix Bulk SMS credentials in Settings.'];
         }
 
         $normalised = normalize_phone($phone);
@@ -51,130 +75,204 @@ class Sms
             return ['ok' => false, 'error' => 'Invalid phone number: ' . $phone];
         }
 
-        $message = trim($message);
+        $message = $this->prepare($message);
 
         if ($message === '') {
             return ['ok' => false, 'error' => 'Message body is empty.'];
         }
 
-        // Long messages are billed per 160-char part; warn rather than truncate.
-        if (mb_strlen($message) > 918) {
-            $message = mb_substr($message, 0, 915) . '...';
-        }
-
-        $fields = [
-            'username' => $this->username,
-            'to'       => '+' . $normalised,
-            'message'  => $message,
-        ];
-
-        if ($this->senderId !== '') {
-            $fields['from'] = $this->senderId;
-        }
-
-        $response = $this->post($this->endpoint(), $fields);
+        $response = $this->post('sendsms.php', [
+            'to'      => $normalised,
+            'message' => $message,
+        ]);
 
         if (!$response['ok']) {
             return ['ok' => false, 'error' => $response['error']];
         }
 
-        $recipients = $response['json']['SMSMessageData']['Recipients'] ?? [];
-
-        if ($recipients === []) {
-            $summary = $response['json']['SMSMessageData']['Message'] ?? 'No recipients accepted.';
-            Logger::error('SMS rejected by gateway', ['phone' => $normalised, 'summary' => $summary]);
-            return ['ok' => false, 'error' => (string) $summary];
-        }
-
-        $first  = $recipients[0];
-        $status = (string) ($first['status'] ?? 'Unknown');
-
-        // "Success" means queued for delivery; anything else is a failure now.
-        if (stripos($status, 'success') === false) {
-            return [
-                'ok'     => false,
-                'error'  => $status . ' (' . ($first['statusCode'] ?? '?') . ')',
-                'status' => $status,
-            ];
-        }
+        $json = $response['json'];
 
         return [
-            'ok'     => true,
-            'ref'    => (string) ($first['messageId'] ?? ''),
-            'cost'   => $this->parseCost((string) ($first['cost'] ?? '')),
-            'status' => $status,
+            'ok'      => true,
+            'ref'     => (string) ($json['message_id'] ?? ''),
+            'cost'    => isset($json['units_charged']) ? (float) $json['units_charged'] : null,
+            'status'  => 'Submitted',
+            'balance' => isset($json['remaining_units']) ? (string) $json['remaining_units'] : null,
         ];
     }
 
-    /** Check the credentials without spending money on a message. */
-    public function test(): array
+    /**
+     * Send the same message to many recipients in one call. The gateway
+     * de-duplicates numbers and reports invalid ones back rather than failing
+     * the whole batch.
+     *
+     * @param array<int,string> $phones Raw numbers; normalised here
+     *
+     * @return array{ok:bool, error?:string, submitted?:int, sent?:int, failed?:int,
+     *               invalid?:array<int,string>, cost?:float, balance?:string}
+     */
+    public function sendBulk(array $phones, string $message): array
+    {
+        if (!$this->isConfigured()) {
+            return ['ok' => false, 'error' => 'SMS is not configured. Add your Shanfix Bulk SMS credentials in Settings.'];
+        }
+
+        $message = $this->prepare($message);
+
+        if ($message === '') {
+            return ['ok' => false, 'error' => 'Message body is empty.'];
+        }
+
+        $recipients = [];
+        $invalid    = [];
+
+        foreach ($phones as $phone) {
+            $normalised = normalize_phone((string) $phone);
+
+            if ($normalised === null) {
+                $invalid[] = (string) $phone;
+            } else {
+                $recipients[$normalised] = true;   // key de-dupes
+            }
+        }
+
+        $recipients = array_keys($recipients);
+
+        if ($recipients === []) {
+            return ['ok' => false, 'error' => 'No valid phone numbers to send to.', 'invalid' => $invalid];
+        }
+
+        $submitted = 0;
+        $sent      = 0;
+        $failed    = 0;
+        $cost      = 0.0;
+        $balance   = null;
+
+        // Chunk so a list longer than the gateway's per-call ceiling still goes.
+        foreach (array_chunk($recipients, self::BULK_LIMIT) as $chunk) {
+            $response = $this->post('bulksend.php', [
+                'to'      => $chunk,
+                'message' => $message,
+            ]);
+
+            if (!$response['ok']) {
+                // Anything already sent stands; report the failure with the tally.
+                return [
+                    'ok'        => false,
+                    'error'     => $response['error'],
+                    'submitted' => $submitted,
+                    'sent'      => $sent,
+                    'failed'    => $failed + count($chunk),
+                    'invalid'   => $invalid,
+                    'cost'      => $cost,
+                ];
+            }
+
+            $json = $response['json'];
+
+            $submitted += (int) ($json['total_submitted'] ?? count($chunk));
+            $sent      += (int) ($json['sent'] ?? 0);
+            $failed    += (int) ($json['failed'] ?? 0);
+            $cost      += (float) ($json['units_charged'] ?? 0);
+            $balance    = $json['remaining_units'] ?? $balance;
+
+            foreach ((array) ($json['invalid_numbers'] ?? []) as $bad) {
+                $invalid[] = (string) $bad;
+            }
+        }
+
+        return [
+            'ok'        => true,
+            'submitted' => $submitted,
+            'sent'      => $sent,
+            'failed'    => $failed,
+            'invalid'   => $invalid,
+            'cost'      => round($cost, 4),
+            'balance'   => $balance !== null ? (string) $balance : null,
+        ];
+    }
+
+    /**
+     * Remaining SMS units on the account. Doubles as the credentials check —
+     * it costs nothing to call.
+     *
+     * @return array{ok:bool, error?:string, balance?:float, client_name?:string, message?:string}
+     */
+    public function balance(): array
     {
         if (!$this->isConfigured()) {
             return ['ok' => false, 'error' => 'SMS is not configured.'];
         }
 
-        $url = (strtolower($this->username) === 'sandbox'
-                ? 'https://api.sandbox.africastalking.com'
-                : 'https://api.africastalking.com')
-             . '/version1/user?username=' . urlencode($this->username);
-
-        $response = $this->post($url, null, 'GET');
+        $response = $this->post('balance.php', []);
 
         if (!$response['ok']) {
             return ['ok' => false, 'error' => $response['error']];
         }
 
-        $balance = $response['json']['UserData']['balance'] ?? null;
+        $json  = $response['json'];
+        $units = isset($json['sms_units']) ? (float) $json['sms_units'] : null;
+        $name  = (string) ($json['client_name'] ?? '');
 
         return [
-            'ok'      => true,
-            'balance' => $balance,
-            'message' => $balance !== null
-                ? 'Connected. Account balance: ' . $balance
-                : 'Connected to Africa\'s Talking.',
+            'ok'          => true,
+            'balance'     => $units,
+            'client_name' => $name,
+            'message'     => 'Connected as ' . ($name !== '' ? $name : 'your account')
+                           . ($units !== null ? '. Balance: ' . rtrim(rtrim(number_format($units, 2), '0'), '.') . ' SMS units' : '.'),
         ];
     }
 
-    private function parseCost(string $cost): ?float
+    /** Trim, and keep the body inside the gateway's hard length limit. */
+    private function prepare(string $message): string
     {
-        // Gateway returns e.g. "KES 0.8000"
-        if (preg_match('/([0-9]+(?:\.[0-9]+)?)/', $cost, $m)) {
-            return (float) $m[1];
+        $message = trim($message);
+
+        if (mb_strlen($message) > self::MAX_LENGTH) {
+            $message = mb_substr($message, 0, self::MAX_LENGTH - 3) . '...';
         }
-        return null;
+
+        return $message;
     }
 
     /**
-     * @return array{ok:bool, json?:array, body?:string, error?:string}
+     * POST a JSON body to an api/v1 endpoint with the credential headers.
+     *
+     * @return array{ok:bool, json?:array, error?:string}
      */
-    private function post(string $url, ?array $fields, string $method = 'POST'): array
+    private function post(string $script, array $payload): array
     {
         if (!function_exists('curl_init')) {
             return ['ok' => false, 'error' => 'PHP cURL is not available on this server.'];
         }
 
-        $ch = curl_init();
+        if ($this->senderId !== '' && !isset($payload['sender_id'])
+            && in_array($script, ['sendsms.php', 'bulksend.php'], true)) {
+            $payload['sender_id'] = $this->senderId;
+        }
 
-        $options = [
+        $url = $this->endpoint($script);
+        $ch  = curl_init();
+
+        curl_setopt_array($ch, [
             CURLOPT_URL            => $url,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_SLASHES),
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_TIMEOUT        => 60,      // a full bulk batch takes a while
             CURLOPT_CONNECTTIMEOUT => 12,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
+            // Without this cURL sends no User-Agent, which some edge
+            // protection answers with a bare 403.
+            CURLOPT_USERAGENT      => 'ShanfixBMS/1.0 (+PHP cURL)',
             CURLOPT_HTTPHEADER     => [
                 'Accept: application/json',
-                'apiKey: ' . $this->apiKey,
+                'Content-Type: application/json',
+                'X-Client-Id: ' . $this->clientId,
+                'X-Api-Key: ' . $this->apiKey,
             ],
-        ];
-
-        if ($method === 'POST') {
-            $options[CURLOPT_POST]       = true;
-            $options[CURLOPT_POSTFIELDS] = http_build_query($fields ?? []);
-            $options[CURLOPT_HTTPHEADER][] = 'Content-Type: application/x-www-form-urlencoded';
-        }
-
-        curl_setopt_array($ch, $options);
+        ]);
 
         $body   = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -182,30 +280,40 @@ class Sms
         curl_close($ch);
 
         if ($body === false) {
-            Logger::error('SMS gateway unreachable', ['error' => $err]);
+            Logger::error('SMS gateway unreachable', ['url' => $url, 'error' => $err]);
             return ['ok' => false, 'error' => 'Could not reach the SMS gateway: ' . $err];
         }
 
         $json = json_decode((string) $body, true);
 
-        if ($status < 200 || $status >= 300) {
-            Logger::error('SMS gateway error', ['status' => $status, 'body' => mb_substr((string) $body, 0, 400)]);
-
-            $message = is_array($json)
-                ? ($json['SMSMessageData']['Message'] ?? $json['message'] ?? '')
-                : '';
-
-            if ($status === 401) {
-                $message = 'The gateway rejected your credentials. Check the username and API key.';
-            }
-
-            return [
-                'ok'    => false,
-                'error' => $message !== '' ? (string) $message : 'SMS gateway returned HTTP ' . $status . '.',
-            ];
+        if (!is_array($json)) {
+            Logger::error('SMS gateway returned non-JSON', [
+                'url'    => $url,
+                'status' => $status,
+                'body'   => mb_substr((string) $body, 0, 400),
+            ]);
+            return ['ok' => false, 'error' => 'The SMS gateway returned an unreadable response (HTTP ' . $status . ').'];
         }
 
-        return ['ok' => true, 'json' => is_array($json) ? $json : [], 'body' => (string) $body];
+        // The API reports failure both by HTTP status and by success:false.
+        if ($status < 200 || $status >= 300 || ($json['success'] ?? false) !== true) {
+            $message = (string) ($json['error'] ?? '');
+
+            if ($message === '') {
+                $message = match ($status) {
+                    401     => 'The gateway rejected your credentials. Check the Client ID and API key.',
+                    403     => 'Your Shanfix Bulk SMS account is suspended.',
+                    429     => 'Sending too fast — the gateway rate limit was hit. It will retry shortly.',
+                    default => 'SMS gateway returned HTTP ' . $status . '.',
+                };
+            }
+
+            Logger::error('SMS gateway error', ['url' => $url, 'status' => $status, 'error' => $message]);
+
+            return ['ok' => false, 'error' => $message];
+        }
+
+        return ['ok' => true, 'json' => $json];
     }
 
     /**

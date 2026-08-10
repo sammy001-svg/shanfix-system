@@ -326,16 +326,27 @@ class Mailer
             $headers[] = 'Reply-To: <' . $this->replyTo . '>';
         }
 
+        $hasAttachments = $attachments !== [];
+
+        // The top-level Content-Type has to be a real header. Emitting it as
+        // the first line of the body instead leaves the message with no
+        // declared type at all, and every client then shows the raw MIME
+        // source — boundaries, base64 and all — as the message text.
+        $headers[] = $hasAttachments
+            ? 'Content-Type: multipart/mixed; boundary="' . $boundaryMixed . '"'
+            : 'Content-Type: multipart/alternative; boundary="' . $boundaryAlt . '"';
+
         $body = '';
 
-        if ($attachments !== []) {
-            $headers[] = 'Content-Type: multipart/mixed; boundary="' . $boundaryMixed . '"';
+        if ($hasAttachments) {
+            // The text/html alternative becomes the first part of the mixed
+            // message, so it needs its own part header here.
             $body .= '--' . $boundaryMixed . self::CRLF;
+            $body .= 'Content-Type: multipart/alternative; boundary="' . $boundaryAlt . '"'
+                   . self::CRLF . self::CRLF;
         }
 
         // text/plain + text/html alternative, so every client renders something.
-        $body .= 'Content-Type: multipart/alternative; boundary="' . $boundaryAlt . '"' . self::CRLF . self::CRLF;
-
         $body .= '--' . $boundaryAlt . self::CRLF;
         $body .= 'Content-Type: text/plain; charset=UTF-8' . self::CRLF;
         $body .= 'Content-Transfer-Encoding: base64' . self::CRLF . self::CRLF;
@@ -349,15 +360,16 @@ class Mailer
         $body .= '--' . $boundaryAlt . '--' . self::CRLF;
 
         foreach ($attachments as $file) {
-            $body .= self::CRLF . '--' . $boundaryMixed . self::CRLF;
+            $body .= '--' . $boundaryMixed . self::CRLF;
             $body .= 'Content-Type: ' . ($file['mime'] ?? 'application/octet-stream')
-                   . '; name="' . $file['name'] . '"' . self::CRLF;
+                   . '; name="' . $this->encodeHeader((string) $file['name']) . '"' . self::CRLF;
             $body .= 'Content-Transfer-Encoding: base64' . self::CRLF;
-            $body .= 'Content-Disposition: attachment; filename="' . $file['name'] . '"' . self::CRLF . self::CRLF;
+            $body .= 'Content-Disposition: attachment; filename="'
+                   . $this->encodeHeader((string) $file['name']) . '"' . self::CRLF . self::CRLF;
             $body .= chunk_split(base64_encode($file['content'])) . self::CRLF;
         }
 
-        if ($attachments !== []) {
+        if ($hasAttachments) {
             $body .= '--' . $boundaryMixed . '--' . self::CRLF;
         }
 

@@ -302,6 +302,19 @@ class NotificationController extends Controller
         $channel = (string) $request->input('channel', 'email');
         $me      = Auth::user();
 
+        // Free check — confirms the credentials without spending a unit.
+        if ($channel === 'sms_balance') {
+            $result = (new Sms())->balance();
+
+            if ($result['ok']) {
+                Session::success($result['message']);
+            } else {
+                Session::error('Shanfix Bulk SMS rejected the check: ' . $result['error']);
+            }
+
+            Response::to('/settings?tab=messaging');
+        }
+
         if ($channel === 'sms') {
             $phone = trim((string) $request->input('to', '')) ?: (string) ($me['phone'] ?? '');
 

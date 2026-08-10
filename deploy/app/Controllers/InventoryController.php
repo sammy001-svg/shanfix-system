@@ -3,13 +3,16 @@ namespace App\Controllers;
 
 use App\Core\ActivityLog;
 use App\Core\Auth;
+use App\Core\Config;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
+use App\Core\Settings;
 use App\Core\Validator;
+use App\Services\ImageProcessor;
 
 class InventoryController extends Controller
 {
@@ -47,10 +50,19 @@ class InventoryController extends Controller
         $total = (int) Database::scalar("SELECT COUNT(*) FROM inventory_items i WHERE {$clause}", $params, 0);
         $pager = $this->paginate($total, 25);
 
+        // The main photo comes along in the same query — a per-row lookup
+        // would be 25 extra queries on every page of the list.
         $items = Database::all(
-            "SELECT i.*, c.name AS category_name
+            "SELECT i.*, c.name AS category_name,
+                    img.thumb_path, img.file_path AS image_path,
+                    (SELECT COUNT(*) FROM inventory_images WHERE item_id = i.id) AS image_count
                FROM inventory_items i
           LEFT JOIN categories c ON c.id = i.category_id
+          LEFT JOIN inventory_images img ON img.id = (
+                    SELECT id FROM inventory_images
+                     WHERE item_id = i.id
+                  ORDER BY is_primary DESC, sort_order, id
+                     LIMIT 1)
               WHERE {$clause}
            ORDER BY i.name ASC
               LIMIT {$pager['perPage']} OFFSET {$pager['offset']}",
@@ -114,8 +126,21 @@ class InventoryController extends Controller
             return $id;
         });
 
+        // Photos are optional, and a failure to store one must not lose the
+        // item the user just typed in — so it is reported, not thrown.
+        $photos = $this->storeImages($id, $request);
+
         ActivityLog::record('inventory_created', 'inventory_item', $id, 'Added item ' . $data['name']);
-        Session::success('"' . $data['name'] . '" has been added to inventory.');
+
+        Session::success(
+            '"' . $data['name'] . '" has been added to inventory.'
+            . ($photos['saved'] > 0 ? ' ' . $photos['saved'] . ' photo(s) uploaded.' : '')
+        );
+
+        foreach ($photos['errors'] as $error) {
+            Session::warning($error);
+        }
+
         Response::to('/inventory/' . $id);
     }
 
@@ -152,6 +177,7 @@ class InventoryController extends Controller
             'item'        => $item,
             'movements'   => $movements,
             'recentSales' => $recentSales,
+            'images'      => $this->imagesFor((int) $item['id']),
         ]);
     }
 
@@ -166,6 +192,7 @@ class InventoryController extends Controller
             'item'       => $item,
             'categories' => $this->categories(),
             'units'      => self::UNITS,
+            'images'     => $this->imagesFor((int) $item['id']),
         ]);
     }
 
@@ -181,6 +208,12 @@ class InventoryController extends Controller
         unset($data['quantity']);
 
         Database::update('inventory_items', $data, ['id' => $item['id']]);
+
+        $photos = $this->storeImages((int) $item['id'], $request);
+
+        foreach ($photos['errors'] as $error) {
+            Session::warning($error);
+        }
 
         ActivityLog::record('inventory_updated', 'inventory_item', (int) $item['id'], 'Updated item ' . $data['name']);
         Session::success('Item updated.');
@@ -272,6 +305,13 @@ class InventoryController extends Controller
             Response::to('/inventory');
         }
 
+        // The rows go with the item via ON DELETE CASCADE, but the files on
+        // disk would be orphaned, so they are removed first.
+        foreach ($this->imagesFor((int) $item['id']) as $image) {
+            $this->deleteUpload($image['file_path']);
+            $this->deleteUpload($image['thumb_path']);
+        }
+
         Database::delete('inventory_items', ['id' => $item['id']]);
         ActivityLog::record('inventory_deleted', 'inventory_item', (int) $item['id'], 'Deleted ' . $item['name']);
         Session::success('"' . $item['name'] . '" has been deleted.');
@@ -308,6 +348,238 @@ class InventoryController extends Controller
             'shanfix-inventory-' . date('Y-m-d') . '.csv',
             ['SKU', 'Name', 'Category', 'Unit', 'Cost Price', 'Selling Price', 'Quantity', 'Reorder Level', 'Status'],
             $out
+        );
+    }
+
+    // -- Product images ------------------------------------------------
+
+    /** Add photos to an item that already exists. */
+    public function uploadImages(Request $request): void
+    {
+        $this->authorize('inventory.manage');
+
+        $item   = $this->findOrFail($request->paramInt('id'));
+        $photos = $this->storeImages((int) $item['id'], $request);
+
+        if ($photos['saved'] > 0) {
+            ActivityLog::record(
+                'inventory_images_added',
+                'inventory_item',
+                (int) $item['id'],
+                $photos['saved'] . ' photo(s) added to ' . $item['name']
+            );
+
+            Session::success($photos['saved'] . ' photo(s) added.');
+        } elseif ($photos['errors'] === []) {
+            Session::warning('No photos were selected.');
+        }
+
+        foreach ($photos['errors'] as $error) {
+            Session::error($error);
+        }
+
+        Response::to('/inventory/' . $item['id']);
+    }
+
+    public function deleteImage(Request $request): void
+    {
+        $this->authorize('inventory.manage');
+
+        $image = Database::first(
+            'SELECT i.*, it.name AS item_name FROM inventory_images i
+               JOIN inventory_items it ON it.id = i.item_id
+              WHERE i.id = :id',
+            ['id' => $request->paramInt('imageId')]
+        );
+
+        if (!$image) {
+            throw new HttpException(404, 'That image does not exist.');
+        }
+
+        Database::transaction(function () use ($image) {
+            $this->deleteUpload($image['file_path']);
+            $this->deleteUpload($image['thumb_path']);
+
+            Database::delete('inventory_images', ['id' => $image['id']]);
+
+            // The gallery must never be left without a primary.
+            if ((int) $image['is_primary'] === 1) {
+                $next = Database::first(
+                    'SELECT id FROM inventory_images WHERE item_id = :id ORDER BY sort_order, id LIMIT 1',
+                    ['id' => $image['item_id']]
+                );
+
+                if ($next) {
+                    Database::update('inventory_images', ['is_primary' => 1], ['id' => $next['id']]);
+                }
+            }
+        });
+
+        ActivityLog::record(
+            'inventory_image_deleted',
+            'inventory_item',
+            (int) $image['item_id'],
+            'Removed a photo from ' . $image['item_name']
+        );
+
+        Session::success('Photo removed.');
+        Response::back('/inventory/' . $image['item_id']);
+    }
+
+    /** Choose which photo represents the item in lists and on documents. */
+    public function setPrimaryImage(Request $request): void
+    {
+        $this->authorize('inventory.manage');
+
+        $image = Database::first(
+            'SELECT * FROM inventory_images WHERE id = :id',
+            ['id' => $request->paramInt('imageId')]
+        );
+
+        if (!$image) {
+            throw new HttpException(404, 'That image does not exist.');
+        }
+
+        Database::transaction(function () use ($image) {
+            Database::run(
+                'UPDATE inventory_images SET is_primary = 0 WHERE item_id = :id',
+                ['id' => $image['item_id']]
+            );
+
+            Database::update('inventory_images', ['is_primary' => 1], ['id' => $image['id']]);
+        });
+
+        Session::success('Main photo updated.');
+        Response::back('/inventory/' . $image['item_id']);
+    }
+
+    /**
+     * Validate, resize and store whatever came in on the "images" field.
+     *
+     * Returns counts rather than throwing, so one bad photo cannot discard
+     * a whole form submission.
+     *
+     * @return array{saved:int, errors:array<int,string>}
+     */
+    private function storeImages(int $itemId, Request $request): array
+    {
+        $files  = $_FILES['images'] ?? null;
+        $saved  = 0;
+        $errors = [];
+
+        if (!is_array($files) || !isset($files['name'])) {
+            return ['saved' => 0, 'errors' => []];
+        }
+
+        // Normalise PHP's awkward multi-file layout into one entry per file.
+        $names = (array) $files['name'];
+        $count = count($names);
+
+        $existing = (int) Database::scalar(
+            'SELECT COUNT(*) FROM inventory_images WHERE item_id = :id',
+            ['id' => $itemId],
+            0
+        );
+
+        $max = max(1, Settings::int('product_images_max', 6));
+
+        $maxEdge  = max(400, Settings::int('product_image_max_px', 1600));
+        $thumbPx  = max(100, Settings::int('product_thumb_px', 400));
+        $maxBytes = (int) Config::get('uploads.max_size_mb', 8) * 1024 * 1024;
+
+        $dir = STORAGE_PATH . '/uploads/products';
+
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            return ['saved' => 0, 'errors' => ['Could not create the product image folder on the server.']];
+        }
+
+        for ($i = 0; $i < $count; $i++) {
+            $error = (int) ($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+
+            if ($error === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+
+            $original = trim((string) ($names[$i] ?? 'image'));
+
+            if ($existing + $saved >= $max) {
+                $errors[] = 'Only ' . $max . ' photos are allowed per item — "' . str_excerpt($original, 30) . '" was skipped.';
+                continue;
+            }
+
+            if ($error !== UPLOAD_ERR_OK) {
+                $errors[] = match ($error) {
+                    UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE =>
+                        '"' . str_excerpt($original, 30) . '" is larger than the server allows.',
+                    UPLOAD_ERR_PARTIAL =>
+                        '"' . str_excerpt($original, 30) . '" only uploaded partially. Try again.',
+                    default =>
+                        '"' . str_excerpt($original, 30) . '" could not be uploaded (error ' . $error . ').',
+                };
+                continue;
+            }
+
+            $tmp = (string) ($files['tmp_name'][$i] ?? '');
+
+            if (!is_uploaded_file($tmp)) {
+                $errors[] = '"' . str_excerpt($original, 30) . '" was rejected.';
+                continue;
+            }
+
+            if ((int) ($files['size'][$i] ?? 0) > $maxBytes) {
+                $errors[] = '"' . str_excerpt($original, 30) . '" is over the '
+                          . Config::get('uploads.max_size_mb', 8) . 'MB limit.';
+                continue;
+            }
+
+            // Header inspection, not the file extension — a renamed script
+            // never reaches the filesystem.
+            $info = ImageProcessor::inspect($tmp);
+
+            if (!$info['ok']) {
+                $errors[] = '"' . str_excerpt($original, 30) . '": ' . $info['error'];
+                continue;
+            }
+
+            $base      = bin2hex(random_bytes(12));
+            $fileName  = $base . '.' . $info['ext'];
+            $thumbName = $base . '_thumb.' . $info['ext'];
+
+            $result = ImageProcessor::resize($tmp, $dir . '/' . $fileName, $maxEdge);
+
+            if (!$result['ok']) {
+                $errors[] = '"' . str_excerpt($original, 30) . '": ' . ($result['error'] ?? 'could not be saved.');
+                continue;
+            }
+
+            $hasThumb = ImageProcessor::thumbnail($tmp, $dir . '/' . $thumbName, $thumbPx);
+
+            Database::insert('inventory_images', [
+                'item_id'     => $itemId,
+                'file_path'   => 'uploads/products/' . $fileName,
+                'thumb_path'  => $hasThumb ? 'uploads/products/' . $thumbName : null,
+                'file_name'   => mb_substr($original, 0, 200),
+                'file_size'   => (int) @filesize($dir . '/' . $fileName),
+                'width'       => $result['width'] ?? null,
+                'height'      => $result['height'] ?? null,
+                // First photo on a bare item becomes the main one automatically.
+                'is_primary'  => ($existing + $saved) === 0 ? 1 : 0,
+                'sort_order'  => $existing + $saved,
+                'uploaded_by' => Auth::id(),
+            ]);
+
+            $saved++;
+        }
+
+        return ['saved' => $saved, 'errors' => $errors];
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private function imagesFor(int $itemId): array
+    {
+        return Database::all(
+            'SELECT * FROM inventory_images WHERE item_id = :id ORDER BY is_primary DESC, sort_order, id',
+            ['id' => $itemId]
         );
     }
 

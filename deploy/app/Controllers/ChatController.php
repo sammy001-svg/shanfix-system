@@ -242,7 +242,7 @@ class ChatController extends Controller
                     'color'          => $me['avatar_color'],
                     'time'           => date('H:i'),
                     'is_mine'        => true,
-                    'attachment_url' => $storedPath ? url('storage/' . $storedPath) : null,
+                    'attachment_url' => $storedPath ? url('files/' . $storedPath) : null,
                     'attachment_name'=> $storedName,
                 ],
             ]);
@@ -279,7 +279,7 @@ class ChatController extends Controller
             'color'           => $m['avatar_color'],
             'time'            => date('H:i', strtotime($m['created_at'])),
             'is_mine'         => (int) $m['user_id'] === $meId,
-            'attachment_url'  => $m['attachment_path'] ? url('storage/' . $m['attachment_path']) : null,
+            'attachment_url'  => $m['attachment_path'] ? url('files/' . $m['attachment_path']) : null,
             'attachment_name' => $m['attachment_name'],
         ], $rows);
 

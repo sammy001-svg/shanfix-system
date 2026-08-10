@@ -352,6 +352,9 @@ class KopoKopo
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_CUSTOMREQUEST  => $method,
+            // cURL sends no User-Agent at all once headers are set by hand,
+            // and API edge protection commonly answers that with a bare 403.
+            CURLOPT_USERAGENT      => 'ShanfixBMS/1.0 (+PHP cURL)',
         ];
 
         if ($payload !== null) {
@@ -393,7 +396,7 @@ class KopoKopo
             return [
                 'ok' => false, 'status' => $status, 'body' => $body,
                 'json' => is_array($json) ? $json : null, 'headers' => $parsedHeaders,
-                'error' => $apiError ?: ('KopoKopo returned HTTP ' . $status . '.'),
+                'error' => $apiError ?: $this->httpErrorMessage($status, $body),
             ];
         }
 
@@ -403,11 +406,50 @@ class KopoKopo
         ];
     }
 
+    /**
+     * Message for a failure whose body carried no JSON error field.
+     *
+     * KopoKopo itself answers a bad request with JSON, so a bare status —
+     * especially 403 with an HTML or empty body — usually means something in
+     * front of the API refused us rather than the API disagreeing. Show the
+     * operator what actually came back instead of just the number.
+     */
+    private function httpErrorMessage(int $status, string $body): string
+    {
+        $hint = match ($status) {
+            401 => ' Check the Client ID and Secret, and that they belong to the environment selected above.',
+            403 => ' Refused. Check that the credentials match the environment selected above, that your'
+                 . ' KopoKopo application is still active, and that your server IP is permitted.',
+            404 => ' Check the environment setting — sandbox and production are different hosts.',
+            429 => ' Too many requests. Wait a moment and try again.',
+            default => '',
+        };
+
+        // Strip markup so a WAF's HTML page becomes one readable line.
+        $snippet = trim((string) preg_replace('/\s+/', ' ', strip_tags($body)));
+
+        if ($snippet !== '') {
+            $snippet = ' Response: "' . mb_substr($snippet, 0, 160) . '"';
+        }
+
+        return 'KopoKopo returned HTTP ' . $status . '.' . $hint . $snippet;
+    }
+
     /** Pull a human-readable message out of a KopoKopo error body. */
     private function extractError(array $json): string
     {
         if (!empty($json['error_description'])) {
             return (string) $json['error_description'];
+        }
+
+        // KopoKopo answers an account-level refusal with error_code /
+        // error_message rather than the OAuth-style error_description.
+        // Missing this reports a plain "HTTP 403" and buries the one line
+        // that actually says what is wrong.
+        foreach (['error_message', 'message'] as $key) {
+            if (!empty($json[$key]) && is_string($json[$key])) {
+                return $json[$key];
+            }
         }
 
         if (!empty($json['error']) && is_string($json['error'])) {

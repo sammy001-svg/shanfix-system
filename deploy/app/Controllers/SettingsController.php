@@ -50,7 +50,7 @@ class SettingsController extends Controller
             ],
             'events'         => \App\Services\Notifier::EVENTS,
             'defaultCallback' => rtrim((string) Config::get('app.url', ''), '/') . base_path() . '/webhooks/kopokopo',
-            'appKeySet'       => (string) Config::get('security.app_key', '') !== '',
+            'appUrlSet'       => rtrim((string) Config::get('app.url', ''), '/') !== '',
         ]);
     }
 
@@ -161,12 +161,6 @@ class SettingsController extends Controller
             if (!$secretProvided)     { $v->custom('kopokopo_client_secret', false, 'Client Secret is required to enable KopoKopo.'); }
             if ($till === '')         { $v->custom('kopokopo_till_number', false, 'Till number is required to enable KopoKopo.'); }
             if (!$apiKeyProvided)     { $v->custom('kopokopo_api_key', false, 'The API key is required — it verifies webhook signatures.'); }
-
-            if ((string) Config::get('security.app_key', '') === '') {
-                $v->custom('kopokopo_client_secret', false,
-                    'Set security.app_key in config/config.php before storing API secrets. '
-                    . 'Generate one with: php -r "echo bin2hex(random_bytes(32));"');
-            }
 
             $callback = trim((string) $request->input('kopokopo_callback_url', ''));
             if ($callback !== '' && !str_starts_with($callback, 'https://')) {
@@ -295,17 +289,20 @@ class SettingsController extends Controller
         }
 
         if ($smsOn) {
-            if (trim((string) $request->input('sms_username', '')) === '') {
-                $v->custom('sms_username', false, 'The gateway username is required to enable SMS.');
+            if (trim((string) $request->input('sms_client_id', '')) === '') {
+                $v->custom('sms_client_id', false, 'The Client ID from Shanfix Bulk SMS is required to enable SMS.');
             }
             if (trim((string) $request->input('sms_api_key', '')) === '' && !Settings::hasSecret('sms_api_key')) {
                 $v->custom('sms_api_key', false, 'The API key is required to enable SMS.');
             }
+            if (trim((string) $request->input('sms_sender_id', '')) === '') {
+                $v->custom('sms_sender_id', false, 'A sender ID approved on your Shanfix Bulk SMS account is required.');
+            }
         }
 
-        if (($emailOn || $smsOn) && (string) Config::get('security.app_key', '') === '') {
-            $v->custom('smtp_password', false,
-                'Set security.app_key in config/config.php before storing mail or SMS credentials.');
+        $smsBase = trim((string) $request->input('sms_base_url', ''));
+        if ($smsBase !== '' && !str_starts_with($smsBase, 'https://')) {
+            $v->custom('sms_base_url', false, 'The SMS portal address must start with https://');
         }
 
         $window = trim((string) $request->input('notify_send_window', ''));
@@ -316,6 +313,18 @@ class SettingsController extends Controller
         $days = trim((string) $request->input('notify_overdue_days', ''));
         if ($days !== '' && !preg_match('/^\d+(\s*,\s*\d+)*$/', $days)) {
             $v->custom('notify_overdue_days', false, 'Enter day numbers separated by commas, e.g. 1,7,14');
+        }
+
+        // The two look-ahead windows take the same comma-separated form.
+        $lookAhead = [];
+        foreach (['notify_due_days', 'notify_expiry_days'] as $field) {
+            $value = trim((string) $request->input($field, ''));
+
+            if ($value !== '' && !preg_match('/^\d+(\s*,\s*\d+)*$/', $value)) {
+                $v->custom($field, false, 'Enter day numbers separated by commas, e.g. 3,1');
+            }
+
+            $lookAhead[$field] = $value === '' ? '' : preg_replace('/\s+/', '', $value);
         }
 
         if ($v->fails()) {
@@ -333,10 +342,14 @@ class SettingsController extends Controller
             'smtp_reply_to'   => trim((string) $request->input('smtp_reply_to', '')),
 
             'sms_enabled'     => $smsOn ? '1' : '0',
-            'sms_username'    => trim((string) $request->input('sms_username', '')),
+            'sms_provider'    => 'shanfix',
+            'sms_client_id'   => trim((string) $request->input('sms_client_id', '')),
             'sms_sender_id'   => trim((string) $request->input('sms_sender_id', '')),
+            'sms_base_url'    => $smsBase !== '' ? rtrim($smsBase, '/') : \App\Services\Sms::DEFAULT_BASE_URL,
 
             'notify_overdue_days' => $days !== '' ? preg_replace('/\s+/', '', $days) : '1,7,14',
+            'notify_due_days'     => $lookAhead['notify_due_days'],
+            'notify_expiry_days'  => $lookAhead['notify_expiry_days'],
             'notify_send_window'  => $window,
             'notify_max_attempts' => max(1, min(10, $request->int('notify_max_attempts', 3))),
 

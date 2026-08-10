@@ -39,6 +39,25 @@ function say(string $message): void
     }
 }
 
+/**
+ * A problem the operator has to know about.
+ *
+ * The documented cron line sends stdout and stderr to /dev/null, so a plain
+ * say() would be invisible in exactly the unattended runs that matter. This
+ * lands in storage/logs as well.
+ */
+function alert(string $message): void
+{
+    Logger::error('Cron: ' . $message);
+
+    global $verbose;
+    if ($verbose) {
+        echo '[' . date('H:i:s') . '] ** ' . $message . PHP_EOL;
+    } else {
+        fwrite(STDERR, 'Cron: ' . $message . PHP_EOL);
+    }
+}
+
 $started = microtime(true);
 
 try {
@@ -99,23 +118,44 @@ try {
     }
 
     // -----------------------------------------------------------------
-    // 3. Queue overdue reminders — respecting the sending window so a
+    // 3. Queue the date-based chases — respecting the sending window so a
     //    client is never texted at 3am.
+    //
+    //    Nothing goes out unless we can build a real link. Cron has no HTTP
+    //    request to borrow a hostname from, so without app.url every share
+    //    link, proof link and logo would point at localhost. Holding the
+    //    message costs a run; sending a dead link costs a customer.
     // -----------------------------------------------------------------
-    if (withinSendWindow()) {
-        $reminders = Notifier::queueOverdueReminders();
+    $canLink = Notifier::canBuildLinks();
 
-        if ($reminders['queued'] > 0) {
-            say("Queued {$reminders['queued']} overdue reminder(s)");
+    if (!$canLink) {
+        alert(
+            'app.url is not set in config/config.php, so client links would point at '
+            . 'localhost. No notifications sent this run — set app.url and they will go '
+            . 'out on the next one.'
+        );
+    }
+
+    if ($canLink && withinSendWindow()) {
+        foreach ([
+            'overdue reminder'   => [Notifier::class, 'queueOverdueReminders'],
+            'due reminder'       => [Notifier::class, 'queueDueReminders'],
+            'expiring quotation' => [Notifier::class, 'queueExpiringQuotations'],
+        ] as $label => $chaser) {
+            $result = $chaser();
+
+            if ($result['queued'] > 0) {
+                say("Queued {$result['queued']} {$label}(s)");
+            }
         }
-    } else {
+    } elseif ($canLink) {
         say('Outside the sending window — reminders held back');
     }
 
     // -----------------------------------------------------------------
     // 4. Work the queue
     // -----------------------------------------------------------------
-    if (withinSendWindow()) {
+    if ($canLink && withinSendWindow()) {
         $result = Notifier::processQueue(40);
 
         if ($result['processed'] > 0) {

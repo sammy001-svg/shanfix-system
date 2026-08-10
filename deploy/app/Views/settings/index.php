@@ -107,7 +107,7 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           <?php if ($settings['logo']): ?>
             <div class="field field--full">
               <div class="text-xs uppercase fw-700 text-muted mb-8">Current logo</div>
-              <img src="<?= url('storage/' . $settings['logo']) ?>" alt="Company logo"
+              <img src="<?= url('files/' . $settings['logo']) ?>" alt="Company logo"
                    style="max-height:70px;background:#fff;padding:8px;border:1px solid var(--border);border-radius:var(--r)">
             </div>
           <?php endif; ?>
@@ -227,18 +227,6 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
   </form>
 
 <?php elseif ($tab === 'payments'): ?>
-
-  <?php if (!$appKeySet): ?>
-    <div class="alert alert--warning">
-      <?= icon('alert-triangle') ?>
-      <div class="alert__body">
-        <strong>Set an application key first.</strong>
-        API secrets are encrypted before they are stored, which needs
-        <code>security.app_key</code> in <code>config/config.php</code>.
-        Generate one with <code>php -r "echo bin2hex(random_bytes(32));"</code>.
-      </div>
-    </div>
-  <?php endif; ?>
 
   <div class="alert alert--info">
     <?= icon('info') ?>
@@ -423,13 +411,15 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
 
 <?php elseif ($tab === 'messaging'): ?>
 
-  <?php if (!$appKeySet): ?>
+  <?php if (!$appUrlSet): ?>
     <div class="alert alert--warning">
       <?= icon('alert-triangle') ?>
       <div class="alert__body">
-        <strong>Set an application key first.</strong>
-        Mail and SMS credentials are encrypted before storage, which needs
-        <code>security.app_key</code> in <code>config/config.php</code>.
+        <strong>Set your public address before relying on scheduled messages.</strong>
+        <code>app.url</code> is empty in <code>config/config.php</code>. Messages you send
+        by hand are fine, but cron has no web request to work from — so reminders,
+        receipts and proof approvals would carry links pointing at
+        <code>localhost</code>. Cron holds them back until this is set.
       </div>
     </div>
   <?php endif; ?>
@@ -533,19 +523,22 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
         <div class="card__head">
           <?= icon('message') ?>
           <div>
-            <div class="card__title">SMS (Africa's Talking)</div>
-            <div class="card__sub">Credentials from your Africa's Talking dashboard</div>
+            <div class="card__title">SMS (Shanfix Bulk SMS)</div>
+            <div class="card__sub">Credentials from your portal's Developer / API page</div>
           </div>
         </div>
         <div class="card__body">
           <div class="form-grid form-grid--2">
             <div class="field field--full">
-              <label class="label" for="sms_username">Gateway username</label>
-              <input class="input <?= isset($errors['sms_username']) ? 'has-error' : '' ?>"
-                     id="sms_username" name="sms_username" autocomplete="off"
-                     value="<?= e(setting('sms_username', '')) ?>" placeholder="shanfix">
-              <span class="field-hint">Type <code>sandbox</code> to test without spending credit.</span>
-              <?= error_for($errors ?? [], 'sms_username') ?>
+              <label class="label" for="sms_client_id">Client ID</label>
+              <input class="input <?= isset($errors['sms_client_id']) ? 'has-error' : '' ?>"
+                     id="sms_client_id" name="sms_client_id" autocomplete="off"
+                     value="<?= e(setting('sms_client_id', '')) ?>" placeholder="e.g. SFX-1042">
+              <span class="field-hint">
+                Sign in at <code><?= e(setting('sms_base_url', \App\Services\Sms::DEFAULT_BASE_URL)) ?></code>
+                and open <strong>API</strong> to copy your Client ID and key.
+              </span>
+              <?= error_for($errors ?? [], 'sms_client_id') ?>
             </div>
 
             <div class="field field--full">
@@ -561,13 +554,24 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
               <?= error_for($errors ?? [], 'sms_api_key') ?>
             </div>
 
-            <div class="field field--full">
+            <div class="field">
               <label class="label" for="sms_sender_id">Sender ID</label>
-              <input class="input" id="sms_sender_id" name="sms_sender_id" maxlength="20"
+              <input class="input <?= isset($errors['sms_sender_id']) ? 'has-error' : '' ?>"
+                     id="sms_sender_id" name="sms_sender_id" maxlength="20"
                      value="<?= e(setting('sms_sender_id', '')) ?>" placeholder="SHANFIX">
               <span class="field-hint">
-                Your registered alphanumeric sender or shortcode. Leave blank to use the shared pool.
+                Must already be approved on that account, or the gateway rejects the send.
               </span>
+              <?= error_for($errors ?? [], 'sms_sender_id') ?>
+            </div>
+
+            <div class="field">
+              <label class="label" for="sms_base_url">Portal address</label>
+              <input class="input <?= isset($errors['sms_base_url']) ? 'has-error' : '' ?>"
+                     id="sms_base_url" name="sms_base_url"
+                     value="<?= e(setting('sms_base_url', \App\Services\Sms::DEFAULT_BASE_URL)) ?>">
+              <span class="field-hint">Leave as is unless you run the platform on another domain.</span>
+              <?= error_for($errors ?? [], 'sms_base_url') ?>
             </div>
           </div>
 
@@ -577,7 +581,7 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
             <input type="checkbox" name="sms_enabled" value="1" <?= setting('sms_enabled') === '1' ? 'checked' : '' ?>>
             <span class="check__text">
               <strong>Enable SMS sending</strong>
-              <span>SMS is charged per 160 characters — keep templates short.</span>
+              <span>Charged in SMS units per 160 characters — keep templates short.</span>
             </span>
           </label>
         </div>
@@ -634,6 +638,24 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           </div>
 
           <div class="field">
+            <label class="label" for="notify_due_days">Remind before an invoice is due</label>
+            <input class="input <?= isset($errors['notify_due_days']) ? 'has-error' : '' ?>"
+                   id="notify_due_days" name="notify_due_days"
+                   value="<?= e(setting('notify_due_days', '3')) ?>">
+            <span class="field-hint">Days before the due date. Blank turns the early reminder off.</span>
+            <?= error_for($errors ?? [], 'notify_due_days') ?>
+          </div>
+
+          <div class="field">
+            <label class="label" for="notify_expiry_days">Chase a quotation before it expires</label>
+            <input class="input <?= isset($errors['notify_expiry_days']) ? 'has-error' : '' ?>"
+                   id="notify_expiry_days" name="notify_expiry_days"
+                   value="<?= e(setting('notify_expiry_days', '3')) ?>">
+            <span class="field-hint">Days before it lapses. Only quotations still awaiting an answer.</span>
+            <?= error_for($errors ?? [], 'notify_expiry_days') ?>
+          </div>
+
+          <div class="field">
             <label class="label" for="notify_send_window">Only send between</label>
             <input class="input <?= isset($errors['notify_send_window']) ? 'has-error' : '' ?>"
                    id="notify_send_window" name="notify_send_window"
@@ -658,21 +680,24 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
         <div>
           <div class="card__title">Message templates</div>
           <div class="card__sub">
-            Placeholders: <code>{client_name}</code> <code>{contact_name}</code> <code>{company_name}</code>
-            <code>{doc_number}</code> <code>{amount}</code> <code>{balance}</code> <code>{due_date}</code>
-            <code>{valid_until}</code> <code>{link}</code> <code>{job_number}</code> <code>{job_title}</code>
+            <strong>Everyone:</strong> <code>{client_name}</code> <code>{contact_name}</code>
+            <code>{company_name}</code> <code>{company_phone}</code> <code>{link}</code><br>
+            <strong>Documents:</strong> <code>{doc_number}</code> <code>{doc_type}</code> <code>{title}</code>
+            <code>{amount}</code> <code>{subtotal}</code> <code>{vat}</code> <code>{paid}</code>
+            <code>{balance}</code> <code>{issue_date}</code> <code>{due_date}</code> <code>{valid_until}</code>
+            <code>{days_overdue}</code> <code>{days_to_due}</code> <code>{days_to_expiry}</code><br>
+            <strong>Payments:</strong> <code>{paid_now}</code> <code>{payment_ref}</code> <code>{method}</code>
+            <code>{paid_for}</code><br>
+            <strong>Jobs:</strong> <code>{job_number}</code> <code>{job_title}</code> <code>{job_stage}</code><br>
+            <strong>Deliveries:</strong> <code>{dn_number}</code> <code>{delivery_date}</code>
+            <code>{delivered_to}</code> <code>{delivery_address}</code> <code>{delivered_by}</code>
+            <code>{vehicle_reg}</code> <code>{received_by}</code>
           </div>
         </div>
       </div>
       <div class="card__body">
         <div class="text-xs uppercase fw-700 text-muted mb-12">Email</div>
-        <?php foreach ([
-            'quotation_sent'   => 'Quotation sent',
-            'invoice_sent'     => 'Invoice sent',
-            'payment_received' => 'Payment received',
-            'invoice_overdue'  => 'Overdue reminder',
-            'job_ready'        => 'Job ready for collection',
-        ] as $key => $label): ?>
+        <?php foreach ($events as $key => $label): ?>
           <div class="form-grid form-grid--2 mb-16">
             <div class="field">
               <label class="label" for="tpl_<?= e($key) ?>_subject"><?= e($label) ?> — subject</label>
@@ -693,12 +718,7 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           SMS <span class="text-muted" style="font-weight:400;text-transform:none">— keep under 160 characters to stay at one credit</span>
         </div>
         <div class="form-grid form-grid--2">
-          <?php foreach ([
-              'invoice_sent'     => 'Invoice sent',
-              'payment_received' => 'Payment received',
-              'invoice_overdue'  => 'Overdue reminder',
-              'job_ready'        => 'Job ready',
-          ] as $key => $label): ?>
+          <?php foreach ($events as $key => $label): ?>
             <?php $tpl = (string) setting("tpl_sms_{$key}", ''); ?>
             <div class="field">
               <label class="label" for="tpl_sms_<?= e($key) ?>">
@@ -758,11 +778,20 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
             <input class="input" id="test_sms" name="to"
                    value="<?= e(auth()['phone'] ?? '') ?>" placeholder="0712345678">
           </div>
-          <button class="btn btn--outline btn--block" type="submit" <?= setting('sms_username') ? '' : 'disabled' ?>>
+          <button class="btn btn--outline btn--block" type="submit" <?= setting('sms_client_id') ? '' : 'disabled' ?>>
             <?= icon('message') ?> Send test SMS
           </button>
         </form>
-        <p class="field-hint mt-8 mb-0">Costs one SMS credit unless you are on sandbox.</p>
+        <form method="post" action="<?= url('/settings/messaging/test') ?>" class="mt-8">
+          <?= csrf_field() ?>
+          <input type="hidden" name="channel" value="sms_balance">
+          <button class="btn btn--ghost btn--block" type="submit" <?= setting('sms_client_id') ? '' : 'disabled' ?>>
+            Check credentials &amp; balance
+          </button>
+        </form>
+        <p class="field-hint mt-8 mb-0">
+          A test send costs one SMS unit. Checking the balance is free.
+        </p>
       </div>
     </div>
   </div>

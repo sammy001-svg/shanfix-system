@@ -1,7 +1,7 @@
 <?php
 require_once APP_PATH . '/Views/partials/icons.php';
 
-$logoPath = $company['logo'] ? url('storage/' . $company['logo']) : null;
+$logoPath = $company['logo'] ? url('files/' . $company['logo']) : null;
 ?>
 
 <div class="print-bar no-print">

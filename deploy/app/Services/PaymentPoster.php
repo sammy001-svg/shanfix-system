@@ -103,9 +103,23 @@ class PaymentPoster
 
             // The amount on a receipt is what was just paid, not the invoice total.
             $context['amount']      = money($payment['amount']);
+            $context['paid_now']    = money($payment['amount']);
             $context['payment_ref'] = $payment['reference'] ?? '';
+            $context['method']      = match ((string) ($payment['method'] ?? '')) {
+                'mpesa_stk', 'mpesa_manual' => 'M-Pesa',
+                'bank'   => 'bank transfer',
+                'cash'   => 'cash',
+                'cheque' => 'cheque',
+                default  => 'payment',
+            };
 
-            Notifier::dispatch('payment_received', $context);
+            // A part payment and a settled invoice deserve different words:
+            // one says "thank you, here is what is left", the other says
+            // "you are all square".
+            $outstanding = (float) ($doc['balance'] ?? 0);
+            $event = ($doc && $outstanding > 0.004) ? 'payment_partial' : 'payment_received';
+
+            Notifier::dispatch($event, $context);
             Notifier::processQueue(5);
         } catch (\Throwable $e) {
             // A failed confirmation must never break payment recording.

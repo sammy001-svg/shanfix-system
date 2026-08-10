@@ -18,11 +18,44 @@ use App\Core\View;
 class Notifier
 {
     public const EVENTS = [
-        'quotation_sent'   => 'Quotation sent to client',
-        'invoice_sent'     => 'Invoice sent to client',
-        'payment_received' => 'Payment received confirmation',
-        'invoice_overdue'  => 'Overdue invoice reminder',
-        'job_ready'        => 'Job ready for collection',
+        // Quotations
+        'quotation_sent'      => 'Quotation sent to client',
+        'quotation_accepted'  => 'Quotation accepted — confirming we are proceeding',
+        'quotation_expiring'  => 'Quotation about to expire',
+
+        // Invoices and money
+        'invoice_sent'        => 'Invoice sent to client',
+        'payment_reminder'    => 'Payment due shortly (before the due date)',
+        'invoice_overdue'     => 'Overdue invoice reminder',
+        'payment_partial'     => 'Part payment received, balance outstanding',
+        'payment_received'    => 'Payment received in full',
+        'receipt_issued'      => 'Receipt issued',
+
+        // Production
+        'proof_ready'         => 'Proof ready for client approval',
+        'job_in_production'   => 'Job has gone into production',
+        'job_ready'           => 'Job ready for collection',
+
+        // Delivery
+        'delivery_dispatched' => 'Delivery dispatched — on the way',
+        'delivery_confirmed'  => 'Delivery received and signed for',
+    ];
+
+    /**
+     * Events whose message is about a job or a delivery rather than a
+     * document. The email template uses this to pick the detail block.
+     */
+    /**
+     * Characters of the share token used in the SMS short link. Ten hex
+     * characters is 40 bits — far too many to guess — and saves about 41
+     * characters against the full link, which is the difference between one
+     * billable SMS part and two.
+     */
+    public const SHORT_TOKEN_LENGTH = 10;
+
+    public const JOB_EVENTS = [
+        'proof_ready', 'job_in_production', 'job_ready',
+        'delivery_dispatched', 'delivery_confirmed',
     ];
 
     // -- Queueing ------------------------------------------------------
@@ -86,11 +119,19 @@ class Notifier
         $subject = self::render(Settings::get("tpl_{$event}_subject", ucfirst($event)), $context);
         $intro   = self::render(Settings::get("tpl_{$event}_intro", ''), $context);
 
+        $company = Settings::company();
+
+        // Mail clients fetch images over the internet, so the logo needs an
+        // absolute URL and a route that does not require a session.
+        $company['logo_url'] = $company['logo'] !== ''
+            ? self::absoluteUrl('/brand/logo')
+            : '';
+
         $html = View::capture('emails/document', [
             'event'   => $event,
             'intro'   => $intro,
             'context' => $context,
-            'company' => Settings::company(),
+            'company' => $company,
             'footer'  => Settings::get('email_footer_note', ''),
         ], null);
 
@@ -244,6 +285,9 @@ class Notifier
         $token = self::ensureToken((int) $doc['id'], $doc['public_token'] ?? null);
         $link  = self::publicUrl($token);
 
+        $paid    = (float) ($doc['amount_paid'] ?? 0);
+        $balance = (float) ($doc['balance'] ?? 0);
+
         return [
             'entity_type'  => 'document',
             'entity_id'    => (int) $doc['id'],
@@ -253,23 +297,38 @@ class Notifier
             'email'        => $doc['client_email'] ?? '',
             'phone'        => $doc['client_phone'] ?? '',
             'company_name' => Settings::get('company_name', 'Shanfix Technology'),
+            'company_phone'=> Settings::get('company_phone', ''),
             'doc_number'   => $doc['doc_number'] ?? '',
             'doc_type'     => ucfirst((string) ($doc['doc_type'] ?? 'document')),
             'title'        => $doc['title'] ?? '',
             'amount'       => money($doc['total'] ?? 0),
-            'balance'      => money($doc['balance'] ?? 0),
+            'subtotal'     => money($doc['subtotal'] ?? 0),
+            'vat'          => money($doc['vat_amount'] ?? 0),
+            'discount'     => money($doc['discount_amount'] ?? 0),
+            'paid'         => money($paid),
+            'balance'      => money($balance),
             'total_raw'    => (float) ($doc['total'] ?? 0),
+            'balance_raw'  => $balance,
             'issue_date'   => fdate($doc['issue_date'] ?? null),
             'due_date'     => fdate($doc['due_date'] ?? null),
             'valid_until'  => fdate($doc['valid_until'] ?? null),
+            'days_to_due'  => self::daysUntil($doc['due_date'] ?? null),
+            'days_to_expiry' => self::daysUntil($doc['valid_until'] ?? null),
             'link'         => $link,
-            'short_link'   => $link,
+            'short_link'   => self::shortUrl($token),
             'document'     => $doc,
         ];
     }
 
     public static function jobContext(array $job): array
     {
+        $stages = [
+            'pending' => 'Queued', 'artwork' => 'Artwork', 'proof_sent' => 'Proof sent',
+            'approved' => 'Approved', 'production' => 'In production', 'finishing' => 'Finishing',
+            'ready' => 'Ready', 'delivered' => 'Delivered', 'on_hold' => 'On hold',
+            'cancelled' => 'Cancelled',
+        ];
+
         return [
             'entity_type'  => 'job',
             'entity_id'    => (int) $job['id'],
@@ -279,11 +338,107 @@ class Notifier
             'email'        => $job['client_email'] ?? '',
             'phone'        => $job['client_phone'] ?? '',
             'company_name' => Settings::get('company_name', 'Shanfix Technology'),
+            'company_phone'=> Settings::get('company_phone', ''),
+            'company_address' => Settings::get('company_address', ''),
             'job_number'   => $job['job_number'] ?? '',
             'job_title'    => $job['title'] ?? '',
+            'job_stage'    => $stages[$job['stage'] ?? ''] ?? ucfirst((string) ($job['stage'] ?? '')),
+            'description'  => $job['description'] ?? '',
+            'due_date'     => fdate($job['due_date'] ?? null),
             'doc_number'   => $job['doc_number'] ?? '',
             'link'         => '',
             'job'          => $job,
+        ];
+    }
+
+    /**
+     * Context for a delivery note. Carries the details a client actually
+     * wants when something is on its way: who is bringing it, in what, and
+     * where to.
+     */
+    public static function deliveryContext(array $note): array
+    {
+        return [
+            'entity_type'   => 'delivery_note',
+            'entity_id'     => (int) $note['id'],
+            'client_id'     => (int) $note['client_id'],
+            'client_name'   => $note['client_name'] ?? '',
+            'contact_name'  => self::firstName($note['client_contact'] ?? ($note['client_name'] ?? '')),
+            'email'         => $note['client_email'] ?? '',
+            'phone'         => $note['client_phone'] ?? '',
+            'company_name'  => Settings::get('company_name', 'Shanfix Technology'),
+            'company_phone' => Settings::get('company_phone', ''),
+            'dn_number'     => $note['dn_number'] ?? '',
+            'job_number'    => $note['job_number'] ?? '',
+            'doc_number'    => $note['doc_number'] ?? '',
+            'job_title'     => $note['job_title'] ?? '',
+            'delivery_date' => fdate($note['delivery_date'] ?? null),
+            'delivered_to'  => $note['delivered_to'] ?? '',
+            'delivery_address' => $note['delivery_address'] ?? '',
+            'delivered_by'  => $note['delivered_by'] ?? '',
+            'vehicle_reg'   => $note['vehicle_reg'] ?? '',
+            'received_by'   => $note['received_by'] ?? '',
+            'received_at'   => fdate($note['received_at'] ?? null),
+            'link'          => '',
+            'delivery'      => $note,
+        ];
+    }
+
+    /** Whole days from today until $date; null when there is no date. */
+    private static function daysUntil(?string $date): string
+    {
+        if (!$date) {
+            return '';
+        }
+
+        $target = strtotime($date);
+
+        if ($target === false) {
+            return '';
+        }
+
+        $days = (int) floor(($target - strtotime('today')) / 86400);
+
+        return (string) $days;
+    }
+
+    /**
+     * The newest proof still awaiting a decision on this job, with a share
+     * token minted if it does not have one yet.
+     *
+     * Returns null when there is nothing pending — a proof_ready message
+     * with no proof behind it would only confuse the client.
+     *
+     * @return array{id:int, token:string, link:string, short_link:string}|null
+     */
+    public static function pendingProof(int $jobId): ?array
+    {
+        $proof = Database::first(
+            "SELECT id, public_token, version
+               FROM job_files
+              WHERE job_id = :id AND file_type = 'proof' AND status = 'pending'
+           ORDER BY version DESC, id DESC
+              LIMIT 1",
+            ['id' => $jobId]
+        );
+
+        if (!$proof) {
+            return null;
+        }
+
+        $token = (string) ($proof['public_token'] ?? '');
+
+        if ($token === '') {
+            $token = bin2hex(random_bytes(24));   // 48 hex chars
+            Database::update('job_files', ['public_token' => $token], ['id' => $proof['id']]);
+        }
+
+        return [
+            'id'         => (int) $proof['id'],
+            'version'    => (int) $proof['version'],
+            'token'      => $token,
+            'link'       => self::absoluteUrl('/proof/' . $token),
+            'short_link' => self::absoluteUrl('/p/' . substr($token, 0, self::SHORT_TOKEN_LENGTH)),
         ];
     }
 
@@ -303,15 +458,54 @@ class Notifier
 
     public static function publicUrl(string $token): string
     {
+        return self::absoluteUrl('/view/' . $token);
+    }
+
+    /**
+     * The same document on a much shorter URL, for SMS.
+     *
+     * The full link is 79 characters, which alone pushes a routine text over
+     * one billable part. This trims it to about 38.
+     */
+    public static function shortUrl(string $token): string
+    {
+        return self::absoluteUrl('/v/' . substr($token, 0, self::SHORT_TOKEN_LENGTH));
+    }
+
+    /**
+     * A full https://host/... URL. Email needs this: a mail client fetching
+     * an image has no idea what our base path is, and cron runs have no
+     * request to infer a host from — so set app.url in config.php.
+     */
+    public static function absoluteUrl(string $path): string
+    {
+        $path = '/' . ltrim($path, '/');
         $base = rtrim((string) Config::get('app.url', ''), '/');
 
         if ($base === '') {
             $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $base   = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-            return $base . url('/view/' . $token);
+            return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . url($path);
         }
 
-        return $base . base_path() . '/view/' . $token;
+        return $base . base_path() . $path;
+    }
+
+    /**
+     * Can we build a link a client could actually click?
+     *
+     * In a web request the host header stands in for a missing app.url, so
+     * links come out right. Cron has no request: the fallback resolves to
+     * "localhost", and every share link, proof link and logo in a reminder
+     * would point at the server's own loopback address. Better to hold the
+     * message than to send a dead link to a customer.
+     */
+    public static function canBuildLinks(): bool
+    {
+        if (rtrim((string) Config::get('app.url', ''), '/') !== '') {
+            return true;
+        }
+
+        return !empty($_SERVER['HTTP_HOST']);
     }
 
     /**
@@ -361,60 +555,132 @@ class Notifier
      */
     public static function queueOverdueReminders(): array
     {
-        if (!Settings::bool('notify_invoice_overdue_email') && !Settings::bool('notify_invoice_overdue_sms')) {
+        return self::chase(
+            'invoice_overdue',
+            'overdue',
+            (string) Settings::get('notify_overdue_days', '1,7,14'),
+            "d.doc_type = 'invoice'
+               AND d.status NOT IN ('cancelled','paid','draft')
+               AND d.balance > 0
+               AND d.due_date IS NOT NULL
+               AND DATEDIFF(CURDATE(), d.due_date) = :days",
+            'days_overdue'
+        );
+    }
+
+    /**
+     * Nudge before the due date, not after. Same machinery as the overdue
+     * chase, counting the other way.
+     *
+     * @return array{queued:int, checked:int}
+     */
+    public static function queueDueReminders(): array
+    {
+        return self::chase(
+            'payment_reminder',
+            'due',
+            (string) Settings::get('notify_due_days', '3'),
+            "d.doc_type = 'invoice'
+               AND d.status NOT IN ('cancelled','paid','draft')
+               AND d.balance > 0
+               AND d.due_date IS NOT NULL
+               AND DATEDIFF(d.due_date, CURDATE()) = :days",
+            'days_to_due'
+        );
+    }
+
+    /**
+     * Chase a quotation before it lapses. Only ones still open — an accepted
+     * or rejected quote needs no chasing.
+     *
+     * @return array{queued:int, checked:int}
+     */
+    public static function queueExpiringQuotations(): array
+    {
+        return self::chase(
+            'quotation_expiring',
+            'expiring',
+            (string) Settings::get('notify_expiry_days', '3'),
+            "d.doc_type = 'quotation'
+               AND d.status = 'sent'
+               AND d.valid_until IS NOT NULL
+               AND DATEDIFF(d.valid_until, CURDATE()) = :days",
+            'days_to_expiry'
+        );
+    }
+
+    /**
+     * The shared engine behind every date-based chase.
+     *
+     * @param string $event     Which notification to send
+     * @param string $lockKey   Prefix for the idempotency lock
+     * @param string $offsets   Comma-separated day offsets from settings
+     * @param string $where     SQL predicate over documents d / clients c, using :days
+     * @param string $dayField  Context key to expose the offset under
+     *
+     * @return array{queued:int, checked:int}
+     */
+    private static function chase(
+        string $event,
+        string $lockKey,
+        string $offsets,
+        string $where,
+        string $dayField
+    ): array {
+        // Nothing enabled on either channel means nothing to do.
+        if (!Settings::bool("notify_{$event}_email") && !Settings::bool("notify_{$event}_sms")) {
             return ['queued' => 0, 'checked' => 0];
         }
 
-        $offsets = array_values(array_filter(array_map(
+        $days = array_values(array_filter(array_map(
             static fn($d) => (int) trim($d),
-            explode(',', (string) Settings::get('notify_overdue_days', '1,7,14'))
-        ), static fn($d) => $d > 0));
+            explode(',', $offsets)
+        ), static fn($d) => $d >= 0));
 
-        if ($offsets === []) {
+        if ($days === []) {
             return ['queued' => 0, 'checked' => 0];
         }
 
         $queued  = 0;
         $checked = 0;
 
-        foreach ($offsets as $days) {
-            $invoices = Database::all(
+        foreach ($days as $offset) {
+            $rows = Database::all(
                 "SELECT d.*, c.name AS client_name, c.email AS client_email,
                         c.phone AS client_phone, c.contact_person AS client_contact
                    FROM documents d
                    JOIN clients c ON c.id = d.client_id
-                  WHERE d.doc_type = 'invoice'
-                    AND d.status NOT IN ('cancelled','paid','draft')
-                    AND d.balance > 0
-                    AND d.due_date IS NOT NULL
-                    AND DATEDIFF(CURDATE(), d.due_date) = :days",
-                ['days' => $days]
+                  WHERE {$where}",
+                ['days' => $offset]
             );
 
-            foreach ($invoices as $invoice) {
+            foreach ($rows as $row) {
                 $checked++;
-                $lockKey = 'overdue:' . $invoice['id'] . ':' . $days;
 
                 // INSERT on a unique key is our idempotency guard.
                 try {
                     Database::run(
                         'INSERT INTO notification_locks (lock_key) VALUES (:k)',
-                        ['k' => $lockKey]
+                        ['k' => $lockKey . ':' . $row['id'] . ':' . $offset]
                     );
                 } catch (\Throwable) {
                     continue;   // already chased at this offset
                 }
 
-                $context = self::documentContext($invoice);
-                $context['days_overdue'] = (string) $days;
+                $context = self::documentContext($row);
+                $context[$dayField] = (string) $offset;
 
-                $result = self::dispatch('invoice_overdue', $context);
-                $queued += $result['queued'];
+                $queued += self::dispatch($event, $context)['queued'];
             }
         }
 
         if ($queued > 0) {
-            ActivityLog::record('overdue_reminders_queued', 'notification', null, $queued . ' overdue reminder(s) queued');
+            ActivityLog::record(
+                $event . '_queued',
+                'notification',
+                null,
+                $queued . ' ' . str_replace('_', ' ', $event) . ' message(s) queued'
+            );
         }
 
         return ['queued' => $queued, 'checked' => $checked];

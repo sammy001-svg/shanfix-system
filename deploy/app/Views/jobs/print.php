@@ -1,7 +1,7 @@
 <?php
 require_once APP_PATH . '/Views/partials/icons.php';
 
-$logoPath = $company['logo'] ? url('storage/' . $company['logo']) : null;
+$logoPath = $company['logo'] ? url('files/' . $company['logo']) : null;
 $overdue  = $job['due_date'] && strtotime($job['due_date']) < time()
     && !in_array($job['stage'], ['delivered', 'cancelled'], true);
 ?>

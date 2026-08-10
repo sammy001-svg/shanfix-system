@@ -39,6 +39,12 @@ class AuthController extends Controller
             Response::to('/login');
         }
 
+        // Only after the password checked out — never issue a persistent
+        // token off the back of a failed attempt.
+        if ($request->bool('remember')) {
+            Auth::remember((int) $result['user']['id']);
+        }
+
         ActivityLog::record('login', 'user', (int) $result['user']['id'], $result['user']['name'] . ' signed in');
 
         $intended = Session::get('intended_url');
@@ -137,9 +143,18 @@ class AuthController extends Controller
 
         ActivityLog::record('password_changed', 'user', (int) $me['id'], 'Changed own password');
 
+        // Every "keep me signed in" device was trusted on the old password,
+        // so they all have to sign in again — that is the point of changing it.
+        Auth::forgetAllRemembered((int) $me['id']);
+
         // Force a fresh session so any other active session is invalidated.
         Session::regenerate();
-        Session::success('Your password has been changed.');
+
+        Session::success(
+            'Your password has been changed. Any device you had chosen to stay '
+            . 'signed in on will need the new password.'
+        );
+
         Response::to('/profile');
     }
 }

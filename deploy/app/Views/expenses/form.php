@@ -167,7 +167,7 @@ $val = static function (string $key, $fallback = '') use ($expense) {
         <div class="card__body">
           <?php if ($editing && $expense['receipt_file']): ?>
             <a class="btn btn--outline btn--block mb-8" target="_blank" rel="noopener"
-               href="<?= url('storage/' . $expense['receipt_file']) ?>">
+               href="<?= url('files/' . $expense['receipt_file']) ?>">
               <?= icon('paperclip') ?> View current receipt
             </a>
           <?php endif; ?>

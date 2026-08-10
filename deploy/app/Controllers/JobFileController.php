@@ -119,6 +119,9 @@ class JobFileController extends Controller
                 'client_feedback' => $feedback !== '' ? mb_substr($feedback, 0, 500) : null,
                 'approved_by'     => Auth::id(),
                 'approved_at'     => date('Y-m-d H:i:s'),
+                // A member of staff relaying what the client said, as opposed
+                // to the client pressing the button on the share link.
+                'decided_via'     => 'staff',
             ], ['id' => $file['id']]);
 
             Database::insert('job_stages', [

@@ -12,6 +12,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
+use App\Services\Notifier;
 
 /**
  * Production job cards — the shop-floor workflow between "invoice raised"
@@ -551,6 +552,47 @@ class JobController extends Controller
 
         if ($stage === 'ready') {
             $message .= ' Raise a delivery note when it goes out.';
+        }
+
+        // Tell the client, on the stages they actually care about. These
+        // respect the per-event switches in Settings, so an operator who
+        // does not want a text on every stage can turn them off.
+        $clientEvent = match ($stage) {
+            'proof_sent'  => 'proof_ready',
+            'production'  => 'job_in_production',
+            'ready'       => 'job_ready',
+            default       => null,
+        };
+
+        if ($clientEvent !== null) {
+            // $job is the row as it was before the move, so tell the context
+            // about the stage we have just landed on.
+            $context = Notifier::jobContext(['stage' => $stage] + $job);
+
+            if ($clientEvent === 'proof_ready') {
+                $proof = Notifier::pendingProof((int) $job['id']);
+
+                // Asking someone to approve a proof that does not exist is
+                // worse than saying nothing, so skip rather than send.
+                if ($proof === null) {
+                    Session::warning(
+                        $message . ' No proof is waiting for approval, so the client was not asked to approve one. '
+                        . 'Upload the proof, then move the job here again.'
+                    );
+                    Response::to('/jobs/' . $job['id']);
+                }
+
+                $context['link']       = $proof['link'];
+                $context['short_link'] = $proof['short_link'];
+                $context['version']    = (string) $proof['version'];
+            }
+
+            $queued = Notifier::dispatch($clientEvent, $context)['queued'];
+
+            if ($queued > 0) {
+                Notifier::processQueue(10);
+                $message .= ' The client has been notified.';
+            }
         }
 
         Session::success($message);

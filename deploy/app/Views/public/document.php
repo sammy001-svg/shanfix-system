@@ -13,7 +13,8 @@ $overdue = $isInvoice && $doc['due_date']
     && strtotime($doc['due_date']) < strtotime('today')
     && $balance > 0.009;
 
-$logoPath = $company['logo'] ? url('storage/' . $company['logo']) : null;
+// The public route, not /files — whoever opens this share link has no session.
+$logoPath = $company['logo'] ? url('brand/logo') : null;
 
 $label = ucfirst($type);
 ?>

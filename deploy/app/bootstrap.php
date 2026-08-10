@@ -31,7 +31,7 @@ spl_autoload_register(static function (string $class): void {
 require_once APP_PATH . '/Core/helpers.php';
 
 // Make sure writable directories exist on a fresh deployment.
-foreach (['logs', 'uploads', 'uploads/receipts', 'uploads/chat', 'uploads/logos', 'uploads/artwork'] as $dir) {
+foreach (['logs', 'uploads', 'uploads/receipts', 'uploads/chat', 'uploads/logos', 'uploads/artwork', 'uploads/products'] as $dir) {
     $path = STORAGE_PATH . '/' . $dir;
     if (!is_dir($path)) {
         @mkdir($path, 0755, true);
