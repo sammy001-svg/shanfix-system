@@ -9,16 +9,24 @@ $rememberDays = \App\Core\Settings::int('remember_me_days', 30);
 
 // The photo is optional — the navy ground underneath stands on its own, so
 // a missing file degrades to a plain dark page rather than a broken one.
-// Any common format is accepted so nobody has to convert theirs first.
+//
+// Preference order:
+//   1. whatever was uploaded in Settings (no server access needed)
+//   2. a file dropped into public/assets/img/ by hand
 $bg = null;
 
-foreach (['jpg', 'jpeg', 'png', 'webp', 'svg'] as $ext) {
-    if (is_file(PUBLIC_PATH . '/assets/img/login-bg.' . $ext)) {
-        // Cache-bust on the file's timestamp, so replacing the photo shows
-        // up immediately instead of after a browser cache clear.
-        $bg = asset('img/login-bg.' . $ext)
-            . '?v=' . filemtime(PUBLIC_PATH . '/assets/img/login-bg.' . $ext);
-        break;
+$uploaded = (string) setting('login_background', '');
+
+if ($uploaded !== '' && is_file(STORAGE_PATH . '/' . $uploaded)) {
+    // Timestamp in the URL so replacing the photo shows up at once rather
+    // than after the week-long asset cache expires.
+    $bg = url('/brand/login-bg') . '?v=' . filemtime(STORAGE_PATH . '/' . $uploaded);
+} else {
+    foreach (['jpg', 'jpeg', 'png', 'webp', 'svg'] as $ext) {
+        if (is_file(PUBLIC_PATH . '/assets/img/login-bg.' . $ext)) {
+            $bg = asset('img/login-bg.' . $ext);   // asset() adds its own ?v=
+            break;
+        }
     }
 }
 ?>

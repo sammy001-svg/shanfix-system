@@ -10,6 +10,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
+use App\Services\ImageProcessor;
 use App\Services\KopoKopo;
 
 class SettingsController extends Controller
@@ -85,6 +86,36 @@ class SettingsController extends Controller
         if ($logo) {
             $this->deleteUpload(Settings::get('company_logo'));
             Settings::set('company_logo', $logo);
+        }
+
+        // Sign-in background. Uploaded here rather than dropped into the
+        // assets folder over FTP, so changing it needs no server access.
+        $background = $request->file('login_background');
+
+        if ($background !== null) {
+            $check = ImageProcessor::inspect((string) ($background['tmp_name'] ?? ''));
+
+            if (!$check['ok']) {
+                Session::error('Sign-in background: ' . $check['error']);
+                Response::to('/settings?tab=company');
+            }
+
+            $stored = $this->storeUpload($background, 'branding');
+
+            if ($stored) {
+                // A full-bleed background is the largest image the system
+                // serves, so it is capped rather than stored as shot.
+                $full = STORAGE_PATH . '/' . $stored;
+                ImageProcessor::resize($full, $full, 2200, 78);
+
+                $this->deleteUpload(Settings::get('login_background'));
+                Settings::set('login_background', $stored);
+            }
+        }
+
+        if ($request->bool('remove_login_background')) {
+            $this->deleteUpload(Settings::get('login_background'));
+            Settings::set('login_background', '');
         }
 
         ActivityLog::record('settings_updated', 'settings', null, 'Updated company details');

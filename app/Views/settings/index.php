@@ -111,6 +111,33 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
                    style="max-height:70px;background:#fff;padding:8px;border:1px solid var(--border);border-radius:var(--r)">
             </div>
           <?php endif; ?>
+
+          <?php $loginBg = (string) setting('login_background', ''); ?>
+          <div class="field field--full">
+            <label class="label" for="login_background">Sign-in page background</label>
+            <input class="input" type="file" id="login_background" name="login_background"
+                   accept="image/jpeg,image/png,image/webp">
+            <span class="field-hint">
+              A wide photograph works best — an office or workshop shot.
+              Large images are resized automatically. Leave blank to keep the current one.
+            </span>
+          </div>
+
+          <?php if ($loginBg !== ''): ?>
+            <div class="field field--full">
+              <div class="text-xs uppercase fw-700 text-muted mb-8">Current background</div>
+              <img src="<?= url('/brand/login-bg') ?>?v=<?= @filemtime(STORAGE_PATH . '/' . $loginBg) ?>"
+                   alt="Sign-in background"
+                   style="width:100%;max-width:420px;border-radius:var(--r);border:1px solid var(--border);display:block">
+              <label class="check mt-8">
+                <input type="checkbox" name="remove_login_background" value="1">
+                <span class="check__text">
+                  <strong>Remove this background</strong>
+                  <span>The sign-in page falls back to plain navy.</span>
+                </span>
+              </label>
+            </div>
+          <?php endif; ?>
         </div>
 
         <div class="form-actions">

@@ -17,6 +17,14 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Build output — regenerate any time with:  php build-cpanel.php
+# deploy/ is a full copy of the application, so committing it doubles the
+# repository and makes every diff unreadable.
+/deploy/
+/quick-fix/
+/shanfix-cpanel.zip
+*.zip
+
 # Local dumps
 *.sql.gz
 *.bak

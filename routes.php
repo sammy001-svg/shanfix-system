@@ -106,6 +106,44 @@ $r->get('/brand/logo', function () {
     exit;
 });
 
+// The sign-in background, also public — the page that uses it is the one
+// page nobody is signed in on. Same narrow contract as the logo: one
+// setting-controlled path, images only, nothing else reachable.
+$r->get('/brand/login-bg', function () {
+    $file = (string) \App\Core\Settings::get('login_background', '');
+
+    if ($file === '' || str_contains($file, '..')) {
+        throw new \App\Core\HttpException(404, 'No background has been set.');
+    }
+
+    $full = realpath(STORAGE_PATH . '/' . $file);
+    $root = realpath(STORAGE_PATH . '/uploads/branding');
+
+    if (!$full || !$root || !str_starts_with($full, $root) || !is_file($full)) {
+        throw new \App\Core\HttpException(404, 'Background file is missing.');
+    }
+
+    $mime = 'image/jpeg';
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $full) ?: $mime;
+        finfo_close($finfo);
+    }
+
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+        throw new \App\Core\HttpException(404, 'Background file is not an image.');
+    }
+
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($full));
+    header('X-Content-Type-Options: nosniff');
+    // Long cache: the URL carries the file's timestamp, so a replacement
+    // gets a new URL rather than waiting for this to expire.
+    header('Cache-Control: public, max-age=604800');
+    readfile($full);
+    exit;
+});
+
 // Serve uploaded files through PHP.
 //
 // The URL is deliberately NOT /storage/... — in the flat cPanel build the

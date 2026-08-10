@@ -173,7 +173,7 @@ say('  wrote   .htaccess');
 $deny = "Require all denied\n";
 
 foreach (['storage', 'storage/logs', 'storage/uploads', 'storage/uploads/receipts',
-          'storage/uploads/chat', 'storage/uploads/logos', 'storage/uploads/artwork', 'storage/uploads/products'] as $dir) {
+          'storage/uploads/chat', 'storage/uploads/logos', 'storage/uploads/artwork', 'storage/uploads/products', 'storage/uploads/branding'] as $dir) {
     mkdir($out . '/' . $dir, 0755, true);
     touch($out . '/' . $dir . '/.gitkeep');
 }
