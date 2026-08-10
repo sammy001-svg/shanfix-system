@@ -58,9 +58,32 @@ if (!function_exists('url')) {
 }
 
 if (!function_exists('asset')) {
+    /**
+     * URL for a file in public/assets, stamped with its modification time.
+     *
+     * Assets are served with a long cache lifetime for speed, which means a
+     * browser will happily keep an old stylesheet for a week after an
+     * upgrade — the page renders with markup its CSS has never seen.
+     * Appending ?v={mtime} changes the URL whenever the file changes, so
+     * the new version is fetched immediately and nobody has to be told to
+     * hard-refresh.
+     */
     function asset(string $path): string
     {
-        return url('assets/' . ltrim($path, '/'));
+        $relative = ltrim($path, '/');
+        $url      = url('assets/' . $relative);
+
+        // Both layouts: public/assets in the standard tree, assets/ when the
+        // flat cPanel build puts the front controller at the web root.
+        foreach ([PUBLIC_PATH . '/assets/', BASE_PATH . '/assets/'] as $dir) {
+            $file = $dir . $relative;
+
+            if (is_file($file)) {
+                return $url . '?v=' . filemtime($file);
+            }
+        }
+
+        return $url;
     }
 }
 
