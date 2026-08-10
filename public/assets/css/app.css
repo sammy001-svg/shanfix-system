@@ -959,47 +959,150 @@ fieldset:last-of-type { margin-bottom: 0; }
 .pagination .is-disabled { opacity: .4; pointer-events: none; }
 
 /* ---------------------------------------------------------------------
-   Auth screen
-   --------------------------------------------------------------------- */
-.auth {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr 460px;
-  background: var(--bg);
-}
-.auth__aside {
-  background: var(--navy-900);
-  color: #fff;
-  padding: 48px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-.auth__aside h2 { font-size: 27px; margin-bottom: 12px; letter-spacing: -.02em; }
-.auth__aside p  { color: rgba(255,255,255,.68); font-size: 15px; max-width: 400px; }
-.auth__brand { display: flex; align-items: center; gap: 12px; }
-.auth__brand .sidebar__mark { width: 38px; height: 38px; flex-basis: 38px; font-size: 16px; }
-.auth__points { list-style: none; padding: 0; margin: 26px 0 0; }
-.auth__points li {
-  display: flex; gap: 11px; align-items: flex-start;
-  color: rgba(255,255,255,.8);
-  font-size: 14px;
-  margin-bottom: 11px;
-}
-.auth__points svg { width: 17px; height: 17px; color: var(--green-400); flex: 0 0 17px; margin-top: 3px; }
-.auth__foot { font-size: 12.5px; color: rgba(255,255,255,.42); }
+   Sign-in screen
 
-.auth__panel {
-  background: var(--surface);
-  padding: 48px 44px;
+   A single centred card floating over a photograph. The navy ground sits
+   beneath the image, so the page still reads correctly while the photo
+   loads — or if it is missing entirely.
+   --------------------------------------------------------------------- */
+.login {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;          /* mobile browser chrome */
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--navy-900);
+  overflow: hidden;
+}
+
+.login__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Darkens the photo so white text and the card edge stay legible over
+   whatever happens to be behind them. A flat colour, not a gradient. */
+.login__veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 32, 58, .72);
+}
+
+.login__panel {
+  position: relative;          /* above the veil */
+  width: 100%;
+  max-width: 424px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 18px;
 }
-.auth__form { width: 100%; max-width: 340px; margin: 0 auto; }
-.auth__form h1 { font-size: 23px; margin-bottom: 5px; }
-.auth__form > p { color: var(--slate-600); margin-bottom: 26px; font-size: 13.5px; }
-.auth__form .field { margin-bottom: 15px; }
+
+.login__card {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 34px 32px 30px;
+  box-shadow: 0 18px 50px rgba(4, 16, 30, .38);
+}
+
+.login__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.login__mark {
+  width: 44px; height: 44px;
+  flex: 0 0 44px;
+  border-radius: 9px;
+  background: var(--green-600);
+  color: #fff;
+  display: grid; place-items: center;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -.02em;
+}
+
+.login__logo { max-height: 44px; width: auto; }
+.login__company { font-weight: 700; font-size: 16px; color: var(--navy-900); line-height: 1.25; }
+.login__tagline { font-size: 12px; color: var(--green-700); font-weight: 600; margin-top: 1px; }
+
+.login__title { font-size: 24px; margin-bottom: 4px; }
+.login__intro { color: var(--slate-600); font-size: 13.5px; margin-bottom: 22px; }
+
+.login__card .field { margin-bottom: 16px; }
+
+.login__remember { margin: 2px 0 20px; }
+.login__remember .check__text strong { font-size: 13.5px; }
+.login__remember .check__text span { line-height: 1.45; }
+
+.login__submit { margin-top: 2px; }
+
+.login__help {
+  margin: 20px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--slate-500);
+  text-align: center;
+}
+
+.login__foot {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, .62);
+}
+.login__foot span { margin: 0 5px; opacity: .55; }
+
+/* Input with a leading icon, and optionally a trailing button */
+.input-icon { position: relative; display: flex; align-items: center; }
+
+.input-icon > svg {
+  position: absolute;
+  left: 12px;
+  width: 17px; height: 17px;
+  color: var(--slate-400);
+  pointer-events: none;
+}
+
+.input-icon .input { padding-left: 38px; }
+.input-icon:focus-within > svg { color: var(--green-600); }
+
+.input-icon__toggle {
+  position: absolute;
+  right: 6px;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border: 0;
+  background: none;
+  border-radius: var(--r-sm);
+  color: var(--slate-500);
+  cursor: pointer;
+  padding: 0;
+}
+.input-icon__toggle:hover { background: var(--surface-2); color: var(--navy-700); }
+.input-icon__toggle svg { width: 17px; height: 17px; display: block; }
+.input-icon__toggle [hidden] { display: none; }
+.input-icon .input:has(+ .input-icon__toggle) { padding-right: 42px; }
+
+@media (max-width: 480px) {
+  .login { padding: 16px 12px; }
+  .login__card { padding: 26px 20px 24px; border-radius: 12px; }
+  .login__title { font-size: 21px; }
+}
+
+/* The photo is decorative; drop it for anyone who asked for less motion
+   and contrast trouble, leaving the solid navy behind it. */
+@media (prefers-contrast: more) {
+  .login__bg { display: none; }
+  .login__veil { background: var(--navy-900); }
+}
 
 /* ---------------------------------------------------------------------
    Chat

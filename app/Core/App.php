@@ -26,6 +26,18 @@ class App
         Database::connect(Config::get('db'));
         Session::start();
 
+        // No session but a "keep me signed in" cookie? Restore the login
+        // before routing, so the user never sees the sign-in page.
+        if (!Session::has('user_id') && isset($_COOKIE['SHANFIX_REMEMBER'])) {
+            try {
+                Auth::loginFromCookie();
+            } catch (\Throwable $e) {
+                // A failure here must never block the request — worst case
+                // the user signs in by hand.
+                Logger::warning('Remember-me restore failed: ' . $e->getMessage());
+            }
+        }
+
         $this->securityHeaders();
 
         // Values every view can rely on.

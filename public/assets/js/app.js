@@ -153,6 +153,52 @@
   }
 
   /* ------------------------------------------------------------------
+     Show / hide password
+     ------------------------------------------------------------------ */
+  function initPasswordToggle() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-toggle-password]');
+      if (!btn) return;
+
+      e.preventDefault();
+
+      const input = $(btn.dataset.togglePassword);
+      if (!input) return;
+
+      const revealing = input.type === 'password';
+      input.type = revealing ? 'text' : 'password';
+
+      // Marked so the submit handler can put it back — browsers are more
+      // reliable about offering to save a password from a password field.
+      if (revealing) {
+        input.dataset.wasPassword = '1';
+      } else {
+        delete input.dataset.wasPassword;
+      }
+
+      btn.setAttribute('aria-pressed', String(revealing));
+      btn.setAttribute('aria-label', revealing ? 'Hide password' : 'Show password');
+
+      const show = $('[data-icon-show]', btn);
+      const hide = $('[data-icon-hide]', btn);
+      if (show) show.hidden = revealing;
+      if (hide) hide.hidden = !revealing;
+
+      // Keep the caret where it was rather than jumping to the start.
+      const pos = input.value.length;
+      input.focus();
+      try { input.setSelectionRange(pos, pos); } catch (_) { /* type change race */ }
+    });
+
+    // Never leave a password on screen after the form is submitted.
+    document.addEventListener('submit', (e) => {
+      $$('input[type="text"][data-was-password]', e.target).forEach((i) => {
+        i.type = 'password';
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------------
      Print triggers (inline handlers are blocked by the CSP)
      ------------------------------------------------------------------ */
   function initPrint() {
@@ -742,6 +788,7 @@
     initModals();
     initFlashDismiss();
     initConfirm();
+    initPasswordToggle();
     initPrint();
     initSelectOnFocus();
     initAutoFilters();

@@ -130,8 +130,199 @@ class Auth
 
     public static function logout(): void
     {
+        // Drop the persistent token too, or "sign out" would only last until
+        // the next page load.
+        self::forgetRemembered();
+
         self::$user = null;
         Session::destroy();
+    }
+
+    // -- "Keep me signed in" -------------------------------------------
+
+    private const REMEMBER_COOKIE = 'SHANFIX_REMEMBER';
+
+    /**
+     * Issue a persistent-login cookie.
+     *
+     * The cookie carries "selector:validator". Only the selector is stored
+     * in the clear; the validator is kept as a SHA-256 hash, so a leaked
+     * database cannot be replayed as a login.
+     */
+    public static function remember(int $userId): void
+    {
+        if (!Settings::bool('remember_me_enabled', true)) {
+            return;
+        }
+
+        $days = max(1, min(365, Settings::int('remember_me_days', 30)));
+
+        $selector  = bin2hex(random_bytes(12));   // 24 chars
+        $validator = bin2hex(random_bytes(32));   // 64 chars, the secret
+
+        $expires = time() + ($days * 86400);
+
+        Database::insert('remember_tokens', [
+            'user_id'        => $userId,
+            'selector'       => $selector,
+            'validator_hash' => hash('sha256', $validator),
+            'expires_at'     => date('Y-m-d H:i:s', $expires),
+            'user_agent'     => mb_substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255),
+            'ip_address'     => self::ip(),
+        ]);
+
+        self::writeRememberCookie($selector . ':' . $validator, $expires);
+    }
+
+    /**
+     * Sign in from the persistent cookie, if it is valid.
+     *
+     * Called during boot when there is no session. Returns true only when a
+     * real login happened.
+     */
+    public static function loginFromCookie(): bool
+    {
+        $cookie = $_COOKIE[self::REMEMBER_COOKIE] ?? '';
+
+        if (!is_string($cookie) || !str_contains($cookie, ':')) {
+            return false;
+        }
+
+        [$selector, $validator] = explode(':', $cookie, 2);
+
+        // Shape check before touching the database.
+        if (!preg_match('/^[a-f0-9]{24}$/', $selector) || !preg_match('/^[a-f0-9]{64}$/', $validator)) {
+            self::forgetRemembered();
+            return false;
+        }
+
+        $token = Database::first(
+            'SELECT * FROM remember_tokens WHERE selector = :s LIMIT 1',
+            ['s' => $selector]
+        );
+
+        if (!$token) {
+            self::forgetRemembered();
+            return false;
+        }
+
+        if (strtotime($token['expires_at']) < time()) {
+            Database::delete('remember_tokens', ['id' => $token['id']]);
+            self::forgetRemembered();
+            return false;
+        }
+
+        // Constant-time comparison — a byte-by-byte one would leak the
+        // validator through response timing.
+        if (!hash_equals($token['validator_hash'], hash('sha256', $validator))) {
+            // The selector is real but the secret is wrong: either a stale
+            // cookie or someone guessing. Drop every token for this user so
+            // a stolen-and-rotated cookie cannot be used either.
+            Database::delete('remember_tokens', ['user_id' => $token['user_id']]);
+            self::forgetRemembered();
+
+            Logger::warning('Rejected a remember-me token with a bad validator', [
+                'user_id' => $token['user_id'],
+                'ip'      => self::ip(),
+            ]);
+
+            return false;
+        }
+
+        $user = Database::first(
+            'SELECT * FROM users WHERE id = :id AND is_active = 1 LIMIT 1',
+            ['id' => $token['user_id']]
+        );
+
+        if (!$user) {
+            Database::delete('remember_tokens', ['id' => $token['id']]);
+            self::forgetRemembered();
+            return false;
+        }
+
+        // Rotate the secret on every use, so a cookie captured earlier stops
+        // working as soon as the genuine user comes back.
+        $newValidator = bin2hex(random_bytes(32));
+        $days         = max(1, min(365, Settings::int('remember_me_days', 30)));
+        $expires      = time() + ($days * 86400);
+
+        Database::update('remember_tokens', [
+            'validator_hash' => hash('sha256', $newValidator),
+            'expires_at'     => date('Y-m-d H:i:s', $expires),
+            'last_used_at'   => date('Y-m-d H:i:s'),
+            'ip_address'     => self::ip(),
+        ], ['id' => $token['id']]);
+
+        self::writeRememberCookie($selector . ':' . $newValidator, $expires);
+
+        self::login($user);
+        Session::put('via_remember', true);
+
+        return true;
+    }
+
+    /** Remove this device's token and its cookie. */
+    public static function forgetRemembered(): void
+    {
+        $cookie = $_COOKIE[self::REMEMBER_COOKIE] ?? '';
+
+        if (is_string($cookie) && str_contains($cookie, ':')) {
+            [$selector] = explode(':', $cookie, 2);
+
+            if (preg_match('/^[a-f0-9]{24}$/', $selector)) {
+                try {
+                    Database::delete('remember_tokens', ['selector' => $selector]);
+                } catch (\Throwable) {
+                    // Table may not exist yet on an un-migrated install.
+                }
+            }
+        }
+
+        self::writeRememberCookie('', time() - 3600);
+        unset($_COOKIE[self::REMEMBER_COOKIE]);
+    }
+
+    /**
+     * Drop every persistent login for a user — used when the password
+     * changes, so old devices cannot stay signed in on the old credential.
+     */
+    public static function forgetAllRemembered(int $userId): void
+    {
+        try {
+            Database::delete('remember_tokens', ['user_id' => $userId]);
+        } catch (\Throwable) {
+            // Nothing to clean up on an un-migrated install.
+        }
+    }
+
+    private static function writeRememberCookie(string $value, int $expires): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+
+        setcookie(self::REMEMBER_COOKIE, $value, [
+            'expires'  => $expires,
+            'path'     => base_path() === '' ? '/' : base_path() . '/',
+            'domain'   => '',
+            'secure'   => (bool) Config::get('security.secure_cookies', true),
+            'httponly' => true,          // JavaScript must never read this
+            'samesite' => 'Lax',
+        ]);
+    }
+
+    private static function ip(): string
+    {
+        foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $key) {
+            if (!empty($_SERVER[$key])) {
+                $ip = trim(explode(',', (string) $_SERVER[$key])[0]);
+                if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip;
+                }
+            }
+        }
+
+        return '0.0.0.0';
     }
 
     public static function check(): bool
