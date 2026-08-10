@@ -116,10 +116,26 @@
           ?>
             <tr>
               <td>
-                <a class="table__primary" href="<?= url('/inventory/' . $item['id']) ?>"><?= e($item['name']) ?></a>
-                <?php if ($item['description']): ?>
-                  <div class="table__muted"><?= e(str_excerpt($item['description'], 62)) ?></div>
-                <?php endif; ?>
+                <div class="flex items-center gap-12">
+                  <?php $thumb = $item['thumb_path'] ?: $item['image_path']; ?>
+                  <a class="cell-thumb <?= $thumb ? '' : 'cell-thumb--empty' ?>"
+                     href="<?= url('/inventory/' . $item['id']) ?>">
+                    <?php if ($thumb): ?>
+                      <img src="<?= url('files/' . $thumb) ?>" alt="" loading="lazy">
+                      <?php if ((int) $item['image_count'] > 1): ?>
+                        <span class="cell-thumb__count"><?= (int) $item['image_count'] ?></span>
+                      <?php endif; ?>
+                    <?php else: ?>
+                      <?= icon('image') ?>
+                    <?php endif; ?>
+                  </a>
+                  <span style="min-width:0">
+                    <a class="table__primary" href="<?= url('/inventory/' . $item['id']) ?>"><?= e($item['name']) ?></a>
+                    <?php if ($item['description']): ?>
+                      <div class="table__muted"><?= e(str_excerpt($item['description'], 52)) ?></div>
+                    <?php endif; ?>
+                  </span>
+                </div>
               </td>
               <td><code class="text-xs"><?= e($item['sku']) ?></code></td>
               <td class="text-sm"><?= e($item['category_name'] ?: '—') ?></td>

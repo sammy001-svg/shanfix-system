@@ -717,8 +717,11 @@ class DocumentController extends Controller
         );
 
         $inventory = Database::all(
-            'SELECT id, sku, name, unit, selling_price, quantity, description
-               FROM inventory_items WHERE is_active = 1 ORDER BY name'
+            // Main photo comes along so the picker can show what the item is.
+            'SELECT i.id, i.sku, i.name, i.unit, i.selling_price, i.quantity, i.description,
+                    (SELECT COALESCE(thumb_path, file_path) FROM inventory_images
+                      WHERE item_id = i.id ORDER BY is_primary DESC, sort_order, id LIMIT 1) AS thumb
+               FROM inventory_items i WHERE i.is_active = 1 ORDER BY i.name'
         );
 
         $services = Database::all(

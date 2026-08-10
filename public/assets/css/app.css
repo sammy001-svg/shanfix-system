@@ -1235,6 +1235,125 @@ fieldset:last-of-type { margin-bottom: 0; }
 .chat__empty { display: grid; place-items: center; height: 100%; text-align: center; padding: 40px; }
 
 /* ---------------------------------------------------------------------
+   Product photos
+   --------------------------------------------------------------------- */
+
+/* Square tile in a list row. Fixed size so rows stay aligned whether or
+   not an item has a photo. */
+.cell-thumb {
+  position: relative;
+  width: 44px; height: 44px;
+  flex: 0 0 44px;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+}
+.cell-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cell-thumb--empty { color: var(--slate-400); }
+.cell-thumb--empty svg { width: 18px; height: 18px; }
+.cell-thumb:hover { border-color: var(--navy-500); }
+
+.cell-thumb__count {
+  position: absolute;
+  right: 0; bottom: 0;
+  background: var(--navy-800);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--r-sm) 0 0 0;
+}
+
+/* Large image on the item page */
+.product-hero {
+  display: block;
+  border-radius: var(--r);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  aspect-ratio: 4 / 3;
+}
+.product-hero img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.product-hero:hover { border-color: var(--navy-500); }
+
+/* Square tiles — a grid of mixed portrait/landscape photos otherwise
+   looks ragged, so each is cropped to a square. */
+.thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 8px;
+}
+.thumb-grid:empty { display: none; }
+
+.thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb:hover { border-color: var(--navy-500); }
+.thumb--primary { border-color: var(--green-600); border-width: 2px; }
+
+.thumb__badge {
+  position: absolute;
+  left: 0; bottom: 0; right: 0;
+  background: var(--green-600);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  text-align: center;
+  padding: 1px 0;
+}
+
+/* Small square in the quotation catalogue picker */
+.pick-thumb {
+  width: 26px; height: 26px;
+  flex: 0 0 26px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  display: block;
+}
+.pick-thumb--empty {
+  display: grid; place-items: center;
+  color: var(--slate-400);
+}
+.pick-thumb--empty svg { width: 13px; height: 13px; }
+
+/* One manageable photo: thumbnail, name, actions */
+.photo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.photo-row:last-child { border-bottom: 0; }
+
+.photo-row__thumb {
+  width: 40px; height: 40px;
+  flex: 0 0 40px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  border: 1px solid var(--border);
+  display: block;
+}
+.photo-row__meta { flex: 1; min-width: 0; font-size: 12.5px; }
+.photo-row__actions { display: flex; gap: 4px; flex: 0 0 auto; }
+.photo-row__actions form { display: inline; }
+
+/* ---------------------------------------------------------------------
    Kanban pipeline
    --------------------------------------------------------------------- */
 .kanban { display: flex; gap: 13px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }

@@ -42,8 +42,22 @@ if (!function_exists('base_path')) {
             return $base;
         }
 
-        $script = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
-        $base   = ($script === '/' || $script === '.') ? '' : rtrim($script, '/');
+        // SCRIPT_NAME is only meaningful when it actually points at the front
+        // controller. Several servers — PHP's built-in one, and some FastCGI
+        // setups — instead report the requested path whenever it looks like a
+        // file, so a URL such as /files/uploads/logo.png yields a bogus base
+        // of "/files/uploads" and the route silently fails to match.
+        $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+
+        if (basename($script) !== 'index.php') {
+            return $base = '';
+        }
+
+        // dirname() uses the platform separator, so on Windows "/index.php"
+        // comes back as "\" — normalise after the call, not just before it.
+        $dir = str_replace('\\', '/', dirname($script));
+
+        $base = ($dir === '/' || $dir === '.' || $dir === '') ? '' : rtrim($dir, '/');
 
         return $base;
     }

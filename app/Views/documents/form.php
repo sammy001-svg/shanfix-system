@@ -324,8 +324,13 @@ $rows = $existingItems ?: [];
                       data-description="<?= e($i['description'] ?: $i['name']) ?>"
                       data-price="<?= e((string) $i['selling_price']) ?>"
                       data-unit="<?= e($i['unit']) ?>"
-                      style="justify-content:space-between;text-align:left">
-                <span class="truncate"><?= e($i['name']) ?></span>
+                      style="justify-content:flex-start;gap:9px;text-align:left">
+                <?php if (!empty($i['thumb'])): ?>
+                  <img class="pick-thumb" src="<?= url('files/' . $i['thumb']) ?>" alt="" loading="lazy">
+                <?php else: ?>
+                  <span class="pick-thumb pick-thumb--empty"><?= icon('image') ?></span>
+                <?php endif; ?>
+                <span class="truncate flex-1"><?= e($i['name']) ?></span>
                 <span class="text-xs text-muted"><?= e(money($i['selling_price'], false)) ?></span>
               </button>
             <?php endforeach; ?>

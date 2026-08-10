@@ -153,6 +153,37 @@
   }
 
   /* ------------------------------------------------------------------
+     Preview picked images before they are uploaded
+     ------------------------------------------------------------------ */
+  function initImagePreview() {
+    $$('[data-image-preview]').forEach((input) => {
+      const target = $(input.dataset.imagePreview);
+      if (!target) return;
+
+      input.addEventListener('change', () => {
+        // Release the previous batch, or the object URLs leak.
+        $$('img', target).forEach((img) => URL.revokeObjectURL(img.src));
+        target.innerHTML = '';
+
+        Array.from(input.files || []).forEach((file) => {
+          if (!file.type.startsWith('image/')) return;
+
+          const tile = document.createElement('span');
+          tile.className = 'thumb';
+
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(file);
+          img.alt = file.name;
+          img.onload = () => { /* keep the URL: revoked on the next change */ };
+
+          tile.appendChild(img);
+          target.appendChild(tile);
+        });
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------------
      Show / hide password
      ------------------------------------------------------------------ */
   function initPasswordToggle() {
@@ -788,6 +819,7 @@
     initModals();
     initFlashDismiss();
     initConfirm();
+    initImagePreview();
     initPasswordToggle();
     initPrint();
     initSelectOnFocus();

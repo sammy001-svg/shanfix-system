@@ -154,6 +154,118 @@ $marginPct = $sell > 0 ? ($margin / $sell) * 100 : 0;
   </div>
 
   <aside>
+    <?php
+      $images     = $images ?? [];
+      $maxImages  = max(1, (int) setting('product_images_max', 6));
+      $canManage  = can('inventory.manage');
+    ?>
+    <div class="card">
+      <div class="card__head">
+        <?= icon('image') ?>
+        <div>
+          <div class="card__title">Photos</div>
+          <div class="card__sub"><?= count($images) ?> of <?= $maxImages ?></div>
+        </div>
+      </div>
+
+      <?php if (!$images): ?>
+        <div class="empty" style="padding:28px 18px">
+          <div class="empty__icon"><?= icon('image') ?></div>
+          <div class="empty__title">No photos yet</div>
+          <p class="empty__text">
+            A picture makes this item far easier to recognise on the shop floor
+            and when quoting.
+          </p>
+        </div>
+      <?php else: ?>
+        <div class="card__body">
+          <?php $main = $images[0]; ?>
+
+          <a class="product-hero" href="<?= url('files/' . $main['file_path']) ?>"
+             target="_blank" rel="noopener" title="Open full size">
+            <img src="<?= url('files/' . $main['file_path']) ?>"
+                 alt="<?= e($main['alt_text'] ?: $item['name']) ?>" loading="lazy">
+          </a>
+
+          <?php if (count($images) > 1): ?>
+            <div class="thumb-grid mt-12">
+              <?php foreach ($images as $img): ?>
+                <a class="thumb <?= (int) $img['is_primary'] === 1 ? 'thumb--primary' : '' ?>"
+                   href="<?= url('files/' . $img['file_path']) ?>" target="_blank" rel="noopener"
+                   title="<?= e($img['file_name']) ?>">
+                  <img src="<?= url('files/' . ($img['thumb_path'] ?: $img['file_path'])) ?>"
+                       alt="<?= e($img['alt_text'] ?: $item['name']) ?>" loading="lazy">
+                  <?php if ((int) $img['is_primary'] === 1): ?>
+                    <span class="thumb__badge">Main</span>
+                  <?php endif; ?>
+                </a>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <?php if ($canManage): ?>
+          <div class="card__body" style="border-top:1px solid var(--border);padding-top:14px">
+            <div class="text-xs uppercase fw-700 text-muted mb-8">Manage photos</div>
+
+            <?php foreach ($images as $img): ?>
+              <div class="photo-row">
+                <img class="photo-row__thumb"
+                     src="<?= url('files/' . ($img['thumb_path'] ?: $img['file_path'])) ?>"
+                     alt="" loading="lazy">
+
+                <div class="photo-row__meta">
+                  <div class="truncate"><?= e($img['file_name']) ?></div>
+                  <div class="text-xs text-muted">
+                    <?= $img['width'] ? (int) $img['width'] . '×' . (int) $img['height'] . ' · ' : '' ?>
+                    <?= e(number_format($img['file_size'] / 1024, 0)) ?> KB
+                  </div>
+                </div>
+
+                <div class="photo-row__actions">
+                  <?php if ((int) $img['is_primary'] !== 1): ?>
+                    <form method="post" action="<?= url('/inventory/images/' . $img['id'] . '/primary') ?>">
+                      <?= csrf_field() ?>
+                      <button class="btn btn--outline btn--sm btn--icon" type="submit"
+                              title="Make this the main photo"><?= icon('star') ?></button>
+                    </form>
+                  <?php else: ?>
+                    <span class="btn btn--sm btn--icon" title="Main photo"
+                          style="color:var(--amber-700);cursor:default"><?= icon('star-filled') ?></span>
+                  <?php endif; ?>
+
+                  <form method="post" action="<?= url('/inventory/images/' . $img['id'] . '/delete') ?>"
+                        data-confirm="Remove this photo?">
+                    <?= csrf_field() ?>
+                    <button class="btn btn--danger-soft btn--sm btn--icon" type="submit"
+                            title="Remove"><?= icon('trash') ?></button>
+                  </form>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      <?php endif; ?>
+
+      <?php if ($canManage && count($images) < $maxImages): ?>
+        <div class="card__foot" style="display:block">
+          <form method="post" action="<?= url('/inventory/' . $item['id'] . '/images') ?>"
+                enctype="multipart/form-data">
+            <?= csrf_field() ?>
+            <div class="field mb-8">
+              <input class="input" type="file" name="images[]" multiple required
+                     accept="image/jpeg,image/png,image/gif,image/webp"
+                     data-image-preview="#add-preview">
+            </div>
+            <div class="thumb-grid mb-8" id="add-preview"></div>
+            <button class="btn btn--primary btn--block btn--sm" type="submit">
+              <?= icon('plus') ?> Upload photo<?= count($images) ? 's' : '' ?>
+            </button>
+          </form>
+        </div>
+      <?php endif; ?>
+    </div>
+
     <div class="card">
       <div class="card__head"><div class="card__title">Details</div></div>
       <div class="card__body">
