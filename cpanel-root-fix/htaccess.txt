@@ -1,0 +1,80 @@
+# =====================================================================
+# Shanfix BMS — web root configuration
+#
+# Upload as ".htaccess" into the folder your subdomain serves: the one
+# containing app/, config/, public/ — beside the index.php shipped with
+# this file.
+#
+# It does three jobs:
+#   1. Blocks the project internals, which sit inside the web root under
+#      this layout and are otherwise downloadable.
+#   2. Serves /assets/... from public/assets/...
+#   3. Sends everything else to index.php.
+# =====================================================================
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # -----------------------------------------------------------------
+    # 1. Never serve the application internals.
+    #    These rules come first so nothing below can bypass them.
+    # -----------------------------------------------------------------
+    RewriteRule ^(app|config|database|storage)(/|$)  - [F,L]
+    RewriteRule ^(install|migrate|cron|dev-server|routes|build-cpanel|check)\.php$ - [F,L]
+    RewriteRule \.(sql|log|md|ini|sh|bak|yml|yaml|lock)$ - [F,L]
+    RewriteRule (^|/)\.                              - [F,L]
+
+    # -----------------------------------------------------------------
+    # 2. Stylesheets, scripts and images live under public/.
+    #    The target does not start with "assets/", so this cannot loop.
+    # -----------------------------------------------------------------
+    RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+
+    # Favicon and similar, if they are ever requested from the root.
+    RewriteCond %{DOCUMENT_ROOT}/public/$0 -f
+    RewriteRule ^[^/]+\.(ico|png|svg|txt|webmanifest)$ public/%{REQUEST_URI} [L]
+
+    # -----------------------------------------------------------------
+    # 3. Everything that is not a real file or folder goes to the front
+    #    controller. index.php then hands over to public/index.php.
+    # -----------------------------------------------------------------
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# ---------------------------------------------------------------------
+# The same protection expressed a second way, so a server without
+# mod_rewrite still refuses to hand these over.
+# ---------------------------------------------------------------------
+<FilesMatch "\.(sql|log|ini|sh|bak|md|yml|yaml|lock|dist)$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "^(install|migrate|cron|dev-server|routes|build-cpanel|check)\.php$">
+    Require all denied
+</FilesMatch>
+
+# ---------------------------------------------------------------------
+# Caching. Asset URLs already carry a ?v= stamp that changes when the
+# file changes, so a long lifetime is safe.
+# ---------------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css               "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/png              "access plus 30 days"
+    ExpiresByType image/jpeg             "access plus 30 days"
+    ExpiresByType image/svg+xml          "access plus 30 days"
+    ExpiresByType image/webp             "access plus 30 days"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json text/plain
+</IfModule>
