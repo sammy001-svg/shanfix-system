@@ -101,6 +101,79 @@ if (!function_exists('asset')) {
     }
 }
 
+if (!function_exists('asset_path')) {
+    /** Absolute path to a file in the assets folder, or null if absent. */
+    function asset_path(string $relative): ?string
+    {
+        foreach ([PUBLIC_PATH . '/assets/', BASE_PATH . '/assets/'] as $dir) {
+            $file = $dir . ltrim($relative, '/');
+
+            if (is_file($file)) {
+                return $file;
+            }
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('css_tag')) {
+    /**
+     * The stylesheet, as a <link> or embedded in the page.
+     *
+     * Embedding exists for one situation: a proxy or "bot protection" layer
+     * sitting in front of the site that answers requests for .css with an
+     * HTML challenge page. The browser refuses HTML as a stylesheet, so the
+     * page renders completely unstyled while the HTML itself loads fine.
+     * Putting the CSS in the document means it arrives with the page and
+     * cannot be intercepted separately.
+     *
+     * Costs bandwidth on every page, so it is off unless app.inline_assets
+     * is switched on in config.php. Turn it back off once the proxy is
+     * fixed — a cached external stylesheet is faster.
+     */
+    function css_tag(string $relative = 'css/app.css'): string
+    {
+        $file = asset_path($relative);
+
+        if ($file !== null && Config::get('app.inline_assets', false)) {
+            return "<style>\n" . file_get_contents($file) . "\n</style>";
+        }
+
+        return '<link rel="stylesheet" href="' . e(asset($relative)) . '">';
+    }
+}
+
+if (!function_exists('js_tag')) {
+    /** The script, as a <script src> or embedded. See css_tag(). */
+    function js_tag(string $relative = 'js/app.js'): string
+    {
+        $file = asset_path($relative);
+
+        if ($file !== null && Config::get('app.inline_assets', false)) {
+            // The CSP forbids inline script, so this one carries a nonce.
+            return '<script nonce="' . e(csp_nonce()) . '">' . "\n"
+                 . file_get_contents($file) . "\n</script>";
+        }
+
+        return '<script src="' . e(asset($relative)) . '"></script>';
+    }
+}
+
+if (!function_exists('csp_nonce')) {
+    /** One random nonce per request, shared by the CSP header and any inline script. */
+    function csp_nonce(): string
+    {
+        static $nonce = null;
+
+        if ($nonce === null) {
+            $nonce = base64_encode(random_bytes(16));
+        }
+
+        return $nonce;
+    }
+}
+
 if (!function_exists('csrf_field')) {
     function csrf_field(): string
     {
