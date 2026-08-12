@@ -134,14 +134,19 @@ class Auth
         try {
             // Scoped to this address as well as this account, so one person
             // mistyping cannot lock a colleague out from somewhere else.
+            // The window is cast into the statement rather than bound: some
+            // MySQL builds reject a placeholder inside INTERVAL. It comes from
+            // config and is forced to an integer, so nothing can ride in on it.
+            $window = max(1, $minutes);
+
             $row = Database::first(
                 'SELECT COUNT(*) AS failures, MIN(created_at) AS first_at
                    FROM activity_log
                   WHERE action      = \'login_failed\'
                     AND description = :note
                     AND ip_address  = :ip
-                    AND created_at  > (NOW() - INTERVAL :mins MINUTE)',
-                ['note' => self::failureNote($email), 'ip' => $ip, 'mins' => $minutes]
+                    AND created_at  > (NOW() - INTERVAL ' . $window . ' MINUTE)',
+                ['note' => self::failureNote($email), 'ip' => $ip]
             );
         } catch (\Throwable $e) {
             // A logging problem must never lock everyone out of the system.
@@ -164,11 +169,15 @@ class Auth
         try {
             Database::insert('activity_log', [
                 'user_id'     => null,
-                'action'      => self::failureTag($email, $ip),
+                'action'      => 'login_failed',
                 'entity_type' => 'user',
-                'description' => 'Failed sign-in for ' . $email,
+                'description' => self::failureNote($email),
                 'ip_address'  => $ip,
-                'created_at'  => date('Y-m-d H:i:s'),
+                // created_at is left to the column default so the database
+                // stamps it. The lockout window compares against NOW(), and a
+                // timestamp written by PHP can sit in a different timezone —
+                // which silently pushes every failure outside the window and
+                // stops the limit counting at all.
             ]);
         } catch (\Throwable $e) {
             Logger::warning('Could not record failed sign-in: ' . $e->getMessage());
@@ -180,8 +189,11 @@ class Auth
     {
         try {
             Database::run(
-                'DELETE FROM activity_log WHERE action = :tag',
-                ['tag' => self::failureTag($email, $ip)]
+                'DELETE FROM activity_log
+                  WHERE action      = \'login_failed\'
+                    AND description = :note
+                    AND ip_address  = :ip',
+                ['note' => self::failureNote($email), 'ip' => $ip]
             );
         } catch (\Throwable $e) {
             Logger::warning('Could not clear failed sign-ins: ' . $e->getMessage());

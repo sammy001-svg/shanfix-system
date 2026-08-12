@@ -27,6 +27,12 @@ use App\Core\Migrator;
 use App\Core\Session;
 
 Config::load(CONFIG_PATH . '/config.php');
+
+// App::boot() normally does this; this page deliberately does not boot the
+// full application, so it has to set the clock itself or every timestamp it
+// touches comes out in UTC.
+date_default_timezone_set(Config::get('app.timezone', 'Africa/Nairobi'));
+
 Database::connect(Config::get('db'));
 Session::start();
 

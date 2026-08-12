@@ -33,8 +33,9 @@ class AuthController extends Controller
 
         $result = Auth::attempt($email, $password, $request->ip());
 
+        // The failure itself is recorded inside Auth::attempt, which also
+        // counts it towards the lockout — every caller gets both.
         if (!$result['ok']) {
-            ActivityLog::record('login_failed', 'user', null, 'Failed sign-in for ' . $email);
             Session::error($result['message']);
             Session::flashInput(['email' => $email]);
             Response::to('/login');
