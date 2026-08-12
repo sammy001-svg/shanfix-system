@@ -60,11 +60,20 @@ class App
 
         // All CSS/JS is served from our own origin; inline styles are used for
         // chart bar widths and avatar colours only.
+        //
+        // With app.inline_assets on, the page carries its own script rather
+        // than linking one, so script-src also names that block's nonce.
+        // A nonce rather than 'unsafe-inline' — this still rejects any script
+        // an attacker manages to inject, since they cannot guess the value.
+        $scriptSrc = Config::get('app.inline_assets', false)
+            ? "'self' 'nonce-" . csp_nonce() . "'"
+            : "'self'";
+
         header(
             "Content-Security-Policy: default-src 'self'; "
             . "img-src 'self' data:; "
             . "style-src 'self' 'unsafe-inline'; "
-            . "script-src 'self'; "
+            . "script-src {$scriptSrc}; "
             . "form-action 'self'; "
             . "frame-ancestors 'self'; "
             . "base-uri 'self'"
