@@ -194,6 +194,11 @@ say('  copied  install.php, migrate.php, cron.php  ' . DIM . '(CLI only, blocked
 copy($root . '/check.php', $out . '/check.php');
 say('  copied  check.php  ' . DIM . '(open it in a browser to diagnose the install)' . OFF);
 
+// The browser counterpart to migrate.php, for accounts with no Terminal.
+// Needs an administrator password before it will change anything.
+copy($root . '/upgrade.php', $out . '/upgrade.php');
+say('  copied  upgrade.php  ' . DIM . '(open it in a browser to apply database changes)' . OFF);
+
 copy($root . '/config/config.sample.php', $out . '/config/config.sample.php');
 
 // ---------------------------------------------------------------------
