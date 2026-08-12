@@ -56,7 +56,10 @@
       "Bash(mkdir -p \"C:/Users/Shanfix/AppData/Local/Temp/pwtest\")",
       "Read(//c/Users/Shanfix/AppData/Local/Temp/**)",
       "Bash(node -e \"console.log\\('resolved:', require.resolve\\('playwright-core'\\)\\)\")",
-      "Read(//c/Users/Shanfix/AppData/Local/Temp/pwtest/**)"
+      "Read(//c/Users/Shanfix/AppData/Local/Temp/pwtest/**)",
+      "Bash(sed -i 's|http://127.0.0.1:8077|http://127.0.0.1:8000|g' C:/Users/Shanfix/AppData/Local/Temp/pwtest/proxytest.js)",
+      "Bash(node proxytest.js)",
+      "Bash(php build-cpanel.php)"
     ],
     "additionalDirectories": [
       "C:\\Shanfix System\\storage\\logs",

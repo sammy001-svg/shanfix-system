@@ -67,20 +67,13 @@ class Auth
 
     public static function attempt(string $email, string $password, string $ip): array
     {
-        $key = 'login_attempts_' . md5(strtolower($email) . '|' . $ip);
-        $max = (int) Config::get('security.max_login_attempts', 5);
-        $lockoutSeconds = (int) Config::get('security.lockout_minutes', 15) * 60;
+        $max     = (int) Config::get('security.max_login_attempts', 5);
+        $minutes = (int) Config::get('security.lockout_minutes', 15);
 
-        $state = Session::get($key, ['count' => 0, 'first' => time()]);
+        $lockout = self::lockoutState(strtolower($email), $ip, $max, $minutes);
 
-        // Reset the window once the lockout period has elapsed.
-        if ((time() - $state['first']) > $lockoutSeconds) {
-            $state = ['count' => 0, 'first' => time()];
-        }
-
-        if ($state['count'] >= $max) {
-            $wait = (int) ceil(($lockoutSeconds - (time() - $state['first'])) / 60);
-            return ['ok' => false, 'message' => "Too many failed attempts. Try again in {$wait} minute(s)."];
+        if ($lockout !== null) {
+            return ['ok' => false, 'message' => $lockout];
         }
 
         $user = Database::first(
@@ -94,8 +87,7 @@ class Auth
         $valid = password_verify($password, $hash);
 
         if (!$user || !$valid) {
-            $state['count']++;
-            Session::put($key, $state);
+            self::recordFailure(strtolower($email), $ip);
             return ['ok' => false, 'message' => 'Invalid email or password.'];
         }
 
@@ -110,10 +102,86 @@ class Auth
             ], ['id' => $user['id']]);
         }
 
-        Session::forget($key);
+        self::clearFailures(strtolower($email), $ip);
         self::login($user);
 
         return ['ok' => true, 'user' => $user];
+    }
+
+    /**
+     * The audit-log description for a failed sign-in.
+     *
+     * The counter below matches on this exact text, so the two must be
+     * written in one place. Keeping 'login_failed' as the action leaves the
+     * audit trail readable rather than a column of hashes.
+     */
+    private static function failureNote(string $email): string
+    {
+        return 'Failed sign-in for ' . $email;
+    }
+
+    /**
+     * The refusal message while locked out, or null to let the attempt run.
+     *
+     * Counted from the audit log rather than the session. The session-based
+     * version could be sidestepped completely by discarding cookies between
+     * requests, which costs an attacker nothing and made the limit decorative.
+     * The audit log is server-side, so the count survives whatever the client
+     * chooses to send.
+     */
+    private static function lockoutState(string $email, string $ip, int $max, int $minutes): ?string
+    {
+        try {
+            $row = Database::first(
+                'SELECT COUNT(*) AS failures, MIN(created_at) AS first_at
+                   FROM activity_log
+                  WHERE action = :tag
+                    AND created_at > (NOW() - INTERVAL :mins MINUTE)',
+                ['tag' => self::failureTag($email, $ip), 'mins' => $minutes]
+            );
+        } catch (\Throwable $e) {
+            // A logging problem must never lock everyone out of the system.
+            Logger::warning('Could not read login attempts: ' . $e->getMessage());
+            return null;
+        }
+
+        if ((int) ($row['failures'] ?? 0) < $max) {
+            return null;
+        }
+
+        $elapsed = (time() - strtotime((string) $row['first_at'])) / 60;
+        $wait    = max(1, (int) ceil($minutes - $elapsed));
+
+        return "Too many failed attempts. Try again in {$wait} minute(s).";
+    }
+
+    private static function recordFailure(string $email, string $ip): void
+    {
+        try {
+            Database::insert('activity_log', [
+                'user_id'     => null,
+                'action'      => self::failureTag($email, $ip),
+                'entity_type' => 'user',
+                'description' => 'Failed sign-in for ' . $email,
+                'ip_address'  => $ip,
+                'created_at'  => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable $e) {
+            Logger::warning('Could not record failed sign-in: ' . $e->getMessage());
+        }
+    }
+
+    /** A correct password clears the slate for that person on that address. */
+    private static function clearFailures(string $email, string $ip): void
+    {
+        try {
+            Database::run(
+                'DELETE FROM activity_log WHERE action = :tag',
+                ['tag' => self::failureTag($email, $ip)]
+            );
+        } catch (\Throwable $e) {
+            Logger::warning('Could not clear failed sign-ins: ' . $e->getMessage());
+        }
     }
 
     public static function login(array $user): void

@@ -18,6 +18,7 @@ require_once __DIR__ . '/app/bootstrap.php';
 
 use App\Core\Config;
 use App\Core\Database;
+use App\Core\Migrator;
 
 const OK   = "\033[32m";
 const ERR  = "\033[31m";
@@ -31,35 +32,21 @@ function out(string $msg, string $colour = ''): void
 }
 
 Config::load(CONFIG_PATH . '/config.php');
-$pdo = Database::connect(Config::get('db'));
+Database::connect(Config::get('db'));
 
-// Ledger of what has already run.
-$pdo->exec(
-    'CREATE TABLE IF NOT EXISTS migrations (
-        id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        filename   VARCHAR(180) NOT NULL,
-        applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_migration (filename)
-     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
-);
+// The ledger, the file list and the statement splitting all live in Migrator,
+// shared with upgrade.php so a migration behaves the same from a terminal and
+// from a browser.
+$migrator = new Migrator();
 
-$applied = array_column(
-    Database::all('SELECT filename FROM migrations ORDER BY filename'),
-    'filename'
-);
-
-$files = glob(BASE_PATH . '/database/migrations/*.sql') ?: [];
-sort($files);
+$applied = $migrator->applied();
+$files   = $migrator->all();
+$pending = $migrator->pending();
 
 if ($files === []) {
     out('No migration files found in database/migrations/.', CYAN);
     exit(0);
 }
-
-$pending = array_values(array_filter(
-    $files,
-    static fn(string $f): bool => !in_array(basename($f), $applied, true)
-));
 
 // -- Status only ------------------------------------------------------
 if (in_array('--status', $argv, true)) {
@@ -89,45 +76,23 @@ out(sprintf('Applying %d migration(s)…', count($pending)), CYAN);
 out('');
 
 foreach ($pending as $file) {
-    $name = basename($file);
-    out('  ' . $name);
+    out('  ' . basename($file));
 
-    $sql = (string) file_get_contents($file);
+    $result = $migrator->apply($file);
 
-    // Drop full-line comments so they cannot confuse the statement splitter.
-    $sql = preg_replace('/^\s*--.*$/m', '', $sql);
-
-    $statements = array_values(array_filter(
-        array_map('trim', preg_split('/;\s*[\r\n]/', $sql)),
-        static fn(string $s): bool => $s !== ''
-    ));
-
-    foreach ($statements as $statement) {
-        try {
-            $pdo->exec($statement);
-        } catch (PDOException $e) {
-            // Re-running a migration that partially applied should not be fatal
-            // when the objects already exist.
-            $harmless = [
-                '42S01', // table already exists
-                '42S21', // duplicate column
-            ];
-
-            if (in_array($e->getCode(), $harmless, true)) {
-                out('    ' . DIM . 'skipped (already applied): ' . substr($statement, 0, 60) . '…' . OFF);
-                continue;
-            }
-
-            out('');
-            out('  FAILED: ' . $e->getMessage(), ERR);
-            out('  Statement: ' . substr($statement, 0, 200) . '…', DIM);
-            out('');
-            out('  No further migrations were applied. Fix the error and run again.', ERR);
-            exit(1);
-        }
+    if ($result['skipped'] > 0) {
+        out('    ' . DIM . $result['skipped'] . ' statement(s) already applied, skipped' . OFF);
     }
 
-    Database::run('INSERT INTO migrations (filename) VALUES (:f)', ['f' => $name]);
+    if (!$result['ok']) {
+        out('');
+        out('  FAILED: ' . $result['error'], ERR);
+        out('  Statement: ' . $result['statement'] . '…', DIM);
+        out('');
+        out('  No further migrations were applied. Fix the error and run again.', ERR);
+        exit(1);
+    }
+
     out('    ' . OK . 'done' . OFF);
 }
 

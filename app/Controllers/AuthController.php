@@ -5,6 +5,7 @@ use App\Core\ActivityLog;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
+use App\Core\Logger;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
@@ -41,8 +42,18 @@ class AuthController extends Controller
 
         // Only after the password checked out — never issue a persistent
         // token off the back of a failed attempt.
+        //
+        // Staying signed in is a convenience on top of a login that has
+        // already succeeded, so it must never be able to fail the login
+        // itself. Without this guard a server that has not yet run the
+        // remember_tokens migration turns a correct password into a 500,
+        // which reads to the person typing it as a rejected password.
         if ($request->bool('remember')) {
-            Auth::remember((int) $result['user']['id']);
+            try {
+                Auth::remember((int) $result['user']['id']);
+            } catch (\Throwable $e) {
+                Logger::warning('Could not store remember-me token: ' . $e->getMessage());
+            }
         }
 
         ActivityLog::record('login', 'user', (int) $result['user']['id'], $result['user']['name'] . ' signed in');
