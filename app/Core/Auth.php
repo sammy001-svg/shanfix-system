@@ -132,12 +132,16 @@ class Auth
     private static function lockoutState(string $email, string $ip, int $max, int $minutes): ?string
     {
         try {
+            // Scoped to this address as well as this account, so one person
+            // mistyping cannot lock a colleague out from somewhere else.
             $row = Database::first(
                 'SELECT COUNT(*) AS failures, MIN(created_at) AS first_at
                    FROM activity_log
-                  WHERE action = :tag
-                    AND created_at > (NOW() - INTERVAL :mins MINUTE)',
-                ['tag' => self::failureTag($email, $ip), 'mins' => $minutes]
+                  WHERE action      = \'login_failed\'
+                    AND description = :note
+                    AND ip_address  = :ip
+                    AND created_at  > (NOW() - INTERVAL :mins MINUTE)',
+                ['note' => self::failureNote($email), 'ip' => $ip, 'mins' => $minutes]
             );
         } catch (\Throwable $e) {
             // A logging problem must never lock everyone out of the system.
