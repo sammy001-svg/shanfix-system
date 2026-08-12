@@ -52,7 +52,11 @@
       "Bash(php -l config/config.php)",
       "Bash(php -l config/config.sample.php)",
       "Bash(php -l app/Core/helpers.php)",
-      "Bash(php -l app/Core/App.php)"
+      "Bash(php -l app/Core/App.php)",
+      "Bash(mkdir -p \"C:/Users/Shanfix/AppData/Local/Temp/pwtest\")",
+      "Read(//c/Users/Shanfix/AppData/Local/Temp/**)",
+      "Bash(node -e \"console.log\\('resolved:', require.resolve\\('playwright-core'\\)\\)\")",
+      "Read(//c/Users/Shanfix/AppData/Local/Temp/pwtest/**)"
     ],
     "additionalDirectories": [
       "C:\\Shanfix System\\storage\\logs",

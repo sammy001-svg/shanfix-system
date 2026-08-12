@@ -65,7 +65,7 @@ class App
         // than linking one, so script-src also names that block's nonce.
         // A nonce rather than 'unsafe-inline' — this still rejects any script
         // an attacker manages to inject, since they cannot guess the value.
-        $scriptSrc = Config::get('app.inline_assets', false)
+        $scriptSrc = inline_assets()
             ? "'self' 'nonce-" . csp_nonce() . "'"
             : "'self'";
 

@@ -117,6 +117,42 @@ if (!function_exists('asset_path')) {
     }
 }
 
+if (!function_exists('inline_assets')) {
+    /**
+     * Whether to embed CSS/JS/images in the page rather than link to them.
+     *
+     * Two ways to turn it on, because the two arrive by different routes:
+     * config.php is not in version control, so a deployment cannot switch it
+     * — but Settings lives in the database and can be toggled from the admin
+     * screen, which stays usable even when the page is rendering unstyled.
+     * config wins when set, so a server can pin the behaviour regardless of
+     * what anyone clicks.
+     */
+    function inline_assets(): bool
+    {
+        static $on = null;
+
+        if ($on !== null) {
+            return $on;
+        }
+
+        $configured = Config::get('app.inline_assets');
+
+        if ($configured !== null) {
+            return $on = (bool) $configured;
+        }
+
+        // Wrapped: this runs on every request including ones that fail before
+        // the database is reachable, and a broken lookup must not take the
+        // page down — linking assets is the safe answer either way.
+        try {
+            return $on = Settings::bool('inline_assets', false);
+        } catch (\Throwable) {
+            return $on = false;
+        }
+    }
+}
+
 if (!function_exists('css_tag')) {
     /**
      * The stylesheet, as a <link> or embedded in the page.
@@ -128,15 +164,16 @@ if (!function_exists('css_tag')) {
      * Putting the CSS in the document means it arrives with the page and
      * cannot be intercepted separately.
      *
-     * Costs bandwidth on every page, so it is off unless app.inline_assets
-     * is switched on in config.php. Turn it back off once the proxy is
-     * fixed — a cached external stylesheet is faster.
+     * Costs bandwidth on every page, so it is off unless switched on — see
+     * inline_assets(). Turn it back off once the interception stops; a
+     * stylesheet the browser can cache once is faster than one repeated in
+     * every page.
      */
     function css_tag(string $relative = 'css/app.css'): string
     {
         $file = asset_path($relative);
 
-        if ($file !== null && Config::get('app.inline_assets', false)) {
+        if ($file !== null && inline_assets()) {
             return "<style>\n" . file_get_contents($file) . "\n</style>";
         }
 
@@ -150,7 +187,7 @@ if (!function_exists('js_tag')) {
     {
         $file = asset_path($relative);
 
-        if ($file !== null && Config::get('app.inline_assets', false)) {
+        if ($file !== null && inline_assets()) {
             // The CSP forbids inline script, so this one carries a nonce.
             return '<script nonce="' . e(csp_nonce()) . '">' . "\n"
                  . file_get_contents($file) . "\n</script>";
@@ -176,7 +213,7 @@ if (!function_exists('inline_image')) {
     function inline_image(?string $absolutePath, int $maxBytes = 400_000): ?string
     {
         if ($absolutePath === null
-            || !Config::get('app.inline_assets', false)
+            || !inline_assets()
             || !is_file($absolutePath)
             || filesize($absolutePath) > $maxBytes) {
             return null;

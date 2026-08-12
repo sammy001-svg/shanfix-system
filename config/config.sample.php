@@ -52,8 +52,12 @@ return [
         //
         // It is a workaround, not a fix: pages get roughly 90 KB heavier and
         // lose the benefit of a cached stylesheet. Once the hosting company
-        // has removed the interception, set this back to false.
-        'inline_assets'    => false,
+        // has removed the interception, comment this out again.
+        //
+        // Leave it commented to let the 'inline_assets' row in the settings
+        // table decide. Uncommenting pins the behaviour here — true or false
+        // — and the database row is then ignored.
+        // 'inline_assets' => true,
     ],
 
     // -----------------------------------------------------------------
