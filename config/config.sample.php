@@ -39,6 +39,21 @@ return [
 
         // Idle session timeout in minutes
         'session_lifetime' => 480,
+
+        // Put the stylesheet, script and login photo inside the HTML page
+        // instead of linking to them as separate files.
+        //
+        // Switch this on if the site renders as unstyled text — plain black
+        // links on white, no colours, no layout. That means something between
+        // the browser and this server is answering requests for
+        // /assets/css/app.css with a holding page instead of the stylesheet,
+        // so the browser has no CSS to apply. Embedding the CSS puts it
+        // beyond reach of whatever is intercepting those requests.
+        //
+        // It is a workaround, not a fix: pages get roughly 90 KB heavier and
+        // lose the benefit of a cached stylesheet. Once the hosting company
+        // has removed the interception, set this back to false.
+        'inline_assets'    => false,
     ],
 
     // -----------------------------------------------------------------

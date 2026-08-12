@@ -13,22 +13,32 @@ $rememberDays = \App\Core\Settings::int('remember_me_days', 30);
 // Preference order:
 //   1. whatever was uploaded in Settings (no server access needed)
 //   2. a file dropped into public/assets/img/ by hand
-$bg = null;
+$bg     = null;
+$bgFile = null;
 
 $uploaded = (string) setting('login_background', '');
 
 if ($uploaded !== '' && is_file(STORAGE_PATH . '/' . $uploaded)) {
     // Timestamp in the URL so replacing the photo shows up at once rather
     // than after the week-long asset cache expires.
-    $bg = url('/brand/login-bg') . '?v=' . filemtime(STORAGE_PATH . '/' . $uploaded);
+    $bgFile = STORAGE_PATH . '/' . $uploaded;
+    $bg     = url('/brand/login-bg') . '?v=' . filemtime($bgFile);
 } else {
     foreach (['jpg', 'jpeg', 'png', 'webp', 'svg'] as $ext) {
         if (is_file(PUBLIC_PATH . '/assets/img/login-bg.' . $ext)) {
-            $bg = asset('img/login-bg.' . $ext);   // asset() adds its own ?v=
+            $bgFile = PUBLIC_PATH . '/assets/img/login-bg.' . $ext;
+            $bg     = asset('img/login-bg.' . $ext);   // asset() adds its own ?v=
             break;
         }
     }
 }
+
+// Embed the photo in the page when inline mode is on. Generous limit: this
+// is one image on one page, and it is the whole look of the sign-in screen.
+$bg = inline_image($bgFile, 1_200_000) ?? $bg;
+
+$logoFile   = $logo !== '' && is_file(STORAGE_PATH . '/' . $logo) ? STORAGE_PATH . '/' . $logo : null;
+$logoSrc    = inline_image($logoFile) ?? url('/brand/logo');
 ?>
 
 <div class="login">
@@ -47,7 +57,7 @@ if ($uploaded !== '' && is_file(STORAGE_PATH . '/' . $uploaded)) {
           // /brand/logo rather than /files — nobody is signed in on this page.
         ?>
         <header class="login__brand login__brand--logo">
-          <img class="login__logo" src="<?= url('/brand/logo') ?>" alt="<?= e($company) ?>">
+          <img class="login__logo" src="<?= e($logoSrc) ?>" alt="<?= e($company) ?>">
           <?php if ($tagline): ?>
             <div class="login__tagline"><?= e($tagline) ?></div>
           <?php endif; ?>

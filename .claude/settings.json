@@ -47,7 +47,12 @@
       "Bash(cd \"c:/Shanfix System\" && rm -f live-check.html && echo \"cleaned up local copy\")",
       "Bash(curl -s -I --max-time 20 https://system.shanfixtechnology.com/login)",
       "Bash(perl -0pi -e 's{<link rel=\"stylesheet\" href=\"<\\\\?= asset\\\\\\('\\\\''css/app\\\\.css'\\\\''\\\\\\) \\\\?>\">}{<?= css_tag\\(\\) ?>}g' '$f')",
-      "Bash(perl -0pi -e 's{<script src=\"<\\\\?= asset\\\\\\('\\\\''js/app\\\\.js'\\\\''\\\\\\) \\\\?>\"></script>}{<?= js_tag\\(\\) ?>}g' '$f')"
+      "Bash(perl -0pi -e 's{<script src=\"<\\\\?= asset\\\\\\('\\\\''js/app\\\\.js'\\\\''\\\\\\) \\\\?>\"></script>}{<?= js_tag\\(\\) ?>}g' '$f')",
+      "Bash(php -r *)",
+      "Bash(php -l config/config.php)",
+      "Bash(php -l config/config.sample.php)",
+      "Bash(php -l app/Core/helpers.php)",
+      "Bash(php -l app/Core/App.php)"
     ],
     "additionalDirectories": [
       "C:\\Shanfix System\\storage\\logs",

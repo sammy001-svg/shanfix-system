@@ -160,6 +160,44 @@ if (!function_exists('js_tag')) {
     }
 }
 
+if (!function_exists('inline_image')) {
+    /**
+     * A data: URI for an image file, or null to keep using its normal URL.
+     *
+     * Same purpose as css_tag(): when something in front of the site
+     * intercepts separate file requests, an image embedded in the HTML still
+     * arrives. Only used while app.inline_assets is on.
+     *
+     * Base64 inflates a file by a third and the result cannot be cached
+     * separately, so anything large is left as a normal URL — a missing
+     * background photo is a far smaller problem than a page that takes
+     * several seconds to arrive on a phone.
+     */
+    function inline_image(?string $absolutePath, int $maxBytes = 400_000): ?string
+    {
+        if ($absolutePath === null
+            || !Config::get('app.inline_assets', false)
+            || !is_file($absolutePath)
+            || filesize($absolutePath) > $maxBytes) {
+            return null;
+        }
+
+        $info = @getimagesize($absolutePath);
+        $mime = $info['mime'] ?? null;
+
+        if ($mime === null) {
+            // getimagesize does not understand SVG; it is the one format here
+            // that is text rather than a bitmap.
+            if (strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION)) !== 'svg') {
+                return null;
+            }
+            $mime = 'image/svg+xml';
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($absolutePath));
+    }
+}
+
 if (!function_exists('csp_nonce')) {
     /** One random nonce per request, shared by the CSP header and any inline script. */
     function csp_nonce(): string
