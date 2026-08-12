@@ -27,14 +27,18 @@ Options -Indexes
     RewriteRule (^|/)\.                              - [F,L]
 
     # -----------------------------------------------------------------
-    # 2. Stylesheets, scripts and images live under public/.
-    #    The target does not start with "assets/", so this cannot loop.
+    # 2. Stylesheets, scripts and images.
+    #
+    #    Two layouts exist in the wild: assets/ beside this file, or
+    #    assets/ inside public/. Serve whichever is actually present.
+    #
+    #    The first condition is what makes this safe — without it, a root
+    #    assets/ folder would be redirected into public/assets/, which may
+    #    not exist, and every stylesheet would 404.
     # -----------------------------------------------------------------
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{DOCUMENT_ROOT}/public/assets -d
     RewriteRule ^assets/(.*)$ public/assets/$1 [L]
-
-    # Favicon and similar, if they are ever requested from the root.
-    RewriteCond %{DOCUMENT_ROOT}/public/$0 -f
-    RewriteRule ^[^/]+\.(ico|png|svg|txt|webmanifest)$ public/%{REQUEST_URI} [L]
 
     # -----------------------------------------------------------------
     # 3. Everything that is not a real file or folder goes to the front
