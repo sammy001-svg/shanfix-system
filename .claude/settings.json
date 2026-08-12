@@ -40,7 +40,10 @@
       "Bash(cd \"e:/projects/Bulk SMS/shanfix-bulk-sms\" && grep -n \"function normalizePhone\" -A 25 includes/actions/sms.php && echo \"--- CORS ---\" && cat api/v1/_cors.php)",
       "Bash(sort -u -t: -k3)",
       "Bash(rm -f storage/uploads/logos/test-wordmark.png)",
-      "Bash(php -l app/Views/auth/login.php)"
+      "Bash(php -l app/Views/auth/login.php)",
+      "Bash(grep -v '^\\\\s*$')",
+      "Bash(curl -s --max-time 25 \"https://system.shanfixtechnology.com/check.php\" -o live-check.html)",
+      "Bash(sed -e 's/<[^>]*>/|/g' live-check.html)"
     ],
     "additionalDirectories": [
       "C:\\Shanfix System\\storage\\logs"

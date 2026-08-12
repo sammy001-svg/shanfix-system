@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Installation check · Shanfix BMS</title>
+<style>
+  *{box-sizing:border-box} body{margin:0;background:#F3F6F9;color:#0F1E2E;
+    font:14px/1.55 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;padding:24px 16px}
+  .wrap{max-width:820px;margin:0 auto}
+  .card{background:#fff;border:1px solid #DDE4EC;border-radius:10px;margin-bottom:18px;overflow:hidden}
+  .card__head{background:#08203A;color:#fff;padding:18px 22px}
+  .card__head h1{margin:0;font-size:19px}
+  .card__head p{margin:4px 0 0;color:rgba(255,255,255,.66);font-size:13px}
+  .strip{height:4px}
+  .body{padding:18px 22px}
+  .row{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #EEF2F6}
+  .row:last-child{border-bottom:0}
+  .tag{flex:0 0 62px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    padding:2px 0;border-radius:4px;text-align:center}
+  .pass{background:#D5EFE0;color:#0B5730} .fail{background:#FBE3E0;color:#A62A20}
+  .warn{background:#FCEFD8;color:#9A5B08}
+  .name{font-weight:600;flex:1}
+  .detail{color:#5A6B7D;font-size:12.5px;margin-top:2px;word-break:break-word}
+  dl{display:grid;grid-template-columns:190px 1fr;gap:7px 14px;margin:0;font-size:13px}
+  dt{color:#5A6B7D} dd{margin:0;word-break:break-all}
+  code{background:#F3F6F9;border:1px solid #DDE4EC;border-radius:4px;padding:1px 5px;
+    font-family:Consolas,Menlo,monospace;font-size:12.5px}
+  .banner{padding:16px 22px;font-size:15px;font-weight:600}
+  .banner--ok{background:#EDF8F2;color:#0B5730;border-bottom:1px solid #D5EFE0}
+  .banner--bad{background:#FDF1F0;color:#A62A20;border-bottom:1px solid #FBE3E0}
+  .btn{display:inline-block;background:#14874E;color:#fff;padding:11px 22px;border-radius:6px;
+    text-decoration:none;font-weight:600;margin-top:6px}
+  .note{background:#FEF8EC;border:1px solid #FCEFD8;color:#9A5B08;padding:12px 15px;
+    border-radius:6px;font-size:13px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <div class="card__head">
+      <h1>Shanfix BMS — installation check</h1>
+      <p>Run from /home3/shanfixt/system.shanfixtechnology.com</p>
+    </div>
+    <div class="strip" style="background:#14874E"></div>
+
+          <div class="banner banner--ok">
+        Everything checks out.
+      </div>
+      <div class="body">
+        <a class="btn" href="/">Open the system &rarr;</a>
+        <div class="note">
+          Delete <code>check.php</code> and <code>install.php</code> from the server now.
+          This page reveals server paths.
+        </div>
+      </div>
+      </div>
+
+  <div class="card">
+    <div class="card__head" style="background:#123A61"><h1 style="font-size:15px">Where the server thinks it is</h1></div>
+    <div class="body">
+      <dl>
+        <dt>Web server</dt><dd>LiteSpeed</dd>
+        <dt>Document root</dt><dd><code>/home3/shanfixt/system.shanfixtechnology.com</code></dd>
+        <dt>This file is in</dt><dd><code>/home3/shanfixt/system.shanfixtechnology.com</code></dd>
+        <dt>Script path</dt><dd><code>/check.php</code></dd>
+        <dt>Layout detected</dt>
+        <dd>
+                      Standard — the app is in <code>public/</code>.
+            The document root <strong>must</strong> point at
+            <code>/home3/shanfixt/system.shanfixtechnology.com/public</code>
+                  </dd>
+      </dl>
+
+          </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head" style="background:#123A61"><h1 style="font-size:15px">Checks</h1></div>
+    <div class="body">
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            PHP 8.0 or newer                          <div class="detail">Running 8.3.31</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Extension: pdo_mysql                          <div class="detail">Needed for database access</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Extension: mbstring                          <div class="detail">Needed for text handling</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Extension: openssl                          <div class="detail">Needed for encrypting API secrets</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Extension: json                          <div class="detail">Needed for data encoding</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Extension: curl                          <div class="detail">Needed for M-Pesa STK Push. Without it, payments must be recorded by hand.</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Extension: fileinfo                          <div class="detail">Used to verify uploaded files match their extension.</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            app/bootstrap.php found                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            app/Core/App.php found                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            routes.php found                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            database/schema.sql found                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Stylesheet found                          <div class="detail">/home3/shanfixt/system.shanfixtechnology.com/public/assets/css/app.css</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            config/config.php exists                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Writable: storage/                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Writable: storage/logs/                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Writable: storage/uploads/                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Database connects                          <div class="detail">Connected to &quot;shanfixt_tech&quot; — 30 table(s)</div>
+                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Schema imported                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Encryption key set                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            Public URL set                      </span>
+        </div>
+              <div class="row">
+          <span class="tag pass">OK</span>
+          <span class="name">
+            URL rewriting available                      </span>
+        </div>
+          </div>
+  </div>
+
+  <div class="card">
+    <div class="card__head" style="background:#123A61"><h1 style="font-size:15px">Clean URL test</h1></div>
+    <div class="body">
+      <p style="margin:0 0 10px;color:#5A6B7D">
+        This link works only if URL rewriting is active. If it 404s, the
+        <code>.htaccess</code> file is missing or being ignored by your host.
+      </p>
+      <a class="btn" href="/login">Test /login &rarr;</a>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
