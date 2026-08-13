@@ -86,10 +86,10 @@
 
   /* Neon. A hue-coloured halo, built from layered shadows rather than a
      gradient, so the house rule against gradients still holds. */
-  --glow-green: 0 0 0 1px rgba(26, 160, 92, .55), 0 0 18px rgba(26, 160, 92, .38), 0 0 42px rgba(26, 160, 92, .20);
-  --glow-navy:  0 0 0 1px rgba(42, 106, 166, .55), 0 0 18px rgba(42, 106, 166, .38), 0 0 42px rgba(42, 106, 166, .20);
-  --glow-amber: 0 0 0 1px rgba(214, 158, 62, .55), 0 0 18px rgba(214, 158, 62, .34), 0 0 42px rgba(214, 158, 62, .18);
-  --glow-red:   0 0 0 1px rgba(196, 54, 42, .55), 0 0 18px rgba(196, 54, 42, .34), 0 0 42px rgba(196, 54, 42, .18);
+  --glow-green: 0 0 0 1px rgba(26, 160, 92, .80), 0 0 22px rgba(26, 160, 92, .55), 0 0 56px rgba(26, 160, 92, .30);
+  --glow-navy:  0 0 0 1px rgba(58, 130, 200, .80), 0 0 22px rgba(58, 130, 200, .55), 0 0 56px rgba(58, 130, 200, .30);
+  --glow-amber: 0 0 0 1px rgba(224, 168, 72, .80), 0 0 22px rgba(224, 168, 72, .50), 0 0 56px rgba(224, 168, 72, .28);
+  --glow-red:   0 0 0 1px rgba(220, 78, 64, .80), 0 0 22px rgba(220, 78, 64, .50), 0 0 56px rgba(220, 78, 64, .28);
 
   --sidebar-w: 244px;
   --topbar-h:  60px;
