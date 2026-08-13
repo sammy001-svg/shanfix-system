@@ -1,4 +1,27 @@
-<?php require_once APP_PATH . '/Views/partials/icons.php'; ?>
+<?php
+require_once APP_PATH . '/Views/partials/icons.php';
+
+// Cards by default — the floor and the front desk are matching a photo to a
+// customer's request, which a row of text does not help with. The table
+// stays a click away for stock-taking, where density beats pictures.
+$view = ($_GET['view'] ?? 'cards') === 'table' ? 'table' : 'cards';
+
+// What an item cost us, and therefore the margin on it, is commercial
+// information. Anyone who can price a job or order stock needs it; the
+// people looking things up for a customer do not.
+$showCost = can('inventory.manage') || can('expenses.view');
+
+$marginOf = static function (array $item): float {
+    $sell = (float) $item['selling_price'];
+    return $sell > 0 ? (($sell - (float) $item['cost_price']) / $sell) * 100 : 0.0;
+};
+
+// Carry the current filters onto the other view, so switching does not
+// silently drop what someone has searched for.
+$viewUrl = static function (string $mode): string {
+    return url('/inventory') . query_string(['view' => $mode, 'page' => null]);
+};
+?>
 
 <div class="page-head">
   <div class="page-head__text">
@@ -6,6 +29,16 @@
     <div class="page-head__sub">Stock items and selling prices for printing &amp; branding.</div>
   </div>
   <div class="page-head__actions">
+    <span class="viewswitch" role="group" aria-label="How to show the catalogue">
+      <a class="viewswitch__btn <?= $view === 'cards' ? 'is-on' : '' ?>"
+         href="<?= e($viewUrl('cards')) ?>" aria-pressed="<?= $view === 'cards' ? 'true' : 'false' ?>">
+        <?= icon('grid') ?> Cards
+      </a>
+      <a class="viewswitch__btn <?= $view === 'table' ? 'is-on' : '' ?>"
+         href="<?= e($viewUrl('table')) ?>" aria-pressed="<?= $view === 'table' ? 'true' : 'false' ?>">
+        <?= icon('list') ?> List
+      </a>
+    </span>
     <a class="btn btn--outline" href="<?= url('/inventory/export') ?>"><?= icon('download') ?> Export CSV</a>
     <?php if (can('inventory.manage')): ?>
       <a class="btn btn--primary" href="<?= url('/inventory/create') ?>"><?= icon('plus') ?> New item</a>
@@ -18,11 +51,13 @@
     <div class="stat__label">Active items</div>
     <div class="stat__value"><?= number_format((int) $summary['total_items']) ?></div>
   </div>
-  <div class="stat stat--green">
-    <div class="stat__label">Stock value (at cost)</div>
-    <div class="stat__value"><?= e(money_short($summary['stock_value'])) ?></div>
-    <div class="stat__meta">Retail: <?= e(money_short($summary['retail_value'])) ?></div>
-  </div>
+  <?php if ($showCost): ?>
+    <div class="stat stat--green">
+      <div class="stat__label">Stock value (at cost)</div>
+      <div class="stat__value"><?= e(money_short($summary['stock_value'])) ?></div>
+      <div class="stat__meta">Retail: <?= e(money_short($summary['retail_value'])) ?></div>
+    </div>
+  <?php endif; ?>
   <div class="stat stat--amber">
     <div class="stat__label">Low stock</div>
     <div class="stat__value"><?= (int) $summary['low_stock'] ?></div>
@@ -91,6 +126,71 @@
         <a class="btn btn--primary" href="<?= url('/inventory/create') ?>"><?= icon('plus') ?> New item</a>
       <?php endif; ?>
     </div>
+  <?php elseif ($view === 'cards'): ?>
+    <div class="product-grid">
+      <?php foreach ($items as $item):
+          $q     = (float) $item['quantity'];
+          $r     = (float) $item['reorder_level'];
+          $thumb = $item['thumb_path'] ?: $item['image_path'];
+
+          // One label per item, worst news first: an inactive item is not
+          // worth flagging as low stock, and out beats low.
+          if (!$item['is_active'])  { $state = ['grey',  'Inactive']; }
+          elseif ($q <= 0)          { $state = ['red',   'Out of stock']; }
+          elseif ($q <= $r)         { $state = ['amber', 'Low stock']; }
+          else                      { $state = ['green', 'In stock']; }
+      ?>
+        <a class="card product" href="<?= url('/inventory/' . $item['id']) ?>">
+          <span class="product__shot <?= $thumb ? '' : 'product__shot--empty' ?>">
+            <?php if ($thumb): ?>
+              <img src="<?= url('files/' . $thumb) ?>" alt="<?= e($item['name']) ?>" loading="lazy">
+              <?php if ((int) $item['image_count'] > 1): ?>
+                <span class="product__more"><?= (int) $item['image_count'] ?> photos</span>
+              <?php endif; ?>
+            <?php else: ?>
+              <?= icon('image') ?>
+            <?php endif; ?>
+
+            <span class="badge badge--<?= e($state[0]) ?> product__state"><?= e($state[1]) ?></span>
+          </span>
+
+          <span class="product__body">
+            <span class="product__name"><?= e($item['name']) ?></span>
+            <span class="product__meta">
+              <code><?= e($item['sku']) ?></code>
+              <?php if ($item['category_name']): ?>
+                · <?= e($item['category_name']) ?>
+              <?php endif; ?>
+            </span>
+
+            <span class="product__foot">
+              <span class="product__price">
+                <?= e(money($item['selling_price'], false)) ?>
+                <span class="product__cur"><?= e(\App\Core\Settings::currency()) ?></span>
+              </span>
+              <span class="product__stock">
+                <?= e(qty($q)) ?> <?= e($item['unit']) ?>
+              </span>
+            </span>
+
+            <?php if ($showCost): ?>
+              <span class="product__cost">
+                Cost <?= e(money($item['cost_price'], false)) ?>
+                <?php if ($marginOf($item) > 0): ?>
+                  · <?= number_format($marginOf($item), 0) ?>% margin
+                <?php endif; ?>
+              </span>
+            <?php endif; ?>
+          </span>
+        </a>
+      <?php endforeach; ?>
+    </div>
+
+    <div class="table-foot">
+      <span>Showing <?= count($items) ?> of <?= number_format($pager['total']) ?> item(s)</span>
+      <?php require APP_PATH . '/Views/partials/pagination.php'; ?>
+    </div>
+
   <?php else: ?>
     <div class="table-wrap">
       <table class="table">
@@ -99,7 +199,7 @@
             <th>Item</th>
             <th>SKU</th>
             <th>Category</th>
-            <th class="num">Cost</th>
+            <?php if ($showCost): ?><th class="num">Cost</th><?php endif; ?>
             <th class="num">Selling price</th>
             <th class="num">In stock</th>
             <th>Status</th>
@@ -139,10 +239,12 @@
               </td>
               <td><code class="text-xs"><?= e($item['sku']) ?></code></td>
               <td class="text-sm"><?= e($item['category_name'] ?: '—') ?></td>
-              <td class="num text-sm text-muted"><?= e(money($item['cost_price'], false)) ?></td>
+              <?php if ($showCost): ?>
+                <td class="num text-sm text-muted"><?= e(money($item['cost_price'], false)) ?></td>
+              <?php endif; ?>
               <td class="num">
                 <span class="fw-600"><?= e(money($item['selling_price'], false)) ?></span>
-                <?php if ($marginPct > 0): ?>
+                <?php if ($showCost && $marginPct > 0): ?>
                   <div class="table__muted"><?= number_format($marginPct, 0) ?>% margin</div>
                 <?php endif; ?>
               </td>
