@@ -61,13 +61,13 @@ class App
         // All CSS/JS is served from our own origin; inline styles are used for
         // chart bar widths and avatar colours only.
         //
-        // With app.inline_assets on, the page carries its own script rather
-        // than linking one, so script-src also names that block's nonce.
+        // The nonce is always issued: the layout runs one short inline script
+        // in <head> to apply the saved colour theme before anything paints,
+        // and with app.inline_assets on the whole of app.js is inlined too.
+        //
         // A nonce rather than 'unsafe-inline' — this still rejects any script
         // an attacker manages to inject, since they cannot guess the value.
-        $scriptSrc = inline_assets()
-            ? "'self' 'nonce-" . csp_nonce() . "'"
-            : "'self'";
+        $scriptSrc = "'self' 'nonce-" . csp_nonce() . "'";
 
         header(
             "Content-Security-Policy: default-src 'self'; "

@@ -3,60 +3,147 @@
    Brand: Navy + Green. Solid colours only, no gradients anywhere.
    ===================================================================== */
 
+/* ---------------------------------------------------------------------
+   Tokens
+   Brand scales are fixed — navy is navy in either theme. Everything that
+   describes a surface, a border or a piece of text is themed, so the two
+   modes are one set of overrides rather than two stylesheets.
+
+   Dark is the default: the bare :root carries it, and [data-theme="light"]
+   overrides. Anyone arriving with no saved preference gets dark.
+   --------------------------------------------------------------------- */
 :root {
-  /* Brand - Navy */
+  /* Brand - Navy (fixed) */
   --navy-900: #08203A;
   --navy-800: #0C2B4A;
   --navy-700: #123A61;
   --navy-600: #1A4E80;
   --navy-500: #2A6AA6;
-  --navy-100: #DCE7F2;
-  --navy-50:  #EEF3F9;
 
-  /* Brand - Green */
+  /* Brand - Green (fixed) */
   --green-800: #0B5730;
   --green-700: #0F6B3D;
   --green-600: #14874E;
   --green-500: #1AA05C;
   --green-400: #34B673;
-  --green-100: #D5EFE0;
-  --green-50:  #EDF8F2;
 
-  /* Neutrals */
-  --ink:       #0F1E2E;
-  --slate-700: #3D4E60;
-  --slate-600: #5A6B7D;
-  --slate-500: #7C8B9B;
-  --slate-400: #9AA8B5;
-  --border:    #DDE4EC;
-  --border-strong: #C6D1DD;
-  --bg:        #F3F6F9;
-  --surface:   #FFFFFF;
-  --surface-2: #F8FAFC;
-
-  /* Semantic */
+  /* Semantic hues (fixed) */
   --amber-700: #9A5B08;
-  --amber-100: #FCEFD8;
   --red-700:   #A62A20;
   --red-600:   #C4362A;
-  --red-100:   #FBE3E0;
   --blue-700:  #1B5E9E;
-  --blue-100:  #DCEBF8;
+
+  /* -- Themed: surfaces and text ------------------------------------ */
+  --bg:            #060E18;
+  --surface:       #0C1C2C;
+  --surface-2:     #12283B;
+  --border:        #1F3A55;
+  --border-strong: #2C5075;
+
+  --ink:       #E8F0F8;
+  --slate-700: #C2D2E2;
+  --slate-600: #93A8BD;
+  --slate-500: #7489A0;
+  --slate-400: #5C7288;
+
+  /* -- Themed: soft chip and alert backgrounds ----------------------- */
+  --tint-green: #0E3323;
+  --tint-navy:  #14304B;
+  --tint-amber: #3A2A0C;
+  --tint-red:   #3A1714;
+  --tint-blue:  #12304C;
+  --tint-grey:  #1A2C3F;
+
+  /* Text sitting on those tints — light in dark mode, dark in light. */
+  --on-green: #5FD394;
+  --on-navy:  #8FB8E0;
+  --on-amber: #E5B45F;
+  --on-red:   #F09287;
+  --on-blue:  #7FB4E4;
+  --on-grey:  #C2D2E2;
+
+  /* Legacy aliases: older rules refer to these. Kept pointing at the
+     themed tints so nothing has to be rewritten to stay correct. */
+  --navy-100:  var(--tint-navy);
+  --navy-50:   var(--tint-navy);
+  --green-100: var(--tint-green);
+  --green-50:  var(--tint-green);
+  --amber-100: var(--tint-amber);
+  --red-100:   var(--tint-red);
+  --blue-100:  var(--tint-blue);
 
   /* Shape */
   --r-sm: 4px;
   --r:    7px;
   --r-lg: 11px;
 
-  --shadow-sm: 0 1px 2px rgba(8, 32, 58, .06);
-  --shadow:    0 2px 6px rgba(8, 32, 58, .08);
-  --shadow-lg: 0 10px 30px rgba(8, 32, 58, .14);
+  /* Depth. Dark surfaces need a lift as well as a shadow, so each level
+     pairs a drop shadow with a hairline highlight along the top edge. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow:    0 3px 10px rgba(0, 0, 0, .40);
+  --shadow-lg: 0 18px 44px rgba(0, 0, 0, .55);
+  --lift:      inset 0 1px 0 rgba(255, 255, 255, .05);
+
+  /* Neon. A hue-coloured halo, built from layered shadows rather than a
+     gradient, so the house rule against gradients still holds. */
+  --glow-green: 0 0 0 1px rgba(26, 160, 92, .55), 0 0 18px rgba(26, 160, 92, .38), 0 0 42px rgba(26, 160, 92, .20);
+  --glow-navy:  0 0 0 1px rgba(42, 106, 166, .55), 0 0 18px rgba(42, 106, 166, .38), 0 0 42px rgba(42, 106, 166, .20);
+  --glow-amber: 0 0 0 1px rgba(214, 158, 62, .55), 0 0 18px rgba(214, 158, 62, .34), 0 0 42px rgba(214, 158, 62, .18);
+  --glow-red:   0 0 0 1px rgba(196, 54, 42, .55), 0 0 18px rgba(196, 54, 42, .34), 0 0 42px rgba(196, 54, 42, .18);
 
   --sidebar-w: 244px;
   --topbar-h:  60px;
 
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* One dial for every transition, so reduced-motion can stop the lot. */
+  --ease:  cubic-bezier(.22, .61, .36, 1);
+  --fast:  .14s;
+  --mid:   .26s;
+  --slow:  .45s;
+}
+
+/* ---------------------------------------------------------------------
+   Light mode — only the themed tokens are restated.
+   --------------------------------------------------------------------- */
+:root[data-theme="light"] {
+  --bg:            #F3F6F9;
+  --surface:       #FFFFFF;
+  --surface-2:     #F8FAFC;
+  --border:        #DDE4EC;
+  --border-strong: #C6D1DD;
+
+  --ink:       #0F1E2E;
+  --slate-700: #3D4E60;
+  --slate-600: #5A6B7D;
+  --slate-500: #7C8B9B;
+  --slate-400: #9AA8B5;
+
+  --tint-green: #D5EFE0;
+  --tint-navy:  #DCE7F2;
+  --tint-amber: #FCEFD8;
+  --tint-red:   #FBE3E0;
+  --tint-blue:  #DCEBF8;
+  --tint-grey:  #E8EDF3;
+
+  --on-green: #0B5730;
+  --on-navy:  #0C2B4A;
+  --on-amber: #9A5B08;
+  --on-red:   #A62A20;
+  --on-blue:  #1B5E9E;
+  --on-grey:  #3D4E60;
+
+  --shadow-sm: 0 1px 2px rgba(8, 32, 58, .06);
+  --shadow:    0 2px 6px rgba(8, 32, 58, .08);
+  --shadow-lg: 0 10px 30px rgba(8, 32, 58, .14);
+  --lift:      inset 0 1px 0 rgba(255, 255, 255, .9);
+
+  /* Softer on white — the same halo at dark-mode strength reads as a smudge. */
+  --glow-green: 0 0 0 1px rgba(20, 135, 78, .40), 0 6px 20px rgba(20, 135, 78, .20);
+  --glow-navy:  0 0 0 1px rgba(26, 78, 128, .40), 0 6px 20px rgba(26, 78, 128, .18);
+  --glow-amber: 0 0 0 1px rgba(154, 91, 8, .35),  0 6px 20px rgba(154, 91, 8, .16);
+  --glow-red:   0 0 0 1px rgba(196, 54, 42, .35), 0 6px 20px rgba(196, 54, 42, .16);
 }
 
 /* ---------------------------------------------------------------------
@@ -241,7 +328,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
   border-radius: var(--r);
   background: var(--surface-2);
 }
-.topbar__search input:focus { background: #fff; border-color: var(--navy-500); outline: none; }
+.topbar__search input:focus { background: var(--surface); border-color: var(--navy-500); outline: none; }
 .topbar__search svg {
   position: absolute; left: 10px; top: 50%;
   transform: translateY(-50%);
@@ -387,7 +474,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 .btn--danger:hover   { background: var(--red-700); color: #fff; }
 
 .btn--danger-soft { background: var(--red-100); color: var(--red-700); }
-.btn--danger-soft:hover { background: #F8D5D1; color: var(--red-700); }
+.btn--danger-soft:hover { background: var(--tint-red); color: var(--on-red); }
 
 .btn--sm  { padding: 5px 10px; font-size: 12.5px; }
 .btn--sm svg { width: 13px; height: 13px; flex-basis: 13px; }
@@ -530,12 +617,12 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
   white-space: nowrap;
   line-height: 1.6;
 }
-.badge--green { background: var(--green-100); color: var(--green-800); }
-.badge--navy  { background: var(--navy-100);  color: var(--navy-800); }
-.badge--amber { background: var(--amber-100); color: var(--amber-700); }
-.badge--red   { background: var(--red-100);   color: var(--red-700); }
-.badge--grey  { background: #E8EDF3;          color: var(--slate-700); }
-.badge--blue  { background: var(--blue-100);  color: var(--blue-700); }
+.badge--green { background: var(--tint-green); color: var(--on-green); }
+.badge--navy  { background: var(--tint-navy);  color: var(--on-navy); }
+.badge--amber { background: var(--tint-amber); color: var(--on-amber); }
+.badge--red   { background: var(--tint-red);   color: var(--on-red); }
+.badge--grey  { background: var(--tint-grey);  color: var(--on-grey); }
+.badge--blue  { background: var(--tint-blue);  color: var(--on-blue); }
 
 .badge__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
@@ -720,10 +807,10 @@ fieldset:last-of-type { margin-bottom: 0; }
 .alert__close { margin-left: auto; background: none; border: 0; cursor: pointer; color: inherit; opacity: .55; padding: 0; }
 .alert__close:hover { opacity: 1; }
 
-.alert--success { background: var(--green-50);  color: var(--green-800); border-color: var(--green-100); }
-.alert--error   { background: #FDF1F0;          color: var(--red-700);   border-color: var(--red-100); }
-.alert--warning { background: #FEF8EC;          color: var(--amber-700); border-color: var(--amber-100); }
-.alert--info    { background: var(--navy-50);   color: var(--navy-800);  border-color: var(--navy-100); }
+.alert--success { background: var(--tint-green); color: var(--on-green); border-color: var(--tint-green); }
+.alert--error   { background: var(--tint-red);   color: var(--on-red);   border-color: var(--tint-red); }
+.alert--warning { background: var(--tint-amber); color: var(--on-amber); border-color: var(--tint-amber); }
+.alert--info    { background: var(--tint-navy);  color: var(--on-navy);  border-color: var(--tint-navy); }
 
 /* Toast stack */
 .toasts { position: fixed; top: 16px; right: 16px; z-index: 200; display: flex; flex-direction: column; gap: 9px; max-width: 380px; }
@@ -1702,6 +1789,46 @@ fieldset:last-of-type { margin-bottom: 0; }
 @media print {
   @page { size: A4; margin: 12mm; }
 
+  /* Paper is white whatever the screen is set to. Restating the light
+     tokens here means a quotation printed by someone working in dark mode
+     comes out identical to one printed by a colleague in light mode —
+     without this, dark surfaces carry through and every document prints
+     as pale text on a dark slab. */
+  :root, :root[data-theme="light"], :root[data-theme="dark"] {
+    --bg:            #FFFFFF;
+    --surface:       #FFFFFF;
+    --surface-2:     #F8FAFC;
+    --border:        #DDE4EC;
+    --border-strong: #C6D1DD;
+
+    --ink:       #0F1E2E;
+    --slate-700: #3D4E60;
+    --slate-600: #5A6B7D;
+    --slate-500: #7C8B9B;
+    --slate-400: #9AA8B5;
+
+    --tint-green: #D5EFE0;
+    --tint-navy:  #DCE7F2;
+    --tint-amber: #FCEFD8;
+    --tint-red:   #FBE3E0;
+    --tint-blue:  #DCEBF8;
+    --tint-grey:  #E8EDF3;
+
+    --on-green: #0B5730;
+    --on-navy:  #0C2B4A;
+    --on-amber: #9A5B08;
+    --on-red:   #A62A20;
+    --on-blue:  #1B5E9E;
+    --on-grey:  #3D4E60;
+
+    /* Ink is expensive and haloes do not belong on paper. */
+    --shadow-sm: none; --shadow: none; --shadow-lg: none; --lift: none;
+    --glow-green: none; --glow-navy: none; --glow-amber: none; --glow-red: none;
+  }
+
+  /* Nothing animates or sits tilted on paper. */
+  * { animation: none !important; transition: none !important; transform: none !important; }
+
   body { background: #fff; font-size: 11.5pt; }
 
   .sidebar, .topbar, .print-bar, .no-print,
@@ -1767,3 +1894,146 @@ fieldset:last-of-type { margin-bottom: 0; }
 
 /* Several roles on one line in the user list. */
 .badge-set { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* =====================================================================
+   Depth, glow and motion
+
+   Three rules held throughout:
+     - No gradients. The halo is layered box-shadow; the tilt is transform.
+     - Motion is decoration. Every effect here degrades to a plain, legible
+       card when animation is switched off, and nothing moves that carries
+       meaning on its own.
+     - Only compositor-friendly properties animate (transform, opacity,
+       box-shadow), so a long table does not stutter while it settles.
+   ===================================================================== */
+
+/* Colour and background move too, otherwise flipping theme snaps harshly. */
+body,
+.card, .stat, .sidebar, .topbar, .table, .modal__panel, .badge, .btn {
+  transition:
+    background-color var(--mid) var(--ease),
+    border-color     var(--mid) var(--ease),
+    color            var(--mid) var(--ease),
+    box-shadow       var(--mid) var(--ease),
+    transform        var(--mid) var(--ease);
+}
+
+/* ---------------------------------------------------------------------
+   Cards: a real edge, and a lift toward the pointer
+   --------------------------------------------------------------------- */
+.card,
+.stat {
+  position: relative;
+  box-shadow: var(--shadow), var(--lift);
+  transform: translateZ(0);          /* own layer: keeps the hover smooth */
+  will-change: transform;
+}
+
+.card:hover,
+.stat:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg), var(--lift), var(--glow-navy);
+  border-color: var(--border-strong);
+}
+
+/* The accent stripe already says what a stat is about, so its halo follows
+   suit rather than every card glowing the same colour. */
+.stat--green:hover { box-shadow: var(--shadow-lg), var(--lift), var(--glow-green); }
+.stat--navy:hover  { box-shadow: var(--shadow-lg), var(--lift), var(--glow-navy); }
+.stat--amber:hover { box-shadow: var(--shadow-lg), var(--lift), var(--glow-amber); }
+.stat--red:hover   { box-shadow: var(--shadow-lg), var(--lift), var(--glow-red); }
+
+/* A card that is a link is the one worth tilting: it invites a click.
+   perspective on the parent, rotation on the child — applying both to one
+   element flattens the effect. */
+a.card {
+  transform-style: preserve-3d;
+  perspective: 900px;
+}
+
+a.card:hover {
+  transform: translateY(-4px) rotateX(2.2deg) rotateY(-2.2deg) scale(1.012);
+  box-shadow: var(--shadow-lg), var(--lift), var(--glow-green);
+}
+
+a.card:active { transform: translateY(-1px) scale(.998); }
+
+/* ---------------------------------------------------------------------
+   Buttons
+   --------------------------------------------------------------------- */
+.btn { position: relative; }
+
+.btn--primary:hover { box-shadow: var(--glow-green); transform: translateY(-1px); }
+.btn--navy:hover    { box-shadow: var(--glow-navy);  transform: translateY(-1px); }
+.btn--danger:hover  { box-shadow: var(--glow-red);   transform: translateY(-1px); }
+.btn:active         { transform: translateY(0) scale(.985); }
+
+/* ---------------------------------------------------------------------
+   Sidebar: the active item carries a soft edge light
+   --------------------------------------------------------------------- */
+.nav-link { transition: background var(--fast) var(--ease), color var(--fast) var(--ease), transform var(--fast) var(--ease); }
+.nav-link:hover { transform: translateX(2px); }
+.nav-link.is-active { box-shadow: 0 0 14px rgba(26, 160, 92, .40); }
+
+/* ---------------------------------------------------------------------
+   Entrance
+   Content settles in once on load. Kept short — a dashboard that takes a
+   second to assemble itself is slower to read, not more premium.
+   --------------------------------------------------------------------- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.stat-grid > *,
+.grid-sidebar > * > .card,
+.row > .col.card {
+  /* backwards, not both: 'forwards' would keep applying the final
+     keyframe (transform: none) after the animation ends, and keyframes
+     outrank normal declarations — which silently kills every :hover
+     transform on these cards. */
+  animation: rise var(--slow) var(--ease) backwards;
+}
+
+/* A short stagger reads as one movement; longer and it becomes a queue. */
+.stat-grid > *:nth-child(1) { animation-delay: .02s; }
+.stat-grid > *:nth-child(2) { animation-delay: .06s; }
+.stat-grid > *:nth-child(3) { animation-delay: .10s; }
+.stat-grid > *:nth-child(4) { animation-delay: .14s; }
+
+.page-head { animation: fade var(--mid) var(--ease) backwards; }
+
+.modal__panel { animation: rise var(--mid) var(--ease) backwards; }
+
+/* ---------------------------------------------------------------------
+   Tables: rows respond without shifting the layout
+   --------------------------------------------------------------------- */
+.table tbody tr { transition: background var(--fast) var(--ease); }
+.table tbody tr:hover { background: var(--surface-2); }
+
+/* ---------------------------------------------------------------------
+   Respect the system setting.
+   Someone who has asked for less motion gets the full design, minus the
+   movement — colours, depth and glow all remain.
+   --------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .card:hover,
+  .stat:hover,
+  a.card:hover,
+  .btn:hover,
+  .nav-link:hover { transform: none !important; }
+}

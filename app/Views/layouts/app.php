@@ -50,6 +50,26 @@ if ($me && can('jobs.view')) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <title><?= e($title ?? 'Dashboard') ?> · <?= e($appName ?? 'Shanfix Technology') ?></title>
+<?php
+  // Runs before the stylesheet is applied and before anything paints, so a
+  // user who chose light mode never sees a dark frame flash first. It is
+  // deliberately tiny and inline: an external file would be fetched too late
+  // to prevent exactly the flash it exists to avoid.
+  //
+  // Dark is the default, so with nothing stored there is nothing to do.
+?>
+<script nonce="<?= e(csp_nonce()) ?>">
+  (function () {
+    try {
+      var saved = localStorage.getItem('shanfix-theme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    } catch (e) {
+      /* Private browsing can refuse localStorage; the default theme stands. */
+    }
+  })();
+</script>
 <?= css_tag() ?>
 <link rel="icon" href="<?= asset('img/favicon.svg') ?>" type="image/svg+xml">
 </head>
@@ -206,6 +226,12 @@ if ($me && can('jobs.view')) {
         <input type="search" name="q" placeholder="Search clients, invoices, leads…"
                value="<?= e($_GET['q'] ?? '') ?>" aria-label="Search">
       </form>
+
+      <button class="icon-btn" type="button" data-theme-toggle
+              title="Switch between dark and light" aria-label="Switch between dark and light">
+        <span data-theme-icon="dark"><?= icon('moon') ?></span>
+        <span data-theme-icon="light" hidden><?= icon('sun') ?></span>
+      </button>
 
       <a class="icon-btn" href="<?= url('/reminders') ?>" title="Reminders" aria-label="Reminders">
         <?= icon('bell') ?>

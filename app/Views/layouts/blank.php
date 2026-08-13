@@ -6,6 +6,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <title><?= e($title ?? 'Sign in') ?> · <?= e($appName ?? 'Shanfix Technology') ?></title>
+<?php // Applies the saved theme before anything paints — see layouts/app.php. ?>
+<script nonce="<?= e(csp_nonce()) ?>">
+  (function () {
+    try {
+      var saved = localStorage.getItem('shanfix-theme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    } catch (e) {}
+  })();
+</script>
 <?= css_tag() ?>
 <link rel="icon" href="<?= asset('img/favicon.svg') ?>" type="image/svg+xml">
 </head>

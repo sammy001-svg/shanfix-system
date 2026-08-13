@@ -809,6 +809,45 @@
    * main role back regardless, so the two can never drift apart even if this
    * script never runs.
    */
+  /**
+   * Dark and light.
+   *
+   * The choice is applied by a small script in <head> so the page never
+   * paints the wrong theme first; this only handles switching and the icon.
+   * Dark is the default, so "dark" is still written to storage explicitly —
+   * otherwise someone who switches to light and back would be indistinguish-
+   * able from someone who never chose, which matters if the default changes.
+   */
+  function initTheme() {
+    var root = document.documentElement;
+    var KEY  = 'shanfix-theme';
+
+    function current() {
+      return root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    }
+
+    function paintIcon() {
+      var showing = current();
+      document.querySelectorAll('[data-theme-icon]').forEach(function (el) {
+        // Offer the mode you would move to, not the one you are in.
+        el.hidden = el.getAttribute('data-theme-icon') === showing;
+      });
+    }
+
+    document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var next = current() === 'light' ? 'dark' : 'light';
+        root.setAttribute('data-theme', next);
+
+        try { localStorage.setItem(KEY, next); } catch (e) { /* not fatal */ }
+
+        paintIcon();
+      });
+    });
+
+    paintIcon();
+  }
+
   function initRoleMatrix() {
     var select = document.getElementById('role');
     if (!select) return;
@@ -889,6 +928,7 @@
     initUnreadPoll();
     initLinkedSelects();
     initRoleMatrix();
+    initTheme();
   });
 
   window.Shanfix = { toast, openModal };
