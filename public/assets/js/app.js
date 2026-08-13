@@ -818,6 +818,22 @@
    * otherwise someone who switches to light and back would be indistinguish-
    * able from someone who never chose, which matters if the default changes.
    */
+  /**
+   * "Days in a cycle" only means anything for a custom billing cycle, so it
+   * stays hidden until that is chosen. Hidden rather than removed: the value
+   * still posts, so switching to Custom and back does not lose what was typed.
+   */
+  function initCycleDays() {
+    var cycle = document.querySelector('[data-cycle]');
+    var field = document.querySelector('[data-cycle-days]');
+    if (!cycle || !field) return;
+
+    function sync() { field.hidden = cycle.value !== 'custom'; }
+
+    cycle.addEventListener('change', sync);
+    sync();
+  }
+
   function initTheme() {
     var root = document.documentElement;
     var KEY  = 'shanfix-theme';
@@ -929,6 +945,7 @@
     initLinkedSelects();
     initRoleMatrix();
     initTheme();
+    initCycleDays();
   });
 
   window.Shanfix = { toast, openModal };

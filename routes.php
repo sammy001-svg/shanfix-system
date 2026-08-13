@@ -29,6 +29,7 @@ use App\Controllers\PublicProofController;
 use App\Controllers\ReminderController;
 use App\Controllers\ReportController;
 use App\Controllers\ServiceController;
+use App\Controllers\SubscriptionController;
 use App\Controllers\SettingsController;
 use App\Controllers\UserController;
 use App\Core\Request;
@@ -388,6 +389,19 @@ $r->group(['auth'], function ($r) {
         $r->post('/expenses',             [ExpenseController::class, 'store']);
         $r->post('/expenses/{id}',        [ExpenseController::class, 'update']);
         $r->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy']);
+    });
+
+    // -- Recurring services (websites, hosting, retainers)
+    $r->get('/subscriptions',             [SubscriptionController::class, 'index'],  ['permission:subscriptions.view']);
+    $r->get('/subscriptions/create',      [SubscriptionController::class, 'create'], ['permission:subscriptions.manage']);
+    $r->get('/subscriptions/{id}',        [SubscriptionController::class, 'show'],   ['permission:subscriptions.view']);
+    $r->get('/subscriptions/{id}/edit',   [SubscriptionController::class, 'edit'],   ['permission:subscriptions.manage']);
+
+    $r->group(['permission:subscriptions.manage', 'csrf'], function ($r) {
+        $r->post('/subscriptions',              [SubscriptionController::class, 'store']);
+        $r->post('/subscriptions/{id}',         [SubscriptionController::class, 'update']);
+        $r->post('/subscriptions/{id}/invoice', [SubscriptionController::class, 'invoiceNow']);
+        $r->post('/subscriptions/{id}/delete',  [SubscriptionController::class, 'destroy']);
     });
 
     // -- Messages (email & SMS)

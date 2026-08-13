@@ -149,6 +149,11 @@ if ($me && can('jobs.view')) {
           <?= icon('layers', 'nav-link__icon') ?> Services
         </a>
       <?php endif; ?>
+      <?php if (can('subscriptions.view')): ?>
+        <a class="nav-link <?= is_active_nav('/subscriptions') ? 'is-active' : '' ?>" href="<?= url('/subscriptions') ?>">
+          <?= icon('refresh', 'nav-link__icon') ?> Recurring
+        </a>
+      <?php endif; ?>
 
       <?php if (can('payments.view') || can('expenses.view')): ?>
         <div class="nav-group__label">Finance</div>

@@ -28,6 +28,7 @@ use App\Core\Database;
 use App\Core\Logger;
 use App\Core\Settings;
 use App\Services\Notifier;
+use App\Services\Renewals;
 
 $verbose = in_array('--verbose', $argv, true) || in_array('-v', $argv, true);
 
@@ -141,6 +142,7 @@ try {
             'overdue reminder'   => [Notifier::class, 'queueOverdueReminders'],
             'due reminder'       => [Notifier::class, 'queueDueReminders'],
             'expiring quotation' => [Notifier::class, 'queueExpiringQuotations'],
+            'renewal reminder'   => [Notifier::class, 'queueRenewalReminders'],
         ] as $label => $chaser) {
             $result = $chaser();
 
@@ -150,6 +152,48 @@ try {
         }
     } elseif ($canLink) {
         say('Outside the sending window — reminders held back');
+    }
+
+    // -----------------------------------------------------------------
+    // 3b. Recurring services
+    //
+    //     Runs whether or not links can be built: raising an invoice is
+    //     bookkeeping, not a message, and holding it back would leave the
+    //     renewal silently unbilled. Only subscriptions set to invoice
+    //     automatically are touched — the rest wait for someone to press
+    //     the button, which is the point of the setting.
+    // -----------------------------------------------------------------
+    $lead    = (int) Settings::get('subscription_invoice_lead', 14);
+    $horizon = date('Y-m-d', strtotime('+' . max(0, $lead) . ' days'));
+    $raised  = 0;
+
+    foreach (Renewals::dueBy($horizon) as $sub) {
+        if ((int) $sub['auto_invoice'] !== 1) {
+            continue;
+        }
+
+        try {
+            $result = Renewals::invoicePeriod($sub);
+
+            if ($result['created']) {
+                $raised++;
+                say('Invoiced renewal: ' . $sub['name'] . ' → ' . $result['document']['doc_number']);
+            }
+        } catch (Throwable $e) {
+            // One bad subscription must not stop the rest being billed.
+            alert('Could not invoice ' . $sub['name'] . ': ' . $e->getMessage());
+        }
+    }
+
+    if ($raised === 0) {
+        say('No renewals to invoice');
+    }
+
+    // Renewals whose invoice has since been paid.
+    $settled = Renewals::syncPaidRenewals();
+
+    if ($settled > 0) {
+        say("Marked {$settled} renewal(s) as paid");
     }
 
     // -----------------------------------------------------------------

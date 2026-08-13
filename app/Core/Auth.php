@@ -83,6 +83,12 @@ class Auth
         'expenses.view'     => ['admin', 'manager', 'finance'],
         'expenses.manage'   => ['admin', 'manager', 'finance'],
 
+        // Recurring services — hosting, domains, retainers. Reception can
+        // look one up to answer "when does our site renew?"; changing the
+        // arrangement or its price is for sales, finance and management.
+        'subscriptions.view'   => ['admin', 'manager', 'finance', 'sales', 'reception'],
+        'subscriptions.manage' => ['admin', 'manager', 'finance', 'sales'],
+
         'reports.view'      => ['admin', 'manager', 'finance'],
 
         'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],

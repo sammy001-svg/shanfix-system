@@ -69,6 +69,31 @@ $docPath = static fn(string $type): string => match ($type) {
   </div>
 </div>
 
+<?php if (!empty($subscriptions)): ?>
+  <div class="stat-grid">
+    <div class="stat stat--navy">
+      <div class="stat__label">Recurring services</div>
+      <div class="stat__value"><?= (int) $siteCount ?></div>
+      <div class="stat__meta">
+        <?php
+          // Websites are what people ask about by name, so they are counted
+          // out separately from hosting, domains and retainers.
+          $sites = count(array_filter(
+              $subscriptions,
+              static fn(array $s): bool => $s['service_type'] === 'website' && $s['status'] === 'active'
+          ));
+        ?>
+        <?= $sites ?> website(s) linked
+      </div>
+    </div>
+    <div class="stat <?= (float) $renewalDue > 0 ? 'stat--red' : 'stat--green' ?>">
+      <div class="stat__label">Renewals owing</div>
+      <div class="stat__value"><?= e(money_short($renewalDue)) ?></div>
+      <div class="stat__meta"><?= (float) $renewalDue > 0 ? 'On renewal invoices' : 'All renewals settled' ?></div>
+    </div>
+  </div>
+<?php endif; ?>
+
 <div class="stat-grid">
   <div class="stat stat--navy">
     <div class="stat__label">Total billed</div>
@@ -325,6 +350,72 @@ $docPath = static fn(string $type): string => match ($type) {
   </div>
 
   <aside>
+    <?php if (!empty($subscriptions)): ?>
+      <div class="card">
+        <div class="card__head">
+          <?= icon('refresh') ?>
+          <div>
+            <div class="card__title">Recurring services</div>
+            <div class="card__sub">Websites and retainers we bill on a cycle.</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <?php foreach ($subscriptions as $s):
+              $days = (int) floor((strtotime($s['next_renewal_date']) - strtotime(date('Y-m-d'))) / 86400);
+              $tone = $s['status'] !== 'active' ? 'grey' : ($days < 0 ? 'red' : ($days <= 30 ? 'amber' : 'green'));
+          ?>
+            <div class="siterow">
+              <div class="siterow__main">
+                <a class="siterow__name" href="<?= url('/subscriptions/' . $s['id']) ?>"><?= e($s['name']) ?></a>
+                <div class="text-xs text-muted">
+                  <?= e(money($s['amount'], false)) ?>
+                  · renews <?= e(fdate($s['next_renewal_date'])) ?>
+                  <?php if ((float) $s['due_balance'] > 0): ?>
+                    · <span class="text-red fw-600"><?= e(money($s['due_balance'], false)) ?> owing</span>
+                  <?php endif; ?>
+                </div>
+              </div>
+
+              <span class="siterow__side">
+                <span class="badge badge--<?= e($tone) ?>">
+                  <?= $s['status'] !== 'active'
+                      ? e(label_of($s['status']))
+                      : ($days < 0 ? abs($days) . 'd late' : $days . 'd') ?>
+                </span>
+                <?php if ($s['url']): ?>
+                  <a class="btn btn--outline btn--sm" href="<?= e($s['url']) ?>"
+                     target="_blank" rel="noopener noreferrer" title="Open <?= e($s['url']) ?>">
+                    <?= icon('external-link') ?>
+                  </a>
+                <?php endif; ?>
+              </span>
+            </div>
+          <?php endforeach; ?>
+
+          <?php if (can('subscriptions.manage')): ?>
+            <a class="btn btn--outline btn--sm mt-8"
+               href="<?= url('/subscriptions/create?client=' . $client['id']) ?>">
+              <?= icon('plus') ?> Add a service
+            </a>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php elseif (can('subscriptions.manage')): ?>
+      <div class="card">
+        <div class="card__body">
+          <div class="card__title mb-4">Recurring services</div>
+          <p class="text-sm text-muted">
+            Nothing recurring for this client yet — register a website, hosting
+            package or retainer to track its renewals.
+          </p>
+          <a class="btn btn--outline btn--sm"
+             href="<?= url('/subscriptions/create?client=' . $client['id']) ?>">
+            <?= icon('plus') ?> Add a service
+          </a>
+        </div>
+      </div>
+    <?php endif; ?>
+
     <?php if ($openInvoices && can('payments.stk')): ?>
       <div class="card">
         <div class="card__head">

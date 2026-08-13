@@ -620,6 +620,97 @@ class Notifier
      *
      * @return array{queued:int, checked:int}
      */
+    /**
+     * Warn a client that a recurring service is coming up for renewal.
+     *
+     * Not built on chase(): that walks the documents table, and a renewal
+     * has no invoice yet — warning about it before one exists is the whole
+     * point. The idempotency guard is the same though, so a client is
+     * chased once per offset however many times cron runs.
+     *
+     * A subscription may set its own reminder_days; blank falls back to the
+     * system setting.
+     *
+     * @return array{queued:int, checked:int}
+     */
+    public static function queueRenewalReminders(): array
+    {
+        if (!Settings::bool('notify_renewal_due_email') && !Settings::bool('notify_renewal_due_sms')) {
+            return ['queued' => 0, 'checked' => 0];
+        }
+
+        $fallback = (string) Settings::get('notify_renewal_days', '30,14,7,1');
+
+        $subs = Database::all(
+            "SELECT s.*, c.name AS client_name, c.email AS client_email,
+                    c.phone AS client_phone, c.contact_person AS client_contact
+               FROM subscriptions s
+               JOIN clients c ON c.id = s.client_id
+              WHERE s.status = 'active'
+                AND s.next_renewal_date >= CURDATE()"
+        );
+
+        $queued  = 0;
+        $checked = 0;
+
+        foreach ($subs as $sub) {
+            $offsets = trim((string) $sub['reminder_days']) !== ''
+                ? (string) $sub['reminder_days']
+                : $fallback;
+
+            $days = array_values(array_filter(array_map(
+                static fn($d) => (int) trim($d),
+                explode(',', $offsets)
+            ), static fn($d) => $d >= 0));
+
+            $daysToGo = (int) floor(
+                (strtotime($sub['next_renewal_date']) - strtotime(date('Y-m-d'))) / 86400
+            );
+
+            if (!in_array($daysToGo, $days, true)) {
+                continue;
+            }
+
+            $checked++;
+
+            try {
+                Database::run(
+                    'INSERT INTO notification_locks (lock_key) VALUES (:k)',
+                    ['k' => 'renewal:' . $sub['id'] . ':' . $sub['next_renewal_date'] . ':' . $daysToGo]
+                );
+            } catch (\Throwable) {
+                continue;   // already warned at this offset for this renewal
+            }
+
+            // Same key names documentContext() uses — dispatch() reads
+            // 'email' and 'phone' to find the recipient, and the templates
+            // are written against 'company', 'amount' and the rest.
+            $queued += self::dispatch('renewal_due', [
+                'entity_type'     => 'subscription',
+                'entity_id'       => (int) $sub['id'],
+                'client_id'       => (int) $sub['client_id'],
+                'client_name'     => $sub['client_name'] ?? '',
+                'contact_name'    => self::firstName($sub['client_contact'] ?? ($sub['client_name'] ?? '')),
+                'email'           => $sub['client_email'] ?? '',
+                'phone'           => $sub['client_phone'] ?? '',
+                'company'         => Settings::get('company_name', 'Shanfix Technology'),
+                'company_name'    => Settings::get('company_name', 'Shanfix Technology'),
+                'company_phone'   => Settings::get('company_phone', ''),
+                'service_name'    => $sub['name'],
+                'service_url'     => $sub['url'] ?? '',
+                'renewal_date'    => fdate($sub['next_renewal_date']),
+                'days_to_renewal' => (string) $daysToGo,
+                'amount'          => money($sub['amount']),
+            ])['queued'];
+        }
+
+        if ($queued > 0) {
+            ActivityLog::record('renewal_due_queued', 'notification', null, $queued . ' renewal reminder(s) queued');
+        }
+
+        return ['queued' => $queued, 'checked' => $checked];
+    }
+
     private static function chase(
         string $event,
         string $lockKey,

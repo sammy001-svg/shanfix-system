@@ -152,11 +152,31 @@ class ClientController extends Controller
             0
         );
 
+        // Recurring services this client has with us — the websites we host
+        // and maintain, and what is still owed on them.
+        $subscriptions = Auth::can('subscriptions.view')
+            ? Database::all(
+                "SELECT s.*,
+                        (SELECT COALESCE(SUM(d.balance), 0)
+                           FROM subscription_renewals r
+                           JOIN documents d ON d.id = r.document_id
+                          WHERE r.subscription_id = s.id
+                            AND d.status NOT IN ('cancelled','paid','draft')) AS due_balance
+                   FROM subscriptions s
+                  WHERE s.client_id = :id
+               ORDER BY FIELD(s.status,'active','paused','cancelled'), s.next_renewal_date",
+                ['id' => $client['id']]
+            )
+            : [];
+
         $data = [
-            'title'        => $client['name'],
-            'client'       => $client,
-            'stats'        => $stats,
-            'paymentCount' => $paymentCount,
+            'title'         => $client['name'],
+            'client'        => $client,
+            'stats'         => $stats,
+            'subscriptions' => $subscriptions,
+            'renewalDue'    => \App\Services\Renewals::balanceForClient((int) $client['id']),
+            'siteCount'     => \App\Services\Renewals::countForClient((int) $client['id']),
+            'paymentCount'  => $paymentCount,
             'tab'          => $tab,
             'documents'    => [],
             'payments'     => [],

@@ -2233,3 +2233,36 @@ a.card:active { transform: translateY(-1px) scale(.998); }
   .viewswitch__btn { padding: 7px 10px; }
   .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 12px; }
 }
+
+/* ---------------------------------------------------------------------
+   A client's recurring services, on their profile
+   --------------------------------------------------------------------- */
+.siterow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.siterow:last-of-type { border-bottom: 0; }
+
+.siterow__main { flex: 1 1 auto; min-width: 0; }
+
+.siterow__name {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  /* Service names run long — "Company website — hosting & maintenance" —
+     and wrapping them pushes the renewal date out of view. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.siterow__side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
