@@ -1734,3 +1734,36 @@ fieldset:last-of-type { margin-bottom: 0; }
   .doc-party__label, .doc-section__label, .doc-head__no { color: var(--green-700) !important; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---------------------------------------------------------------------
+   Role assignment — a tickable row per role on the user form
+   --------------------------------------------------------------------- */
+.check-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+
+.check-row:hover { border-color: var(--green-600); background: var(--surface-2); }
+
+.check-row input[type="checkbox"] {
+  margin-top: 3px;
+  flex: 0 0 auto;
+  accent-color: var(--green-700);
+}
+
+/* The main role is ticked and locked: it is set by the select above, and
+   clearing it here would silently contradict it. */
+.check-row input[disabled] { opacity: .6; cursor: not-allowed; }
+.check-row:has(input[disabled]) { cursor: default; background: var(--surface-2); }
+
+.d-block { display: block; }
+
+/* Several roles on one line in the user list. */
+.badge-set { display: flex; flex-wrap: wrap; gap: 4px; }

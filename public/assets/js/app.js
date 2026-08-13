@@ -800,6 +800,44 @@
   /* ------------------------------------------------------------------
      Client picker: fill phone when a client is chosen (STK form)
      ------------------------------------------------------------------ */
+  /**
+   * On the user form, the "main role" select and the role tick-boxes describe
+   * the same thing, so they must not be able to disagree. Whichever role is
+   * chosen as the main one stays ticked and cannot be cleared here.
+   *
+   * A disabled checkbox is not submitted, which is fine: the server adds the
+   * main role back regardless, so the two can never drift apart even if this
+   * script never runs.
+   */
+  function initRoleMatrix() {
+    var select = document.getElementById('role');
+    if (!select) return;
+
+    var rows = document.querySelectorAll('[data-role-option]');
+    if (!rows.length) return;
+
+    function sync() {
+      rows.forEach(function (row) {
+        var box = row.querySelector('input[type="checkbox"]');
+        if (!box) return;
+
+        var isPrimary = row.getAttribute('data-role-option') === select.value;
+
+        if (isPrimary) {
+          box.checked = true;
+          box.disabled = true;
+          row.title = 'This is the main role and is always included.';
+        } else {
+          box.disabled = false;
+          row.removeAttribute('title');
+        }
+      });
+    }
+
+    select.addEventListener('change', sync);
+    sync();
+  }
+
   function initLinkedSelects() {
     $$('[data-fills]').forEach((select) => {
       select.addEventListener('change', () => {
@@ -831,6 +869,7 @@
     initChat();
     initUnreadPoll();
     initLinkedSelects();
+    initRoleMatrix();
   });
 
   window.Shanfix = { toast, openModal };

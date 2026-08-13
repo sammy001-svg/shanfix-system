@@ -67,7 +67,20 @@
                 <div class="table__muted"><?= e($u['phone']) ?></div>
               <?php endif; ?>
             </td>
-            <td><span class="badge badge--navy"><?= e(label_of($u['role'])) ?></span></td>
+            <td>
+              <?php
+                // The main role first and in navy; anything else alongside it
+                // in grey, so the badge someone is known by stays obvious.
+                $mine  = $assignments[(int) $u['id']] ?? [$u['role']];
+                $extra = array_values(array_diff($mine, [$u['role']]));
+              ?>
+              <div class="badge-set">
+                <span class="badge badge--navy"><?= e(label_of($u['role'])) ?></span>
+                <?php foreach ($extra as $role): ?>
+                  <span class="badge badge--grey"><?= e(label_of($role)) ?></span>
+                <?php endforeach; ?>
+              </div>
+            </td>
             <td class="num"><?= (int) $u['lead_count'] ?></td>
             <td class="num"><?= (int) $u['doc_count'] ?></td>
             <td class="text-sm text-muted"><?= e(time_ago($u['last_login_at'])) ?></td>
