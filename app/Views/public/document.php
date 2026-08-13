@@ -17,6 +17,13 @@ $overdue = $isInvoice && $doc['due_date']
 $logoPath = $company['logo'] ? url('brand/logo') : null;
 
 $label = ucfirst($type);
+
+// Can this be settled by M-Pesa from here? Decided by the controller so the
+// page and the endpoint that acts on it can never disagree.
+$canPay = \App\Controllers\PublicDocumentController::payable($doc);
+
+// A prompt already on its way, from the request this visitor just made.
+$watching = (int) \App\Core\Session::get('public_stk_id', 0);
 ?>
 
 <div class="print-bar no-print" style="justify-content:space-between">
@@ -53,6 +60,64 @@ $label = ucfirst($type);
         <?= e(money($balance)) ?> remains outstanding.
       </div>
     </div>
+  </div>
+<?php endif; ?>
+
+<?php if ($canPay): ?>
+  <div class="paybox no-print">
+    <div class="paybox__head">
+      <span class="paybox__mark"><?= icon('smartphone') ?></span>
+      <div class="paybox__intro">
+        <div class="paybox__title">Pay by M-Pesa</div>
+        <div class="paybox__sub">
+          We will send a request to your phone. Enter your M-Pesa PIN to confirm.
+        </div>
+      </div>
+      <div class="paybox__amount">
+        <span class="paybox__amount-label">Amount due</span>
+        <span class="paybox__amount-value"><?= e(money($balance)) ?></span>
+      </div>
+    </div>
+
+    <?php if ($watching): ?>
+      <?php
+        // The same markup the staff page uses, so a single piece of polling
+        // code serves both. It replaces itself with the outcome.
+      ?>
+      <div id="stk-poll"
+           data-stk-id="<?= (int) $watching ?>"
+           data-poll-url="<?= e(url('/view/' . $doc['public_token'] . '/pay/status')) ?>">
+        <div class="stk-status stk-status--pending">
+          <div class="stk-status__icon"><div class="spinner"></div></div>
+          <div class="stk-status__title">Check your phone</div>
+          <div class="stk-status__text">
+            Enter your M-Pesa PIN to complete the payment. This page updates
+            by itself once it goes through.
+          </div>
+        </div>
+      </div>
+    <?php else: ?>
+      <form class="paybox__form" method="post"
+            action="<?= e(url('/view/' . $doc['public_token'] . '/pay')) ?>">
+        <?= csrf_field() ?>
+
+        <div class="paybox__field">
+          <label class="label" for="phone">M-Pesa number</label>
+          <input class="input" type="tel" id="phone" name="phone" required
+                 inputmode="numeric" autocomplete="tel"
+                 value="<?= e($doc['client_phone'] ?? '') ?>"
+                 placeholder="07XX XXX XXX">
+        </div>
+
+        <button class="btn btn--primary paybox__go" type="submit">
+          <?= icon('smartphone') ?> Pay <?= e(money($balance, false)) ?>
+        </button>
+      </form>
+
+      <div class="paybox__note">
+        Paying from another number is fine — enter whichever phone holds the M-Pesa account.
+      </div>
+    <?php endif; ?>
   </div>
 <?php endif; ?>
 

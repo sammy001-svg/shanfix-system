@@ -388,46 +388,7 @@ class PaymentController extends Controller
             Response::json(['ok' => false, 'error' => 'Request not found.'], 404);
         }
 
-        // If the callback has not landed, ask KopoKopo directly. Their webhook
-        // can be delayed or lost, and the client should not be left waiting.
-        if ($stk['status'] === 'pending' && $stk['location_url']) {
-            $ageSeconds = time() - strtotime($stk['created_at']);
-
-            if ($ageSeconds > 12) {
-                $poll = (new KopoKopo())->pollStatus($stk['location_url']);
-
-                if ($poll['ok'] && isset($poll['status'])) {
-                    $mapped = match (strtolower($poll['status'])) {
-                        'success', 'received' => 'success',
-                        'failed', 'rejected'  => 'failed',
-                        default               => 'pending',
-                    };
-
-                    if ($mapped !== 'pending') {
-                        $this->settleStk($stk, [
-                            'status'      => $mapped,
-                            'receipt'     => $poll['receipt'] ?? null,
-                            'amount'      => null,
-                            'phone'       => null,
-                            'kopokopo_id' => $stk['kopokopo_id'],
-                            'description' => 'Resolved by status poll',
-                        ], json_encode($poll['body'] ?? [], JSON_UNESCAPED_SLASHES));
-
-                        $stk = Database::first('SELECT * FROM stk_requests WHERE id = :id', ['id' => $id]);
-                    }
-                }
-            }
-        }
-
-        // Time out prompts the customer clearly abandoned.
-        if ($stk['status'] === 'pending' && (time() - strtotime($stk['created_at'])) > 180) {
-            Database::update('stk_requests', [
-                'status'      => 'timeout',
-                'result_desc' => 'No response from the customer within 3 minutes.',
-            ], ['id' => $stk['id']]);
-
-            $stk['status'] = 'timeout';
-        }
+        $stk = $this->reconcilePending($stk);
 
         $message = match ($stk['status']) {
             'success'  => 'Payment of ' . money($stk['amount']) . ' received'
@@ -507,6 +468,62 @@ class PaymentController extends Controller
     /**
      * Apply a resolved STK result: post the payment on success, or mark it failed.
      */
+    /**
+     * Bring a pending STK request up to date and hand back the fresh row.
+     *
+     * Two things can leave a request stuck at "pending": KopoKopo's webhook
+     * being delayed or lost, and a customer who simply walks away. This asks
+     * the provider directly for the first, and gives up on the second.
+     *
+     * Public because the client-facing payment page needs exactly the same
+     * treatment as the staff one — a customer paying from a share link must
+     * not be told "waiting" for a payment that already went through.
+     */
+    public function reconcilePending(array $stk): array
+    {
+        if ($stk['status'] === 'pending'
+            && $stk['location_url']
+            && (time() - strtotime($stk['created_at'])) > 12) {
+            $poll = (new KopoKopo())->pollStatus($stk['location_url']);
+
+            if ($poll['ok'] && isset($poll['status'])) {
+                $mapped = match (strtolower($poll['status'])) {
+                    'success', 'received' => 'success',
+                    'failed', 'rejected'  => 'failed',
+                    default               => 'pending',
+                };
+
+                if ($mapped !== 'pending') {
+                    $this->settleStk($stk, [
+                        'status'      => $mapped,
+                        'receipt'     => $poll['receipt'] ?? null,
+                        'amount'      => null,
+                        'phone'       => null,
+                        'kopokopo_id' => $stk['kopokopo_id'],
+                        'description' => 'Resolved by status poll',
+                    ], json_encode($poll['body'] ?? [], JSON_UNESCAPED_SLASHES));
+
+                    $stk = Database::first(
+                        'SELECT * FROM stk_requests WHERE id = :id',
+                        ['id' => $stk['id']]
+                    ) ?? $stk;
+                }
+            }
+        }
+
+        // Prompts the customer clearly abandoned.
+        if ($stk['status'] === 'pending' && (time() - strtotime($stk['created_at'])) > 180) {
+            Database::update('stk_requests', [
+                'status'      => 'timeout',
+                'result_desc' => 'No response from the customer within 3 minutes.',
+            ], ['id' => $stk['id']]);
+
+            $stk['status'] = 'timeout';
+        }
+
+        return $stk;
+    }
+
     private function settleStk(array $stk, array $parsed, string $rawPayload): void
     {
         if ($parsed['status'] !== 'success') {

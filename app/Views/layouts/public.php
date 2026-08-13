@@ -13,6 +13,29 @@
 <link rel="icon" href="<?= asset('img/favicon.svg') ?>" type="image/svg+xml">
 </head>
 <body style="background:var(--bg);padding:24px 16px">
+<?php
+  // Clients act on this page now — they can pay an invoice from it — so it
+  // has to be able to tell them what happened. Without this, "check your
+  // phone" and "that number is not valid" both vanish silently.
+  require_once APP_PATH . '/Views/partials/icons.php';
+?>
+<?php if (!empty($flashes)): ?>
+  <div class="no-print" style="max-width:840px;margin:0 auto 14px">
+    <?php foreach ($flashes as $flash): ?>
+      <div class="alert alert--<?= e($flash['type']) ?>">
+        <?= icon(match ($flash['type']) {
+            'success' => 'check-circle',
+            'error'   => 'x-circle',
+            'warning' => 'alert-triangle',
+            default   => 'info',
+        }) ?>
+        <div class="alert__body"><?= e($flash['message']) ?></div>
+        <button class="alert__close" type="button" aria-label="Dismiss">&times;</button>
+      </div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
 <?= $content ?>
 <?= js_tag() ?>
 <?php if (!empty($autoPrint)): ?>

@@ -2266,3 +2266,83 @@ a.card:active { transform: translateY(-1px) scale(.998); }
   gap: 6px;
   flex: 0 0 auto;
 }
+
+/* ---------------------------------------------------------------------
+   Pay-by-M-Pesa panel on a shared invoice
+   Sits above the document itself: someone who opened a payment link came
+   to pay, and should not have to scroll past the line items to do it.
+   --------------------------------------------------------------------- */
+.paybox {
+  max-width: 840px;
+  margin: 0 auto 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green-600);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow), var(--lift);
+  overflow: hidden;
+}
+
+.paybox__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.paybox__mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  background: var(--tint-green);
+  color: var(--on-green);
+}
+
+.paybox__intro { flex: 1 1 220px; min-width: 0; }
+.paybox__title { font-weight: 650; font-size: 15px; color: var(--ink); }
+.paybox__sub   { font-size: 12.5px; color: var(--slate-600); margin-top: 2px; }
+
+.paybox__amount { text-align: right; flex: 0 0 auto; }
+.paybox__amount-label {
+  display: block;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--slate-500);
+}
+.paybox__amount-value {
+  font-size: 19px;
+  font-weight: 750;
+  color: var(--on-green);
+  font-variant-numeric: tabular-nums;
+}
+
+.paybox__form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  padding: 16px 18px 6px;
+  flex-wrap: wrap;
+}
+
+.paybox__field { flex: 1 1 220px; min-width: 0; }
+.paybox__go    { flex: 0 0 auto; }
+
+.paybox__note {
+  padding: 0 18px 14px;
+  font-size: 11.5px;
+  color: var(--slate-500);
+}
+
+@media (max-width: 520px) {
+  /* A full-width button is easier to hit on a phone, which is where most
+     of these links are opened. */
+  .paybox__form { flex-direction: column; align-items: stretch; }
+  .paybox__go { width: 100%; justify-content: center; }
+  .paybox__amount { text-align: left; }
+}

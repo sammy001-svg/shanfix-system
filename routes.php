@@ -55,6 +55,14 @@ $r->get('/view/{token}', [PublicDocumentController::class, 'show']);
 // characters in a text, which turns routine messages into two billable parts.
 $r->get('/v/{token}', [PublicDocumentController::class, 'show']);
 
+// Paying an invoice from that page. No login — the token is the credential,
+// exactly as for viewing it. CSRF still applies: the form is served by us,
+// so a POST that did not come from it has no business here.
+$r->post('/view/{token}/pay',       [PublicDocumentController::class, 'pay'], ['csrf']);
+$r->get('/view/{token}/pay/status', [PublicDocumentController::class, 'payStatus']);
+$r->post('/v/{token}/pay',          [PublicDocumentController::class, 'pay'], ['csrf']);
+$r->get('/v/{token}/pay/status',    [PublicDocumentController::class, 'payStatus']);
+
 // Client-facing proof approval. Also no login — the token is the credential.
 // The client sees the artwork and approves it or asks for changes, which
 // moves the job exactly as a staff-recorded decision does.
