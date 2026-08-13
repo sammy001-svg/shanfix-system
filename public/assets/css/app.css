@@ -173,7 +173,7 @@ p { margin: 0 0 10px; }
 p:last-child { margin-bottom: 0; }
 
 a { color: var(--navy-600); text-decoration: none; }
-a:hover { color: var(--navy-700); text-decoration: underline; }
+a:hover { color: var(--on-navy); text-decoration: underline; }
 
 img { max-width: 100%; height: auto; display: block; }
 
@@ -347,7 +347,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
   cursor: pointer;
   position: relative;
 }
-.icon-btn:hover { background: var(--surface-2); border-color: var(--border); color: var(--navy-700); }
+.icon-btn:hover { background: var(--surface-2); border-color: var(--border); color: var(--on-navy); }
 .icon-btn svg { width: 18px; height: 18px; }
 .icon-btn__dot {
   position: absolute; top: 6px; right: 6px;
@@ -549,7 +549,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 }
 .stat__value { font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); line-height: 1.15; }
 .stat__meta { font-size: 12px; color: var(--slate-500); margin-top: 4px; display: flex; align-items: center; gap: 5px; }
-.stat__delta--up   { color: var(--green-700); font-weight: 600; }
+.stat__delta--up   { color: var(--on-green); font-weight: 600; }
 .stat__delta--down { color: var(--red-600); font-weight: 600; }
 
 /* ---------------------------------------------------------------------
@@ -747,7 +747,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 .radio-card__title { font-weight: 600; font-size: 13.5px; display: block; }
 .radio-card__desc  { font-size: 11.5px; color: var(--slate-500); }
 .radio-card:has(input:checked) { border-color: var(--green-600); background: var(--green-50); }
-.radio-card:has(input:checked) .radio-card__title { color: var(--green-800); }
+.radio-card:has(input:checked) .radio-card__title { color: var(--on-green); }
 
 .form-actions {
   display: flex;
@@ -767,7 +767,7 @@ fieldset:last-of-type { margin-bottom: 0; }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .06em;
-  color: var(--navy-700);
+  color: var(--on-navy);
   padding-bottom: 8px;
   margin-bottom: 14px;
   border-bottom: 1px solid var(--border);
@@ -871,8 +871,8 @@ fieldset:last-of-type { margin-bottom: 0; }
   white-space: nowrap;
   display: flex; align-items: center; gap: 7px;
 }
-.tab:hover { color: var(--navy-700); text-decoration: none; }
-.tab.is-active { color: var(--green-700); border-bottom-color: var(--green-600); font-weight: 650; }
+.tab:hover { color: var(--on-navy); text-decoration: none; }
+.tab.is-active { color: var(--on-green); border-bottom-color: var(--green-600); font-weight: 650; }
 .tab__count {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -882,7 +882,7 @@ fieldset:last-of-type { margin-bottom: 0; }
   font-weight: 650;
   color: var(--slate-600);
 }
-.tab.is-active .tab__count { background: var(--green-100); border-color: var(--green-100); color: var(--green-800); }
+.tab.is-active .tab__count { background: var(--tint-green); border-color: var(--tint-green); color: var(--on-green); }
 
 /* ---------------------------------------------------------------------
    Modal
@@ -965,8 +965,8 @@ fieldset:last-of-type { margin-bottom: 0; }
 .text-sm     { font-size: 12.5px; }
 .text-xs     { font-size: 11.5px; }
 .text-lg     { font-size: 16px; }
-.text-green  { color: var(--green-700); }
-.text-navy   { color: var(--navy-800); }
+.text-green  { color: var(--on-green); }
+.text-navy   { color: var(--on-navy); }
 .text-red    { color: var(--red-600); }
 .text-amber  { color: var(--amber-700); }
 .fw-600 { font-weight: 600; }
@@ -1018,9 +1018,9 @@ fieldset:last-of-type { margin-bottom: 0; }
   border: 2px solid var(--green-600);
   display: grid; place-items: center;
 }
-.timeline__dot svg { width: 9px; height: 9px; color: var(--green-700); }
+.timeline__dot svg { width: 9px; height: 9px; color: var(--on-green); }
 .timeline__dot--navy  { border-color: var(--navy-600); }
-.timeline__dot--navy svg { color: var(--navy-700); }
+.timeline__dot--navy svg { color: var(--on-navy); }
 .timeline__dot--grey  { border-color: var(--border-strong); }
 .timeline__dot--grey svg { color: var(--slate-500); }
 .timeline__head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -1041,7 +1041,7 @@ fieldset:last-of-type { margin-bottom: 0; }
   font-weight: 550;
   color: var(--slate-700);
 }
-.pagination a:hover { background: var(--navy-50); border-color: var(--navy-100); text-decoration: none; color: var(--navy-800); }
+.pagination a:hover { background: var(--tint-navy); border-color: var(--tint-navy); text-decoration: none; color: var(--on-navy); }
 .pagination .is-current { background: var(--navy-800); border-color: var(--navy-800); color: #fff; }
 .pagination .is-disabled { opacity: .4; pointer-events: none; }
 
@@ -1133,8 +1133,8 @@ fieldset:last-of-type { margin-bottom: 0; }
   display: block;
   object-fit: contain;
 }
-.login__company { font-weight: 700; font-size: 16px; color: var(--navy-900); line-height: 1.25; }
-.login__tagline { font-size: 12px; color: var(--green-700); font-weight: 600; margin-top: 1px; }
+.login__company { font-weight: 700; font-size: 16px; color: var(--ink); line-height: 1.25; }
+.login__tagline { font-size: 12px; color: var(--on-green); font-weight: 600; margin-top: 1px; }
 
 .login__title { font-size: 24px; margin-bottom: 4px; }
 .login__intro { color: var(--slate-600); font-size: 13.5px; margin-bottom: 22px; }
@@ -1189,7 +1189,7 @@ fieldset:last-of-type { margin-bottom: 0; }
   cursor: pointer;
   padding: 0;
 }
-.input-icon__toggle:hover { background: var(--surface-2); color: var(--navy-700); }
+.input-icon__toggle:hover { background: var(--surface-2); color: var(--on-navy); }
 .input-icon__toggle svg { width: 17px; height: 17px; display: block; }
 .input-icon__toggle [hidden] { display: none; }
 .input-icon .input:has(+ .input-icon__toggle) { padding-right: 42px; }
@@ -1256,7 +1256,7 @@ fieldset:last-of-type { margin-bottom: 0; }
 .conv__hash {
   width: 32px; height: 32px; flex: 0 0 32px;
   border-radius: var(--r-sm);
-  background: var(--navy-100); color: var(--navy-800);
+  background: var(--tint-navy); color: var(--on-navy);
   display: grid; place-items: center;
   font-weight: 700; font-size: 15px;
 }
@@ -1288,7 +1288,7 @@ fieldset:last-of-type { margin-bottom: 0; }
   max-width: min(620px, 74%);
   box-shadow: var(--shadow-sm);
 }
-.msg__author { font-size: 12.5px; font-weight: 650; color: var(--navy-800); margin-bottom: 2px; }
+.msg__author { font-size: 12.5px; font-weight: 650; color: var(--on-navy); margin-bottom: 2px; }
 .msg__body { font-size: 13.5px; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
 .msg__time { font-size: 10.5px; color: var(--slate-400); margin-top: 3px; text-align: right; }
 .msg__file {
@@ -1501,7 +1501,7 @@ fieldset:last-of-type { margin-bottom: 0; }
 .lead-card__name { font-weight: 650; font-size: 13.5px; color: var(--ink); }
 .lead-card__co { font-size: 12px; color: var(--slate-500); margin-bottom: 6px; }
 .lead-card__meta { display: flex; align-items: center; gap: 7px; justify-content: space-between; margin-top: 8px; }
-.lead-card__value { font-size: 13px; font-weight: 700; color: var(--green-700); font-variant-numeric: tabular-nums; }
+.lead-card__value { font-size: 13px; font-weight: 700; color: var(--on-green); font-variant-numeric: tabular-nums; }
 .lead-card__overdue { color: var(--red-600); font-weight: 600; }
 
 /* ---------------------------------------------------------------------
@@ -1549,9 +1549,9 @@ fieldset:last-of-type { margin-bottom: 0; }
   font-size: 16.5px;
 }
 .totals__row--grand .totals__label { font-weight: 650; color: var(--ink); }
-.totals__row--grand .totals__value { font-weight: 750; color: var(--navy-900); }
+.totals__row--grand .totals__value { font-weight: 750; color: var(--ink); }
 .totals__row--due .totals__value { color: var(--red-600); }
-.totals__row--paid .totals__value { color: var(--green-700); }
+.totals__row--paid .totals__value { color: var(--on-green); }
 
 /* ---------------------------------------------------------------------
    STK Push status
@@ -1562,8 +1562,8 @@ fieldset:last-of-type { margin-bottom: 0; }
   margin: 0 auto 15px;
   border-radius: 50%;
   display: grid; place-items: center;
-  background: var(--green-50);
-  color: var(--green-700);
+  background: var(--tint-green);
+  color: var(--on-green);
   border: 2px solid var(--green-100);
 }
 .stk-status__icon svg { width: 28px; height: 28px; }
