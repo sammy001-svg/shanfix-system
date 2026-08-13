@@ -62,6 +62,13 @@
   --on-blue:  #7FB4E4;
   --on-grey:  #C2D2E2;
 
+  /* Links need their own token: the brand navy that reads well on white
+     is almost invisible on a near-black page (2.3:1), and the darker
+     on-navy used for text on tints is no better. */
+  --link:       #7FB4E4;
+  --link-hover: #A9CDF0;
+  --icon-accent: #6FA0CE;
+
   /* Legacy aliases: older rules refer to these. Kept pointing at the
      themed tints so nothing has to be rewritten to stay correct. */
   --navy-100:  var(--tint-navy);
@@ -117,7 +124,7 @@
   --ink:       #0F1E2E;
   --slate-700: #3D4E60;
   --slate-600: #5A6B7D;
-  --slate-500: #7C8B9B;
+  --slate-500: #687888;   /* darkened to clear 4.5:1 on white */
   --slate-400: #9AA8B5;
 
   --tint-green: #D5EFE0;
@@ -133,6 +140,10 @@
   --on-red:   #A62A20;
   --on-blue:  #1B5E9E;
   --on-grey:  #3D4E60;
+
+  --link:       #1A4E80;
+  --link-hover: #0C2B4A;
+  --icon-accent: #1A4E80;
 
   --shadow-sm: 0 1px 2px rgba(8, 32, 58, .06);
   --shadow:    0 2px 6px rgba(8, 32, 58, .08);
@@ -172,22 +183,22 @@ h4 { font-size: 14px; }
 p { margin: 0 0 10px; }
 p:last-child { margin-bottom: 0; }
 
-a { color: var(--navy-600); text-decoration: none; }
-a:hover { color: var(--on-navy); text-decoration: underline; }
+a { color: var(--link); text-decoration: none; }
+a:hover { color: var(--link-hover); text-decoration: underline; }
 
 img { max-width: 100%; height: auto; display: block; }
 
 /* Default size for inline icons. An SVG with no intrinsic dimensions expands
    to fill its container, so every icon ships with at least this class. */
 .icon { width: 18px; height: 18px; flex: 0 0 18px; }
-.card__head > .icon { color: var(--navy-600); }
+.card__head > .icon { color: var(--icon-accent); }
 .empty__icon > .icon { width: 22px; height: 22px; flex-basis: 22px; }
 
 hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
 
 code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 
-::selection { background: var(--green-100); color: var(--green-800); }
+::selection { background: var(--tint-green); color: var(--on-green); }
 
 :focus-visible {
   outline: 2px solid var(--green-600);
@@ -1804,7 +1815,7 @@ fieldset:last-of-type { margin-bottom: 0; }
     --ink:       #0F1E2E;
     --slate-700: #3D4E60;
     --slate-600: #5A6B7D;
-    --slate-500: #7C8B9B;
+    --slate-500: #687888;   /* darkened to clear 4.5:1 on white */
     --slate-400: #9AA8B5;
 
     --tint-green: #D5EFE0;
@@ -1820,6 +1831,10 @@ fieldset:last-of-type { margin-bottom: 0; }
     --on-red:   #A62A20;
     --on-blue:  #1B5E9E;
     --on-grey:  #3D4E60;
+
+  --link:       #1A4E80;
+  --link-hover: #0C2B4A;
+  --icon-accent: #1A4E80;
 
     /* Ink is expensive and haloes do not belong on paper. */
     --shadow-sm: none; --shadow: none; --shadow-lg: none; --lift: none;
