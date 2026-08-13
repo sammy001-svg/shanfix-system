@@ -816,22 +816,41 @@
     var rows = document.querySelectorAll('[data-role-option]');
     if (!rows.length) return;
 
+    var previous = select.value;
+
+    // Anything ticked by hand is the person's own decision and is left alone.
+    rows.forEach(function (row) {
+      var box = row.querySelector('input[type="checkbox"]');
+      if (box) box.addEventListener('change', function () { box.dataset.userSet = '1'; });
+    });
+
     function sync() {
       rows.forEach(function (row) {
         var box = row.querySelector('input[type="checkbox"]');
         if (!box) return;
 
-        var isPrimary = row.getAttribute('data-role-option') === select.value;
+        var role = row.getAttribute('data-role-option');
 
-        if (isPrimary) {
+        if (role === select.value) {
           box.checked = true;
           box.disabled = true;
           row.title = 'This is the main role and is always included.';
-        } else {
-          box.disabled = false;
-          row.removeAttribute('title');
+          return;
+        }
+
+        box.disabled = false;
+        row.removeAttribute('title');
+
+        // The role that was the main one a moment ago: clear it, unless the
+        // account already held it or someone ticked it deliberately.
+        // Without this, changing the main role from Staff to Reception would
+        // quietly leave Staff assigned as well.
+        if (role === previous && !box.dataset.userSet && !box.hasAttribute('data-held')) {
+          box.checked = false;
         }
       });
+
+      previous = select.value;
     }
 
     select.addEventListener('change', sync);

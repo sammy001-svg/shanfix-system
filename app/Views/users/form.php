@@ -141,9 +141,17 @@ $val = static function (string $key, $fallback = '') use ($user) {
             <?php foreach ($roles as $key => $description):
                 [$roleName, $detail] = array_pad(explode('—', $description, 2), 2, '');
             ?>
+              <?php
+                // Two different reasons a box starts ticked, and they behave
+                // differently when the main role changes: a role the account
+                // genuinely holds stays, whereas one ticked merely because it
+                // was the main role should clear itself.
+                $isHeld = in_array($key, $heldRoles, true);
+              ?>
               <label class="check-row" data-role-option="<?= e($key) ?>">
                 <input type="checkbox" name="roles[]" value="<?= e($key) ?>"
-                       <?= in_array($key, $heldRoles, true) || $primary === $key ? 'checked' : '' ?>>
+                       <?= $isHeld || $primary === $key ? 'checked' : '' ?>
+                       <?= $isHeld ? 'data-held="1"' : '' ?>>
                 <span>
                   <strong><?= e(label_of($key)) ?></strong>
                   <span class="text-xs text-muted d-block"><?= e(trim($detail)) ?></span>

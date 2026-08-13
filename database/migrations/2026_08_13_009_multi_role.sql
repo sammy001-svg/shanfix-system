@@ -17,6 +17,18 @@
 
 SET NAMES utf8mb4;
 
+-- ---------------------------------------------------------------------
+-- users.role was an ENUM listing the six original roles, so storing
+-- 'reception' truncated it to an empty string — silently on a server that
+-- is not in strict mode, which is worse than failing outright.
+--
+-- Widened to VARCHAR to match user_roles.role. The set of roles now lives
+-- in one place, Auth::ROLES, which validates every value on the way in;
+-- adding the next role becomes a code change rather than another schema
+-- migration on a table with live data in it.
+-- ---------------------------------------------------------------------
+ALTER TABLE users MODIFY COLUMN role VARCHAR(20) NOT NULL DEFAULT 'staff';
+
 CREATE TABLE IF NOT EXISTS user_roles (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id    INT UNSIGNED NOT NULL,

@@ -12,7 +12,19 @@ class DashboardController extends Controller
     {
         $userId = (int) Auth::id();
 
-        $money = Database::first(
+        // The dashboard is assembled from what this person is allowed to see.
+        // The figures are gated in the view as well; skipping the queries here
+        // means the numbers are never fetched for someone who may not see
+        // them, rather than fetched and then hidden.
+        $canSeeMoney  = Auth::can('payments.view');
+        $canSeeMargin = Auth::can('expenses.view');
+
+        $blankMoney = [
+            'collected_month' => 0, 'collected_today' => 0, 'outstanding'    => 0,
+            'overdue_value'   => 0, 'expenses_month'  => 0, 'invoiced_month' => 0,
+        ];
+
+        $money = (!$canSeeMoney && !$canSeeMargin) ? $blankMoney : Database::first(
             "SELECT
                 COALESCE((SELECT SUM(amount) FROM payments
                            WHERE status='completed'
@@ -38,7 +50,7 @@ class DashboardController extends Controller
         );
 
         // Same month last year, for a like-for-like comparison.
-        $lastMonthCollected = (float) Database::scalar(
+        $lastMonthCollected = !$canSeeMoney ? 0.0 : (float) Database::scalar(
             "SELECT COALESCE(SUM(amount), 0) FROM payments
               WHERE status='completed'
                 AND COALESCE(paid_at, created_at) >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
@@ -82,7 +94,7 @@ class DashboardController extends Controller
               LIMIT 8"
         );
 
-        $recentPayments = Database::all(
+        $recentPayments = !$canSeeMoney ? [] : Database::all(
             "SELECT p.payment_number, p.amount, p.method, p.paid_at, p.created_at,
                     c.name AS client_name, c.id AS client_id, d.doc_number
                FROM payments p
@@ -135,8 +147,12 @@ class DashboardController extends Controller
         );
 
         // Six-month cash trend for the mini chart.
-        $trend = [];
-        for ($i = 5; $i >= 0; $i--) {
+        // Two queries a month for six months, feeding a chart only the
+        // finance side is shown. Not worth running for anyone else.
+        $trend    = [];
+        $months   = Auth::can('reports.view') ? 5 : -1;
+
+        for ($i = $months; $i >= 0; $i--) {
             $start = date('Y-m-01', strtotime("-{$i} months"));
             $end   = date('Y-m-t', strtotime($start));
 

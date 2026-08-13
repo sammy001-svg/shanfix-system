@@ -35,46 +35,63 @@ $greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good
   </div>
 </div>
 
-<div class="stat-grid">
-  <div class="stat stat--green">
-    <div class="stat__label">Collected this month</div>
-    <div class="stat__value"><?= e(money_short($collectedMonth)) ?></div>
-    <div class="stat__meta">
-      <?php if ($delta !== null): ?>
-        <span class="<?= $delta >= 0 ? 'stat__delta--up' : 'stat__delta--down' ?>">
-          <?= $delta >= 0 ? '▲' : '▼' ?> <?= number_format(abs($delta), 1) ?>%
-        </span>
-        vs last month
-      <?php else: ?>
-        <?= e(money_short($money['collected_today'])) ?> today
-      <?php endif; ?>
-    </div>
-  </div>
+<?php
+  // What the company earns, is owed and keeps is not everyone's business.
+  // Each tile below carries the permission that matches what it discloses:
+  //   payments.view  — money in and money owed
+  //   expenses.view  — the cost base, and so the margin
+  // Production and general staff hold neither, and see the operational
+  // counters underneath instead of the company's financial position.
+  $showMoneyIn  = can('payments.view');
+  $showMargin   = can('expenses.view');
+?>
 
-  <div class="stat <?= (float) $money['outstanding'] > 0 ? 'stat--red' : 'stat--green' ?>">
-    <div class="stat__label">Outstanding</div>
-    <div class="stat__value"><?= e(money_short($money['outstanding'])) ?></div>
-    <div class="stat__meta">
-      <?php if ((float) $money['overdue_value'] > 0): ?>
-        <span class="text-red fw-600"><?= e(money_short($money['overdue_value'])) ?> overdue</span>
-      <?php else: ?>
-        Nothing overdue
-      <?php endif; ?>
-    </div>
-  </div>
+<?php if ($showMoneyIn || $showMargin): ?>
+  <div class="stat-grid">
+    <?php if ($showMoneyIn): ?>
+      <div class="stat stat--green">
+        <div class="stat__label">Collected this month</div>
+        <div class="stat__value"><?= e(money_short($collectedMonth)) ?></div>
+        <div class="stat__meta">
+          <?php if ($delta !== null): ?>
+            <span class="<?= $delta >= 0 ? 'stat__delta--up' : 'stat__delta--down' ?>">
+              <?= $delta >= 0 ? '▲' : '▼' ?> <?= number_format(abs($delta), 1) ?>%
+            </span>
+            vs last month
+          <?php else: ?>
+            <?= e(money_short($money['collected_today'])) ?> today
+          <?php endif; ?>
+        </div>
+      </div>
 
-  <div class="stat stat--navy">
-    <div class="stat__label">Invoiced this month</div>
-    <div class="stat__value"><?= e(money_short($money['invoiced_month'])) ?></div>
-    <div class="stat__meta"><?= e(date('F Y')) ?></div>
-  </div>
+      <div class="stat <?= (float) $money['outstanding'] > 0 ? 'stat--red' : 'stat--green' ?>">
+        <div class="stat__label">Outstanding</div>
+        <div class="stat__value"><?= e(money_short($money['outstanding'])) ?></div>
+        <div class="stat__meta">
+          <?php if ((float) $money['overdue_value'] > 0): ?>
+            <span class="text-red fw-600"><?= e(money_short($money['overdue_value'])) ?> overdue</span>
+          <?php else: ?>
+            Nothing overdue
+          <?php endif; ?>
+        </div>
+      </div>
 
-  <div class="stat <?= $profitMonth >= 0 ? 'stat--green' : 'stat--red' ?>">
-    <div class="stat__label">Net this month</div>
-    <div class="stat__value"><?= e(money_short($profitMonth)) ?></div>
-    <div class="stat__meta">After <?= e(money_short($expensesMonth)) ?> expenses</div>
+      <div class="stat stat--navy">
+        <div class="stat__label">Invoiced this month</div>
+        <div class="stat__value"><?= e(money_short($money['invoiced_month'])) ?></div>
+        <div class="stat__meta"><?= e(date('F Y')) ?></div>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($showMargin): ?>
+      <div class="stat <?= $profitMonth >= 0 ? 'stat--green' : 'stat--red' ?>">
+        <div class="stat__label">Net this month</div>
+        <div class="stat__value"><?= e(money_short($profitMonth)) ?></div>
+        <div class="stat__meta">After <?= e(money_short($expensesMonth)) ?> expenses</div>
+      </div>
+    <?php endif; ?>
   </div>
-</div>
+<?php endif; ?>
 
 <div class="row row--tight mb-24">
   <?php
