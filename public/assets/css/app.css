@@ -2345,4 +2345,8 @@ a.card:active { transform: translateY(-1px) scale(.998); }
   .paybox__form { flex-direction: column; align-items: stretch; }
   .paybox__go { width: 100%; justify-content: center; }
   .paybox__amount { text-align: left; }
+
+  /* The flex-basis that shares a row on a wide screen makes the field grow
+     down the column on a narrow one, leaving a gap under the input. */
+  .paybox__field { flex: 0 0 auto; }
 }
