@@ -111,24 +111,47 @@ $val = static function (string $key, $fallback = '') use ($user) {
       <div class="card">
         <div class="card__head"><div class="card__title">Role &amp; access</div></div>
         <div class="card__body">
+          <?php
+            // Roles ticked last time round survive a validation error; on a
+            // fresh form it is whatever the account already holds.
+            $heldRoles = old_array('roles', $held ?? []);
+            $primary   = $val('role', 'staff');
+          ?>
+
           <div class="field mb-16">
-            <label class="label" for="role">Role <span class="req">*</span></label>
+            <label class="label" for="role">Main role <span class="req">*</span></label>
             <select class="select <?= isset($errors['role']) ? 'has-error' : '' ?>" id="role" name="role" required>
               <?php foreach ($roles as $key => $description): ?>
-                <option value="<?= e($key) ?>" <?= $val('role', 'staff') === $key ? 'selected' : '' ?>>
+                <option value="<?= e($key) ?>" <?= $primary === $key ? 'selected' : '' ?>>
                   <?= e(label_of($key)) ?>
                 </option>
               <?php endforeach; ?>
             </select>
+            <div class="text-xs text-muted mt-4">Shown on their badge, and decides where they land after signing in.</div>
             <?= error_for($errors ?? [], 'role') ?>
           </div>
 
-          <div class="text-xs text-muted" style="line-height:1.7">
+          <div class="field mb-16">
+            <label class="label">Additional roles</label>
+            <div class="text-xs text-muted mb-8">
+              Tick anything else this person does. Someone can be Reception and Sales at once —
+              they get everything both roles allow, and nothing more.
+            </div>
+
             <?php foreach ($roles as $key => $description):
                 [$roleName, $detail] = array_pad(explode('—', $description, 2), 2, '');
             ?>
-              <div class="mb-4"><strong><?= e(label_of($key)) ?>:</strong> <?= e(trim($detail)) ?></div>
+              <label class="check-row" data-role-option="<?= e($key) ?>">
+                <input type="checkbox" name="roles[]" value="<?= e($key) ?>"
+                       <?= in_array($key, $heldRoles, true) || $primary === $key ? 'checked' : '' ?>>
+                <span>
+                  <strong><?= e(label_of($key)) ?></strong>
+                  <span class="text-xs text-muted d-block"><?= e(trim($detail)) ?></span>
+                </span>
+              </label>
             <?php endforeach; ?>
+
+            <?= error_for($errors ?? [], 'roles') ?>
           </div>
 
           <hr>

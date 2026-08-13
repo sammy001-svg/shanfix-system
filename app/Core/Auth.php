@@ -4,60 +4,88 @@ namespace App\Core;
 /**
  * Session-backed authentication and role checks.
  *
- * Roles, most to least privileged:
- *   admin      - everything, including users & settings
- *   manager    - everything operational, no user/settings admin
- *   finance    - finance, invoicing, payments, expenses, reports
- *   sales      - leads, clients, quotations, invoices
- *   production - the shop floor: job cards, stages, artwork, delivery notes
- *   staff      - read-only on most modules, plus chat
+ * A user may hold more than one role — the front desk that also raises
+ * quotations, the office manager who also keeps the books. Permission
+ * checks take the union, so adding a role only ever widens access. See the
+ * ROLES constant below for what each one is for.
  */
 class Auth
 {
     private static ?array $user = null;
 
-    /** Capability => roles allowed. */
-    private const PERMISSIONS = [
-        'dashboard.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'staff'],
+    /** roles() is called many times per request; keyed by user id. */
+    private static array $roleCache = [];
 
-        'inventory.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'staff'],
+    /**
+     * Every role the system knows about, and what each is for.
+     *
+     * Order matters only for display — the widest access first, so the list
+     * reads from most to least privileged.
+     */
+    public const ROLES = [
+        'admin'      => 'Administrator — full access including users and settings',
+        'manager'    => 'Manager — all operations, no user or settings administration',
+        'finance'    => 'Finance — invoicing, payments, expenses and reports',
+        'sales'      => 'Sales — leads, clients, quotations and invoices',
+        'production' => 'Production — job cards, artwork, printing and delivery notes',
+        'reception'  => 'Reception — front desk: walk-in clients and enquiries, quotations, taking payment, job status',
+        'staff'      => 'Staff — read-only across modules, plus team chat',
+    ];
+
+    /**
+     * Capability => roles allowed.
+     *
+     * A user holding several roles gets the union of what those roles allow,
+     * so adding a role can only ever widen access, never narrow it.
+     *
+     * Reception sits deliberately between sales and staff: the front desk
+     * registers walk-ins, raises a quotation, takes a payment and says
+     * whether a job is ready — but does not touch the books, the reports or
+     * anyone's account.
+     */
+    private const PERMISSIONS = [
+        'dashboard.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+
+        'inventory.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
         'inventory.manage'  => ['admin', 'manager', 'production'],
 
-        'services.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'staff'],
+        'services.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
         'services.manage'   => ['admin', 'manager'],
 
-        'clients.view'      => ['admin', 'manager', 'finance', 'sales', 'production', 'staff'],
-        'clients.manage'    => ['admin', 'manager', 'sales'],
+        'clients.view'      => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'clients.manage'    => ['admin', 'manager', 'sales', 'reception'],
         'clients.delete'    => ['admin'],
 
-        'leads.view'        => ['admin', 'manager', 'sales', 'staff'],
-        'leads.manage'      => ['admin', 'manager', 'sales'],
+        'leads.view'        => ['admin', 'manager', 'sales', 'reception', 'staff'],
+        'leads.manage'      => ['admin', 'manager', 'sales', 'reception'],
         'leads.delete'      => ['admin', 'manager'],
 
-        'documents.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'staff'],
-        'documents.manage'  => ['admin', 'manager', 'finance', 'sales'],
+        'documents.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'documents.manage'  => ['admin', 'manager', 'finance', 'sales', 'reception'],
         'documents.delete'  => ['admin', 'manager'],
 
         // Production floor
-        'jobs.view'         => ['admin', 'manager', 'finance', 'sales', 'production', 'staff'],
+        'jobs.view'         => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
         'jobs.manage'       => ['admin', 'manager', 'sales', 'production'],
         'jobs.delete'       => ['admin', 'manager'],
         'jobs.assign'       => ['admin', 'manager', 'production'],
         'jobs.cost'         => ['admin', 'manager', 'finance'],
 
-        'delivery.view'     => ['admin', 'manager', 'finance', 'sales', 'production'],
+        'delivery.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception'],
         'delivery.manage'   => ['admin', 'manager', 'sales', 'production'],
 
-        'payments.view'     => ['admin', 'manager', 'finance', 'sales'],
+        // Reception may see what is owed and send an STK push to collect it,
+        // but recording or reversing a payment stays with finance.
+        'payments.view'     => ['admin', 'manager', 'finance', 'sales', 'reception'],
         'payments.manage'   => ['admin', 'manager', 'finance'],
-        'payments.stk'      => ['admin', 'manager', 'finance', 'sales'],
+        'payments.stk'      => ['admin', 'manager', 'finance', 'sales', 'reception'],
 
         'expenses.view'     => ['admin', 'manager', 'finance'],
         'expenses.manage'   => ['admin', 'manager', 'finance'],
 
         'reports.view'      => ['admin', 'manager', 'finance'],
 
-        'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'staff'],
+        'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
 
         'users.view'        => ['admin'],
         'users.manage'      => ['admin'],
@@ -446,26 +474,88 @@ class Auth
         return $u ? (int) $u['id'] : null;
     }
 
+    /**
+     * The primary role — what shows on the badge beside someone's name.
+     * Permission checks use roles(); this is for display and for choosing a
+     * sensible landing page.
+     */
     public static function role(): string
     {
         return self::user()['role'] ?? 'guest';
     }
 
+    /**
+     * Every role this user holds, primary included.
+     *
+     * Read from user_roles, which the migration backfilled from users.role.
+     * Should that table be unreadable — an upgrade applied only half-way —
+     * this falls back to the primary role rather than returning nothing,
+     * because an empty set would silently strip everyone of all access.
+     */
+    public static function roles(): array
+    {
+        $id = self::id();
+
+        if ($id === null) {
+            return [];
+        }
+
+        if (isset(self::$roleCache[$id])) {
+            return self::$roleCache[$id];
+        }
+
+        $primary = self::role();
+
+        try {
+            $rows  = Database::all('SELECT role FROM user_roles WHERE user_id = :id', ['id' => $id]);
+            $roles = array_column($rows, 'role');
+        } catch (\Throwable $e) {
+            Logger::warning('Could not read user_roles, falling back to the primary role: ' . $e->getMessage());
+            $roles = [];
+        }
+
+        // The primary role always counts, even if the join table missed it.
+        if ($primary !== 'guest' && !in_array($primary, $roles, true)) {
+            $roles[] = $primary;
+        }
+
+        return self::$roleCache[$id] = array_values(array_unique($roles));
+    }
+
+    /**
+     * Drop the cached role set, so the next check re-reads the database.
+     * Call after changing someone's roles — otherwise an administrator who
+     * edits their own account carries the old permissions for the rest of
+     * the request, including the page that renders straight afterwards.
+     */
+    public static function forgetRoles(?int $userId = null): void
+    {
+        if ($userId === null) {
+            self::$roleCache = [];
+            return;
+        }
+
+        unset(self::$roleCache[$userId]);
+    }
+
+    /** True when the user holds any of the named roles. */
     public static function is(string ...$roles): bool
     {
-        return in_array(self::role(), $roles, true);
+        return array_intersect($roles, self::roles()) !== [];
     }
 
     public static function can(string $permission): bool
     {
         $allowed = self::PERMISSIONS[$permission] ?? null;
+        $held    = self::roles();
 
         // Unknown permission: deny by default, but never lock out an admin.
         if ($allowed === null) {
-            return self::role() === 'admin';
+            return in_array('admin', $held, true);
         }
 
-        return in_array(self::role(), $allowed, true);
+        // Holding several roles grants the union of what they allow.
+        return array_intersect($allowed, $held) !== [];
     }
 
     /** Abort with 403 unless the current user holds the permission. */

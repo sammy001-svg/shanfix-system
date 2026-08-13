@@ -284,6 +284,22 @@ if (!function_exists('old')) {
     }
 }
 
+if (!function_exists('old_array')) {
+    /**
+     * Old input for a field that submits several values, such as a group of
+     * checkboxes. The plain old() escapes its result for printing, which a
+     * list of values cannot survive — escape each one where it is used.
+     *
+     * @return string[]
+     */
+    function old_array(string $key, array $default = []): array
+    {
+        $value = Session::old($key, null);
+
+        return is_array($value) ? $value : $default;
+    }
+}
+
 if (!function_exists('error_for')) {
     /** Field-level validation message, already escaped. */
     function error_for(array $errors, string $field): string

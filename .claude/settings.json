@@ -59,11 +59,13 @@
       "Read(//c/Users/Shanfix/AppData/Local/Temp/pwtest/**)",
       "Bash(sed -i 's|http://127.0.0.1:8077|http://127.0.0.1:8000|g' C:/Users/Shanfix/AppData/Local/Temp/pwtest/proxytest.js)",
       "Bash(node proxytest.js)",
-      "Bash(php build-cpanel.php)"
+      "Bash(php build-cpanel.php)",
+      "Bash(cd \"c:/Shanfix System\" && echo \"=== ROLES defined ===\" && grep -n \"ROLES\\\\|'admin', 'manager'\\\\|const ROLE\" app/Core/Auth.php | head -10 *)"
     ],
     "additionalDirectories": [
       "C:\\Shanfix System\\storage\\logs",
-      "c:\\Shanfix System"
+      "c:\\Shanfix System",
+      "c:\\Shanfix System\\app\\Core"
     ]
   }
 }
