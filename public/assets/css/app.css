@@ -2537,3 +2537,11 @@ a.card:active { transform: translateY(-1px) scale(.998); }
   .linkjob { flex-direction: column; }
   .linkjob .btn { width: 100%; justify-content: center; }
 }
+
+/* Approved artwork that is a document rather than a picture. */
+.workitem__kind {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--on-navy);
+}
