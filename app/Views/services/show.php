@@ -68,6 +68,108 @@
 
     <div class="card">
       <div class="card__head">
+        <?= icon('image') ?>
+        <div>
+          <div class="card__title">Work we have done</div>
+          <div class="card__sub">
+            Finished jobs that show what this service looks like — useful when a
+            client asks whether we have done it before.
+          </div>
+        </div>
+      </div>
+
+      <?php if (!$examples): ?>
+        <div class="empty">
+          <div class="empty__icon"><?= icon('image') ?></div>
+          <div class="empty__title">No examples linked yet</div>
+          <p class="empty__text">
+            <?= can('services.manage')
+                ? 'Pick a finished job below to show alongside this service.'
+                : 'Nobody has linked past work to this service yet.' ?>
+          </p>
+        </div>
+      <?php else: ?>
+        <div class="worklist">
+          <?php foreach ($examples as $x):
+              $done = $x['delivered_at'] ?: ($x['completed_at'] ?: $x['created_at']);
+          ?>
+            <div class="workitem">
+              <a class="workitem__shot <?= $x['proof_path'] ? '' : 'workitem__shot--empty' ?>"
+                 href="<?= url('/jobs/' . $x['id']) ?>">
+                <?php if ($x['proof_path']): ?>
+                  <img src="<?= url('files/' . $x['proof_path']) ?>" alt="" loading="lazy">
+                <?php elseif ($x['proof_kind']): ?>
+                  <?php // Approved artwork exists, it just is not a picture. ?>
+                  <span class="workitem__kind"><?= e($x['proof_kind']) ?></span>
+                <?php else: ?>
+                  <?= icon('printer') ?>
+                <?php endif; ?>
+              </a>
+
+              <div class="workitem__body">
+                <a class="workitem__title" href="<?= url('/jobs/' . $x['id']) ?>">
+                  <?= e($x['title'] ?: $x['job_number']) ?>
+                </a>
+                <div class="text-xs text-muted">
+                  <a href="<?= url('/clients/' . $x['client_id']) ?>"><?= e($x['client_name']) ?></a>
+                  · <?= e(fdate($done)) ?>
+                  <?php if ((float) $x['job_value'] > 0 && can('expenses.view')): ?>
+                    · <?= e(money($x['job_value'], false)) ?>
+                  <?php endif; ?>
+                </div>
+                <?php if ($x['note']): ?>
+                  <div class="text-xs" style="color:var(--on-green)"><?= e($x['note']) ?></div>
+                <?php endif; ?>
+              </div>
+
+              <?php if (can('services.manage')): ?>
+                <form method="post" class="workitem__remove"
+                      action="<?= url('/services/' . $service['id'] . '/examples/' . $x['id'] . '/remove') ?>"
+                      data-confirm="Remove <?= e($x['job_number']) ?> from this service? The job card is not affected.">
+                  <?= csrf_field() ?>
+                  <button class="btn btn--ghost btn--sm" type="submit" title="Remove this example">
+                    <?= icon('x') ?>
+                  </button>
+                </form>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+
+      <?php if (can('services.manage') && $suggestions): ?>
+        <div class="card__body" style="border-top:1px solid var(--border)">
+          <div class="text-sm fw-600 mb-8">Link a finished job</div>
+          <?php
+            // Suggested rather than searched: the jobs already invoiced with
+            // this service are almost always the ones wanted, and they are
+            // marked so the obvious choice is obvious.
+          ?>
+          <form method="post" action="<?= url('/services/' . $service['id'] . '/examples') ?>" class="linkjob">
+            <?= csrf_field() ?>
+            <select class="select" name="job_id" required aria-label="Finished job">
+              <option value="">Choose a finished job…</option>
+              <?php foreach ($suggestions as $j): ?>
+                <option value="<?= (int) $j['id'] ?>">
+                  <?= $j['same_service'] ? '★ ' : '' ?><?= e($j['job_number']) ?>
+                  — <?= e(str_excerpt($j['title'] ?: 'Untitled', 42)) ?>
+                  (<?= e($j['client_name']) ?>)
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <input class="input" type="text" name="note" maxlength="255"
+                   placeholder="Why this one is a good example (optional)">
+            <button class="btn btn--primary" type="submit"><?= icon('plus') ?> Link</button>
+          </form>
+          <div class="text-xs text-muted mt-8">
+            ★ marks jobs already invoiced with this service. Only finished jobs appear here.
+          </div>
+        </div>
+      <?php endif; ?>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
         <div>
           <div class="card__title">Recent documents</div>
           <div class="card__sub">Quotations and invoices containing this service.</div>

@@ -17,6 +17,14 @@ $priceLabel = static function (array $s): string {
 
     return $prefix . money($s['price']) . $suffix;
 };
+
+// Cards by default. A service is something you sell, and the examples
+// behind it are the part worth seeing; the list stays for editing rates.
+$view = ($_GET['view'] ?? 'cards') === 'table' ? 'table' : 'cards';
+
+$viewUrl = static function (string $mode): string {
+    return url('/services') . query_string(['view' => $mode, 'page' => null]);
+};
 ?>
 
 <div class="page-head">
@@ -27,6 +35,16 @@ $priceLabel = static function (array $s): string {
     </div>
   </div>
   <div class="page-head__actions">
+    <span class="viewswitch" role="group" aria-label="How to show the services">
+      <a class="viewswitch__btn <?= $view === 'cards' ? 'is-on' : '' ?>"
+         href="<?= e($viewUrl('cards')) ?>" aria-pressed="<?= $view === 'cards' ? 'true' : 'false' ?>">
+        <?= icon('grid') ?> Cards
+      </a>
+      <a class="viewswitch__btn <?= $view === 'table' ? 'is-on' : '' ?>"
+         href="<?= e($viewUrl('table')) ?>" aria-pressed="<?= $view === 'table' ? 'true' : 'false' ?>">
+        <?= icon('list') ?> List
+      </a>
+    </span>
     <?php if (can('services.manage')): ?>
       <a class="btn btn--primary" href="<?= url('/services/create') ?>"><?= icon('plus') ?> New service</a>
     <?php endif; ?>
@@ -95,6 +113,50 @@ $priceLabel = static function (array $s): string {
         </div>
       </div>
 
+      <?php if ($view === 'cards'): ?>
+        <div class="service-grid">
+          <?php foreach ($services as $s): ?>
+            <a class="card service" href="<?= url('/services/' . $s['id']) ?>">
+              <span class="service__shot <?= $s['cover_path'] ? '' : 'service__shot--empty' ?>">
+                <?php if ($s['cover_path']): ?>
+                  <?php
+                    // The approved artwork from a job linked to this service —
+                    // the most persuasive thing we can put on the card.
+                  ?>
+                  <img src="<?= url('files/' . $s['cover_path']) ?>" alt="" loading="lazy">
+                <?php else: ?>
+                  <?= icon('layers') ?>
+                <?php endif; ?>
+
+                <?php if ((int) $s['example_count'] > 0): ?>
+                  <span class="service__count">
+                    <?= (int) $s['example_count'] ?> past job<?= (int) $s['example_count'] === 1 ? '' : 's' ?>
+                  </span>
+                <?php endif; ?>
+
+                <?php if (!$s['is_active']): ?>
+                  <span class="badge badge--grey service__state">Inactive</span>
+                <?php endif; ?>
+              </span>
+
+              <span class="service__body">
+                <span class="service__name"><?= e($s['name']) ?></span>
+                <?php if ($s['description']): ?>
+                  <span class="service__desc"><?= e(str_excerpt($s['description'], 88)) ?></span>
+                <?php endif; ?>
+
+                <span class="service__foot">
+                  <span class="service__price"><?= e($priceLabel($s)) ?></span>
+                  <?php if ($s['lead_time']): ?>
+                    <span class="service__lead"><?= icon('clock') ?> <?= e($s['lead_time']) ?></span>
+                  <?php endif; ?>
+                </span>
+              </span>
+            </a>
+          <?php endforeach; ?>
+        </div>
+
+      <?php else: ?>
       <div class="table-wrap">
         <table class="table">
           <thead>
@@ -115,6 +177,11 @@ $priceLabel = static function (array $s): string {
                   <a class="table__primary" href="<?= url('/services/' . $s['id']) ?>"><?= e($s['name']) ?></a>
                   <?php if ($s['description']): ?>
                     <div class="table__muted"><?= e(str_excerpt($s['description'], 78)) ?></div>
+                  <?php endif; ?>
+                  <?php if ((int) $s['example_count'] > 0): ?>
+                    <div class="text-xs" style="color:var(--on-green)">
+                      <?= (int) $s['example_count'] ?> past job<?= (int) $s['example_count'] === 1 ? '' : 's' ?> linked
+                    </div>
                   <?php endif; ?>
                 </td>
                 <td><code class="text-xs"><?= e($s['code']) ?></code></td>
@@ -137,6 +204,7 @@ $priceLabel = static function (array $s): string {
           </tbody>
         </table>
       </div>
+      <?php endif; ?>
     </div>
   <?php endforeach; ?>
 <?php endif; ?>

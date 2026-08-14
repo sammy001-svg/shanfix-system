@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Core\ActivityLog;
+use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\HttpException;
@@ -45,8 +46,25 @@ class ServiceController extends Controller
 
         $clause = implode(' AND ', $where);
 
+        // The examples come along with the list so a card can show how many
+        // there are and lead with one of them. Sub-selects rather than joins:
+        // a join would multiply the service row by its examples and need
+        // grouping back down again.
         $services = Database::all(
-            "SELECT s.*, c.name AS category_name
+            "SELECT s.*, c.name AS category_name,
+                    (SELECT COUNT(*) FROM service_jobs sj
+                      WHERE sj.service_id = s.id) AS example_count,
+                    -- Images only. Print artwork is very often a PDF, and a
+                    -- PDF in an <img> tag renders as a broken picture.
+                    (SELECT jf.file_path
+                       FROM service_jobs sj
+                       JOIN job_files jf ON jf.job_id = sj.job_id
+                      WHERE sj.service_id = s.id
+                        AND jf.status = 'approved'
+                        AND LOWER(SUBSTRING_INDEX(jf.file_path, '.', -1))
+                            IN ('jpg','jpeg','png','webp','gif')
+                   ORDER BY sj.sort_order, jf.version DESC
+                      LIMIT 1) AS cover_path
                FROM services s
           LEFT JOIN categories c ON c.id = s.category_id
               WHERE {$clause}
@@ -141,7 +159,126 @@ class ServiceController extends Controller
             'revenue'      => $revenue,
             'openLeads'    => $openLeads,
             'pricingTypes' => self::PRICING_TYPES,
+            'examples'     => $this->examplesFor((int) $service['id']),
+            'suggestions'  => $this->suggestedJobs($service),
         ]);
+    }
+
+    /**
+     * Past jobs linked to this service, with a picture where there is one.
+     *
+     * The artwork is what makes this useful in front of a client, so the
+     * approved proof comes along with each job rather than being fetched a
+     * row at a time by the view.
+     */
+    private function examplesFor(int $serviceId): array
+    {
+        return Database::all(
+            "SELECT sj.id AS link_id, sj.note, sj.sort_order,
+                    j.id, j.job_number, j.title, j.stage, j.completed_at, j.delivered_at, j.created_at,
+                    cl.name AS client_name, cl.id AS client_id,
+                    (SELECT jf.file_path FROM job_files jf
+                      WHERE jf.job_id = j.id AND jf.status = 'approved'
+                        AND LOWER(SUBSTRING_INDEX(jf.file_path, '.', -1))
+                            IN ('jpg','jpeg','png','webp','gif')
+                   ORDER BY jf.version DESC LIMIT 1) AS proof_path,
+                    -- Approved artwork that is not a picture — a PDF, usually.
+                    -- Worth saying so rather than showing a blank tile.
+                    (SELECT UPPER(SUBSTRING_INDEX(jf.file_path, '.', -1))
+                       FROM job_files jf
+                      WHERE jf.job_id = j.id AND jf.status = 'approved'
+                   ORDER BY jf.version DESC LIMIT 1) AS proof_kind,
+                    (SELECT COALESCE(SUM(di.line_total), 0)
+                       FROM document_items di WHERE di.document_id = j.document_id) AS job_value
+               FROM service_jobs sj
+               JOIN jobs j    ON j.id = sj.job_id
+               JOIN clients cl ON cl.id = j.client_id
+              WHERE sj.service_id = :id
+           ORDER BY sj.sort_order, j.completed_at DESC, j.id DESC",
+            ['id' => $serviceId]
+        );
+    }
+
+    /**
+     * Jobs worth linking, offered so nobody has to hunt through the board.
+     *
+     * Finished work only — an example is something we can show, and a job
+     * still on the floor is not that yet. Anything invoiced alongside this
+     * service is the strongest signal we have that it is the same kind of
+     * work, so those come first; recent finished jobs fill the rest.
+     */
+    private function suggestedJobs(array $service): array
+    {
+        return Database::all(
+            "SELECT j.id, j.job_number, j.title, j.completed_at, j.delivered_at,
+                    cl.name AS client_name,
+                    CASE WHEN di.id IS NULL THEN 0 ELSE 1 END AS same_service
+               FROM jobs j
+               JOIN clients cl ON cl.id = j.client_id
+          LEFT JOIN document_items di
+                 ON di.document_id = j.document_id
+                AND di.item_type = 'service'
+                AND di.ref_id = :sid1
+              WHERE j.stage IN ('ready','delivered')
+                AND j.id NOT IN (
+                    SELECT job_id FROM service_jobs WHERE service_id = :sid2
+                )
+           ORDER BY same_service DESC, COALESCE(j.delivered_at, j.completed_at, j.created_at) DESC
+              LIMIT 12",
+            ['sid1' => $service['id'], 'sid2' => $service['id']]
+        );
+    }
+
+    /** Add a finished job to this service's examples. */
+    public function linkJob(Request $request): void
+    {
+        $this->authorize('services.manage');
+
+        $service = $this->findOrFail($request->paramInt('id'));
+        $jobId   = $request->int('job_id');
+
+        $job = Database::first('SELECT id, job_number FROM jobs WHERE id = :id', ['id' => $jobId]);
+
+        if (!$job) {
+            Session::error('That job could not be found.');
+            Response::to('/services/' . $service['id']);
+        }
+
+        try {
+            Database::insert('service_jobs', [
+                'service_id' => (int) $service['id'],
+                'job_id'     => (int) $job['id'],
+                'note'       => trim((string) $request->input('note', '')) ?: null,
+                'linked_by'  => Auth::id(),
+            ]);
+        } catch (\Throwable) {
+            // The unique key caught a job that is already an example —
+            // a double click, not something to complain about loudly.
+            Session::warning($job['job_number'] . ' is already linked to this service.');
+            Response::to('/services/' . $service['id']);
+        }
+
+        ActivityLog::record('service_example_added', 'service', (int) $service['id'],
+            'Linked ' . $job['job_number'] . ' to ' . $service['name']);
+
+        Session::success($job['job_number'] . ' added as an example of this service.');
+        Response::to('/services/' . $service['id']);
+    }
+
+    /** Remove an example. The job itself is untouched. */
+    public function unlinkJob(Request $request): void
+    {
+        $this->authorize('services.manage');
+
+        $service = $this->findOrFail($request->paramInt('id'));
+
+        Database::run(
+            'DELETE FROM service_jobs WHERE service_id = :s AND job_id = :j',
+            ['s' => $service['id'], 'j' => $request->paramInt('job')]
+        );
+
+        Session::success('Example removed. The job card itself is unchanged.');
+        Response::to('/services/' . $service['id']);
     }
 
     public function edit(Request $request): void

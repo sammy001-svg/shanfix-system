@@ -241,6 +241,10 @@ $r->group(['auth'], function ($r) {
         $r->post('/services',             [ServiceController::class, 'store']);
         $r->post('/services/{id}',        [ServiceController::class, 'update']);
         $r->post('/services/{id}/delete', [ServiceController::class, 'destroy']);
+
+        // Past work shown as an example of a service.
+        $r->post('/services/{id}/examples',              [ServiceController::class, 'linkJob']);
+        $r->post('/services/{id}/examples/{job}/remove', [ServiceController::class, 'unlinkJob']);
     });
 
     // -- Clients
