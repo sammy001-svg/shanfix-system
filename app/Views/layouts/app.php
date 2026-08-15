@@ -175,6 +175,18 @@ if ($me && can('jobs.view')) {
       <?php endif; ?>
 
       <div class="nav-group__label">Workspace</div>
+      <?php if (can('whatsapp.view')): ?>
+        <a class="nav-link <?= is_active_nav('/whatsapp') ? 'is-active' : '' ?>" href="<?= url('/whatsapp') ?>">
+          <?= icon('message', 'nav-link__icon') ?> WhatsApp
+          <span id="wa-unread-badge" class="nav-link__badge hidden"
+                data-url="<?= url('/whatsapp/unread') ?>"></span>
+        </a>
+      <?php endif; ?>
+      <?php if (can('meetings.view')): ?>
+        <a class="nav-link <?= is_active_nav('/meetings') ? 'is-active' : '' ?>" href="<?= url('/meetings') ?>">
+          <?= icon('video', 'nav-link__icon') ?> Meetings
+        </a>
+      <?php endif; ?>
       <?php if (can('chat.use')): ?>
         <a class="nav-link <?= is_active_nav('/chat') ? 'is-active' : '' ?>" href="<?= url('/chat') ?>">
           <?= icon('message', 'nav-link__icon') ?> Team Chat

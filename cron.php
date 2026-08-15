@@ -143,6 +143,7 @@ try {
             'due reminder'       => [Notifier::class, 'queueDueReminders'],
             'expiring quotation' => [Notifier::class, 'queueExpiringQuotations'],
             'renewal reminder'   => [Notifier::class, 'queueRenewalReminders'],
+            'meeting reminder'   => [Notifier::class, 'queueMeetingReminders'],
         ] as $label => $chaser) {
             $result = $chaser();
 

@@ -613,6 +613,83 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           </label>
         </div>
       </div>
+
+      <!-- WhatsApp Business Cloud API -->
+      <div class="card">
+        <div class="card__head">
+          <?= icon('message') ?>
+          <div>
+            <div class="card__title">WhatsApp Business</div>
+            <div class="card__sub">Meta's official API — the number stays registered and cannot be banned</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <div class="alert alert--info">
+            <?= icon('info') ?>
+            <div class="alert__body text-sm">
+              Set up at <strong>developers.facebook.com</strong>: add WhatsApp to an app,
+              register the company number, then copy the phone number ID and a permanent
+              access token here. Point Meta's webhook at
+              <code><?= e(\App\Services\Notifier::absoluteUrl('/webhooks/whatsapp')) ?></code>
+              and give it the verify token below.
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col field">
+              <label class="label" for="whatsapp_phone_number_id">Phone number ID</label>
+              <input class="input" id="whatsapp_phone_number_id" name="whatsapp_phone_number_id"
+                     value="<?= e(setting('whatsapp_phone_number_id', '')) ?>"
+                     placeholder="From the WhatsApp panel in your Meta app">
+            </div>
+            <div class="col field">
+              <label class="label" for="whatsapp_number_display">The number itself</label>
+              <input class="input" id="whatsapp_number_display" name="whatsapp_number_display"
+                     value="<?= e(setting('whatsapp_number_display', '')) ?>"
+                     placeholder="+254 700 111 222">
+              <span class="field-hint">Shown in the inbox so staff know which number they answer.</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label" for="whatsapp_access_token">Access token</label>
+            <input class="input" type="password" id="whatsapp_access_token" name="whatsapp_access_token"
+                   autocomplete="new-password"
+                   placeholder="<?= setting('whatsapp_access_token') ? 'Stored — leave blank to keep it' : 'Paste the permanent token' ?>">
+            <span class="field-hint">Stored encrypted. Use a permanent token, not the 24-hour test one.</span>
+          </div>
+
+          <div class="field">
+            <label class="label" for="whatsapp_app_secret">App secret</label>
+            <input class="input" type="password" id="whatsapp_app_secret" name="whatsapp_app_secret"
+                   autocomplete="new-password"
+                   placeholder="<?= setting('whatsapp_app_secret') ? 'Stored — leave blank to keep it' : 'From App settings → Basic' ?>">
+            <span class="field-hint">Proves an incoming message really came from Meta. Without it nothing is accepted.</span>
+          </div>
+
+          <div class="field">
+            <label class="label" for="whatsapp_verify_token">Verify token</label>
+            <input class="input" id="whatsapp_verify_token" name="whatsapp_verify_token"
+                   value="<?= e(setting('whatsapp_verify_token', '')) ?>"
+                   placeholder="Leave blank and one is generated for you">
+            <span class="field-hint">Any secret string. Paste the same value into Meta when setting the webhook up.</span>
+          </div>
+
+          <hr>
+
+          <label class="check">
+            <input type="checkbox" name="whatsapp_enabled" value="1" <?= setting('whatsapp_enabled') === '1' ? 'checked' : '' ?>>
+            <span class="check__text">
+              <strong>Enable WhatsApp</strong>
+              <span>
+                Replies are free within 24 hours of a customer's message. Outside that
+                window Meta only accepts an approved template, and the inbox says so.
+              </span>
+            </span>
+          </label>
+          <?= error_for($errors ?? [], 'whatsapp_enabled') ?>
+        </div>
+      </div>
     </div>
 
     <!-- Which events send -->

@@ -22,9 +22,11 @@ use App\Controllers\InventoryController;
 use App\Controllers\JobController;
 use App\Controllers\JobFileController;
 use App\Controllers\LeadController;
+use App\Controllers\MeetingController;
 use App\Controllers\NotificationController;
 use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
+use App\Controllers\PublicMeetingController;
 use App\Controllers\PublicProofController;
 use App\Controllers\ReminderController;
 use App\Controllers\ReportController;
@@ -32,6 +34,8 @@ use App\Controllers\ServiceController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\SettingsController;
 use App\Controllers\UserController;
+use App\Controllers\WhatsAppController;
+use App\Controllers\WhatsAppWebhookController;
 use App\Core\Request;
 use App\Core\Response;
 
@@ -48,6 +52,12 @@ $r->post('/logout', [AuthController::class, 'logout'],   ['csrf']);
 // KopoKopo webhook — no session, no CSRF. Authenticated by HMAC signature.
 $r->post('/webhooks/kopokopo', [PaymentController::class, 'kopokopoCallback']);
 
+// WhatsApp webhook. Meta calls GET once to verify the endpoint, then POSTs
+// every message and delivery receipt. No session and no CSRF — the caller
+// is Meta, and what proves it is the signature on the body.
+$r->get('/webhooks/whatsapp',  [WhatsAppWebhookController::class, 'verify']);
+$r->post('/webhooks/whatsapp', [WhatsAppWebhookController::class, 'receive']);
+
 // Client-facing document view. No login: the 48-char token is the credential.
 $r->get('/view/{token}', [PublicDocumentController::class, 'show']);
 
@@ -62,6 +72,17 @@ $r->post('/view/{token}/pay',       [PublicDocumentController::class, 'pay'], ['
 $r->get('/view/{token}/pay/status', [PublicDocumentController::class, 'payStatus']);
 $r->post('/v/{token}/pay',          [PublicDocumentController::class, 'pay'], ['csrf']);
 $r->get('/v/{token}/pay/status',    [PublicDocumentController::class, 'payStatus']);
+
+// Joining a meeting from a shared link. No login: the token is the
+// credential, as with a shared invoice. A guest gives their name at the
+// door so the minutes record who was actually in the room.
+$r->get('/join/{token}',              [PublicMeetingController::class, 'lobby']);
+$r->post('/join/{token}',             [PublicMeetingController::class, 'enter'], ['csrf']);
+$r->get('/join/{token}/room',         [PublicMeetingController::class, 'room']);
+$r->get('/join/{token}/notes',        [PublicMeetingController::class, 'pollNotes']);
+$r->post('/join/{token}/notes',       [PublicMeetingController::class, 'postNote'], ['csrf']);
+$r->get('/join/{token}/signals',      [PublicMeetingController::class, 'signals']);
+$r->post('/join/{token}/signal',      [PublicMeetingController::class, 'signal'], ['csrf']);
 
 // Client-facing proof approval. Also no login — the token is the credential.
 // The client sees the artwork and approves it or asks for changes, which
@@ -402,6 +423,43 @@ $r->group(['auth'], function ($r) {
         $r->post('/expenses/{id}',        [ExpenseController::class, 'update']);
         $r->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy']);
     });
+
+    // -- WhatsApp (shared company inbox)
+    $r->get('/whatsapp',                   [WhatsAppController::class, 'index'],  ['permission:whatsapp.view']);
+    $r->get('/whatsapp/unread',            [WhatsAppController::class, 'unread'], ['permission:whatsapp.view']);
+    $r->get('/whatsapp/{id}/poll',         [WhatsAppController::class, 'poll'],   ['permission:whatsapp.view']);
+
+    $r->group(['permission:whatsapp.send', 'csrf'], function ($r) {
+        $r->post('/whatsapp/start',        [WhatsAppController::class, 'start']);
+        $r->post('/whatsapp/{id}/send',    [WhatsAppController::class, 'send']);
+        $r->post('/whatsapp/{id}/close',   [WhatsAppController::class, 'close']);
+        $r->post('/whatsapp/{id}/client',  [WhatsAppController::class, 'assignClient']);
+    });
+
+    // -- Meetings
+    $r->get('/meetings',             [MeetingController::class, 'index'],  ['permission:meetings.view']);
+    $r->get('/meetings/create',      [MeetingController::class, 'create'], ['permission:meetings.manage']);
+    $r->get('/meetings/{id}',        [MeetingController::class, 'show'],   ['permission:meetings.view']);
+    $r->get('/meetings/{id}/edit',   [MeetingController::class, 'edit'],   ['permission:meetings.manage']);
+    $r->get('/meetings/{id}/room',   [MeetingController::class, 'room'],   ['permission:meetings.view']);
+
+    // Polled while a meeting is running. No CSRF on the GETs — they read.
+    $r->get('/meetings/{id}/notes',   [MeetingController::class, 'pollNotes'], ['permission:meetings.view']);
+    $r->get('/meetings/{id}/signals', [MeetingController::class, 'signals'],   ['permission:meetings.view']);
+
+    $r->group(['permission:meetings.manage', 'csrf'], function ($r) {
+        $r->post('/meetings',                [MeetingController::class, 'store']);
+        $r->post('/meetings/{id}',           [MeetingController::class, 'update']);
+        $r->post('/meetings/{id}/start',     [MeetingController::class, 'start']);
+        $r->post('/meetings/{id}/end',       [MeetingController::class, 'end']);
+        $r->post('/meetings/{id}/cancel',    [MeetingController::class, 'cancel']);
+        $r->post('/meetings/{id}/minutes',   [MeetingController::class, 'saveMinutes']);
+        $r->post('/meetings/{id}/notes',     [MeetingController::class, 'postNote']);
+        $r->post('/meetings/{id}/signal',    [MeetingController::class, 'signal']);
+    });
+
+    $r->post('/meetings/{id}/delete', [MeetingController::class, 'destroy'],
+             ['permission:meetings.delete', 'csrf']);
 
     // -- Recurring services (websites, hosting, retainers)
     $r->get('/subscriptions',             [SubscriptionController::class, 'index'],  ['permission:subscriptions.view']);

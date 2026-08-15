@@ -93,6 +93,19 @@ class Auth
 
         'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
 
+        // The company WhatsApp is one number answered by many people.
+        // Everyone client-facing can read and reply; production and general
+        // staff have no reason to be inside a customer's conversation.
+        'whatsapp.view'     => ['admin', 'manager', 'finance', 'sales', 'reception'],
+        'whatsapp.send'     => ['admin', 'manager', 'finance', 'sales', 'reception'],
+
+        // Meetings are a workplace tool, like the chat: anyone on the team
+        // can call one and take minutes in it. Only management can delete
+        // a meeting, because its minutes are a record of what was agreed.
+        'meetings.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'meetings.manage'   => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'meetings.delete'   => ['admin', 'manager'],
+
         'users.view'        => ['admin'],
         'users.manage'      => ['admin'],
         'settings.manage'   => ['admin'],

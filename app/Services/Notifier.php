@@ -711,6 +711,77 @@ class Notifier
         return ['queued' => $queued, 'checked' => $checked];
     }
 
+    /**
+     * Tell everyone invited that a meeting is about to start.
+     *
+     * Unlike the document chases, this fans out per person rather than per
+     * record: a meeting has many attendees, each with their own address and
+     * their own reason to be reminded. The lock is per participant per
+     * offset, so twelve people get one message each, once.
+     *
+     * @return array{queued:int, checked:int}
+     */
+    public static function queueMeetingReminders(): array
+    {
+        if (!Settings::bool('notify_meeting_reminder_email')
+            && !Settings::bool('notify_meeting_reminder_sms')) {
+            return ['queued' => 0, 'checked' => 0];
+        }
+
+        $queued  = 0;
+        $checked = 0;
+
+        foreach (Meetings::dueForReminder() as $due) {
+            $meeting = $due['meeting'];
+            $offset  = $due['minutes'];
+
+            foreach (Meetings::participants((int) $meeting['id']) as $p) {
+                $email = $p['email'] ?: ($p['user_email'] ?? '');
+                $phone = $p['phone'] ?: ($p['user_phone'] ?? '');
+
+                if ($email === '' && $phone === '') {
+                    continue;   // nowhere to send it
+                }
+
+                $checked++;
+
+                try {
+                    Database::run(
+                        'INSERT INTO notification_locks (lock_key) VALUES (:k)',
+                        ['k' => 'meeting:' . $meeting['id'] . ':' . $p['id'] . ':' . $offset]
+                    );
+                } catch (\Throwable) {
+                    continue;   // already told at this offset
+                }
+
+                $queued += self::dispatch('meeting_reminder', [
+                    'entity_type'      => 'meeting',
+                    'entity_id'        => (int) $meeting['id'],
+                    'client_name'      => $p['name'],
+                    'contact_name'     => self::firstName($p['name']),
+                    'email'            => $email,
+                    'phone'            => $phone,
+                    'company'          => Settings::get('company_name', 'Shanfix Technology'),
+                    'company_name'     => Settings::get('company_name', 'Shanfix Technology'),
+                    'company_phone'    => Settings::get('company_phone', ''),
+                    'meeting_title'    => $meeting['title'],
+                    'meeting_date'     => fdate($meeting['scheduled_at']),
+                    'meeting_time'     => date('H:i', strtotime($meeting['scheduled_at'])),
+                    'minutes_to_start' => (string) $offset,
+                    'join_link'        => Meetings::joinUrl($meeting['public_token']),
+                    'link'             => Meetings::joinUrl($meeting['public_token']),
+                ])['queued'];
+            }
+        }
+
+        if ($queued > 0) {
+            ActivityLog::record('meeting_reminder_queued', 'notification', null,
+                $queued . ' meeting reminder(s) queued');
+        }
+
+        return ['queued' => $queued, 'checked' => $checked];
+    }
+
     private static function chase(
         string $event,
         string $lockKey,

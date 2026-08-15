@@ -16,6 +16,11 @@ class Settings
         'kopokopo_api_key',
         'smtp_password',
         'sms_api_key',
+        // The WhatsApp token can send as the company for as long as it is
+        // valid, and the app secret is what proves an incoming webhook
+        // really came from Meta. Both belong under the same protection.
+        'whatsapp_access_token',
+        'whatsapp_app_secret',
     ];
 
     private static function load(): array

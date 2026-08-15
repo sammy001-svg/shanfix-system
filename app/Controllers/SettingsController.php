@@ -398,6 +398,46 @@ class SettingsController extends Controller
             $updates['sms_api_key'] = $smsKey;
         }
 
+        // -- WhatsApp Business Cloud API -------------------------------
+        $waOn = $request->bool('whatsapp_enabled');
+
+        $updates['whatsapp_phone_number_id'] = trim((string) $request->input('whatsapp_phone_number_id', ''));
+        $updates['whatsapp_business_id']     = trim((string) $request->input('whatsapp_business_id', ''));
+        $updates['whatsapp_number_display']  = trim((string) $request->input('whatsapp_number_display', ''));
+
+        // Ours to invent, but Meta will not accept an empty one — generate
+        // a usable value rather than letting someone save a broken setup.
+        $verify = trim((string) $request->input('whatsapp_verify_token', ''));
+        $updates['whatsapp_verify_token'] = $verify !== ''
+            ? $verify
+            : (string) (Settings::get('whatsapp_verify_token', '') ?: bin2hex(random_bytes(12)));
+
+        // Same convention as the other secrets: blank means keep what is
+        // stored, so re-saving the page does not wipe the token.
+        $waToken = trim((string) $request->input('whatsapp_access_token', ''));
+        if ($waToken !== '') {
+            $updates['whatsapp_access_token'] = $waToken;
+        }
+
+        $waSecret = trim((string) $request->input('whatsapp_app_secret', ''));
+        if ($waSecret !== '') {
+            $updates['whatsapp_app_secret'] = $waSecret;
+        }
+
+        // Turning it on without the two things it cannot work without would
+        // leave an inbox that silently fails on every send.
+        if ($waOn) {
+            $haveToken = $waToken !== '' || trim((string) Settings::get('whatsapp_access_token', '')) !== '';
+
+            if ($updates['whatsapp_phone_number_id'] === '' || !$haveToken) {
+                $v->custom('whatsapp_enabled', false,
+                    'A phone number ID and an access token are both required before WhatsApp can be switched on.');
+                $v->redirectBack('/settings?tab=messaging');
+            }
+        }
+
+        $updates['whatsapp_enabled'] = $waOn ? '1' : '0';
+
         // Per-event channel toggles
         foreach (array_keys(\App\Services\Notifier::EVENTS) as $event) {
             $updates["notify_{$event}_email"] = $request->bool("notify_{$event}_email") ? '1' : '0';

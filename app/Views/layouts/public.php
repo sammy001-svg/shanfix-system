@@ -8,6 +8,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<?php
+  // Pages on this layout are no longer read-only — a guest in a meeting
+  // posts notes and signalling from here, and the scripts read the token
+  // from this tag. Without it every such request is rejected as forged.
+?>
+<meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <title><?= e($title ?? 'Document') ?> · <?= e(setting('company_name', 'Shanfix Technology')) ?></title>
 <?= css_tag() ?>
 <link rel="icon" href="<?= asset('img/favicon.svg') ?>" type="image/svg+xml">

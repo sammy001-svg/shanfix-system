@@ -638,6 +638,492 @@
   /* ------------------------------------------------------------------
      Chat
      ------------------------------------------------------------------ */
+  /**
+   * The meeting room: screen sharing, and minutes typed as you go.
+   *
+   * Screen sharing is done browser-to-browser. The server only carries the
+   * introductions — each side's description of itself and the network
+   * routes it can be reached on — because ordinary hosting cannot hold a
+   * socket open. Those introductions go through the same kind of polling
+   * the chat uses.
+   *
+   * One person shares at a time and everyone else watches, which is what a
+   * business meeting actually needs and is far more reliable than everyone
+   * connecting to everyone.
+   */
+  /**
+   * The WhatsApp inbox: send without losing your place, and pick up
+   * replies as they arrive.
+   *
+   * Polls rather than pushes, for the same reason as the chat — nothing
+   * on this hosting can hold a connection open. Five seconds is frequent
+   * enough to feel live for a conversation carried out by typing.
+   */
+  function initWhatsApp() {
+    const box = $('[data-wa-messages]');
+    if (!box) return;
+
+    let last = parseInt(box.dataset.last || '0', 10);
+    const pollUrl = box.dataset.pollUrl;
+
+    function atBottom() {
+      // Only auto-scroll if they are already at the bottom; yanking the
+      // view down while somebody is reading back is worse than a missed
+      // message.
+      return box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    }
+
+    function render(m) {
+      const wrap = document.createElement('div');
+      wrap.className = 'wa__msg wa__msg--' + (m.direction === 'out' ? 'out' : 'in');
+
+      const bubble = document.createElement('div');
+      bubble.className = 'wa__bubble';
+
+      if (m.msg_type !== 'text' && !m.body) {
+        bubble.textContent = m.msg_type.charAt(0).toUpperCase() + m.msg_type.slice(1);
+      } else {
+        bubble.textContent = m.body || '';    // textContent, never innerHTML
+      }
+
+      const meta = document.createElement('span');
+      meta.className = 'wa__meta';
+      const when = (m.wa_timestamp || m.created_at || '').slice(11, 16);
+      meta.textContent = (m.direction === 'out' && m.sender ? m.sender.split(' ')[0] + ' · ' : '') +
+                         when + (m.direction === 'out' ? ' · ' + m.status : '');
+
+      bubble.appendChild(meta);
+
+      if (m.error) {
+        const err = document.createElement('span');
+        err.className = 'wa__error';
+        err.textContent = m.error;
+        bubble.appendChild(err);
+      }
+
+      wrap.appendChild(bubble);
+      box.appendChild(wrap);
+    }
+
+    function poll() {
+      fetch(pollUrl + '?since=' + last, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.ok || !data.messages || !data.messages.length) return;
+
+          const stick = atBottom();
+          data.messages.forEach((m) => { render(m); last = m.id; });
+          if (stick) box.scrollTop = box.scrollHeight;
+        })
+        .catch(() => { /* a dropped poll corrects itself on the next one */ });
+    }
+
+    const form = $('[data-wa-form]');
+
+    if (form) {
+      const input = $('[data-wa-input]', form);
+
+      const send = () => {
+        const body = input.value.trim();
+        if (!body) return;
+
+        const params = new URLSearchParams({ _token: csrf(), body: body });
+        input.value = '';
+        input.style.height = '';
+
+        fetch(form.dataset.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          body: params,
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.ok && data.message) {
+              render(data.message);
+              last = data.message.id;
+              box.scrollTop = box.scrollHeight;
+              return;
+            }
+
+            // Put the text back so nothing is lost to a refusal — most
+            // often the 24-hour window having closed mid-conversation.
+            input.value = body;
+            toast(data.error || 'The message could not be sent.', 'error');
+          })
+          .catch(() => {
+            input.value = body;
+            toast('The message could not be sent.', 'error');
+          });
+      };
+
+      form.addEventListener('submit', (e) => { e.preventDefault(); send(); });
+
+      // Enter sends, Shift+Enter starts a new line — as in WhatsApp itself.
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+      });
+
+      input.addEventListener('input', () => {
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+      });
+    }
+
+    box.scrollTop = box.scrollHeight;
+    setInterval(poll, 5000);
+  }
+
+  function initMeetingRoom() {
+    const cfg = $('[data-room]');
+    if (!cfg) return;
+
+    const base   = cfg.dataset.base;
+    const meName = cfg.dataset.me;
+    const ice    = JSON.parse(cfg.dataset.ice || '[]');
+
+    // Identifies this tab, not this person — somebody may join twice.
+    const myPeer = 'p' + Math.random().toString(36).slice(2, 10);
+
+    const stage      = $('[data-stage-video]');
+    const stageIdle  = $('[data-stage-idle]');
+    const statusEl   = $('[data-status]');
+    const shareBtn   = $('[data-share-screen]');
+    const shareLabel = $('[data-share-label]');
+    const micBtn     = $('[data-toggle-mic]');
+    const micLabel   = $('[data-mic-label]');
+
+    /** peer id -> RTCPeerConnection */
+    const peers = {};
+
+    /**
+     * Everyone we know is in the room, whether or not we have a connection
+     * to them yet.
+     *
+     * Needed because arriving and sharing happen in either order. Someone
+     * who joins before the screen goes up must still be offered it, and
+     * without a roster the presenter has nobody to call.
+     */
+    const known = new Set();
+
+    let localScreen = null;
+    let localMic    = null;
+    let sinceSignal = 0;
+    let sharing     = false;
+
+    function say(msg, tone) {
+      statusEl.textContent = msg || '';
+      statusEl.className = 'room__status' + (tone ? ' room__status--' + tone : '');
+    }
+
+    function post(path, data) {
+      const body = new URLSearchParams(data);
+      body.set('_token', csrf());
+
+      return fetch(base + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        body: body,
+      }).then((r) => r.json()).catch(() => ({ ok: false }));
+    }
+
+    function signal(kind, to, payload) {
+      return post('/signal', {
+        from: myPeer,
+        to: to || '',
+        kind: kind,
+        payload: payload ? JSON.stringify(payload) : '',
+      });
+    }
+
+    /* -- connections ------------------------------------------------- */
+
+    function connectionTo(peerId) {
+      if (peers[peerId]) return peers[peerId];
+
+      const pc = new RTCPeerConnection({ iceServers: ice });
+      peers[peerId] = pc;
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) signal('ice', peerId, e.candidate);
+      };
+
+      // Whatever the other side sends becomes what we show.
+      pc.ontrack = (e) => {
+        stage.srcObject = e.streams[0];
+        stage.hidden = false;
+        stageIdle.hidden = true;
+        say('Watching a shared screen.', 'ok');
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed') {
+          // Almost always both ends behind strict NAT with no relay set up.
+          say('Could not connect directly to the other person. A TURN relay may be needed — see Settings.', 'warn');
+        }
+      };
+
+      // Anything we are already sending goes to a newcomer too.
+      if (localScreen) localScreen.getTracks().forEach((t) => pc.addTrack(t, localScreen));
+      if (localMic)    localMic.getTracks().forEach((t) => pc.addTrack(t, localMic));
+
+      return pc;
+    }
+
+    async function offerTo(peerId) {
+      const pc = connectionTo(peerId);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      signal('offer', peerId, offer);
+    }
+
+    async function handle(sig) {
+      const from = sig.from_peer;
+      let payload = null;
+
+      try { payload = sig.payload ? JSON.parse(sig.payload) : null; } catch (e) { return; }
+
+      if (sig.kind === 'hello') {
+        known.add(from);
+
+        // Answer a room-wide hello so the newcomer learns we are here too.
+        // Only broadcasts get a reply — answering a directed one would have
+        // the two of us greeting each other for ever.
+        if (!sig.to_peer) signal('hello', from, { name: meName });
+
+        // If our screen is already up, they should be seeing it.
+        if (sharing) offerTo(from);
+        return;
+      }
+
+      if (sig.kind === 'offer') {
+        const pc = connectionTo(from);
+        await pc.setRemoteDescription(new RTCSessionDescription(payload));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        signal('answer', from, answer);
+        return;
+      }
+
+      if (sig.kind === 'answer') {
+        const pc = peers[from];
+        if (pc) await pc.setRemoteDescription(new RTCSessionDescription(payload));
+        return;
+      }
+
+      if (sig.kind === 'ice') {
+        const pc = peers[from];
+        // A candidate can arrive before the description it belongs to;
+        // failing here is normal and not worth surfacing.
+        if (pc) { try { await pc.addIceCandidate(payload); } catch (e) { /* ignore */ } }
+        return;
+      }
+
+      if (sig.kind === 'bye') {
+        known.delete(from);
+        if (peers[from]) { peers[from].close(); delete peers[from]; }
+        if (!Object.keys(peers).length) {
+          stage.hidden = true;
+          stageIdle.hidden = false;
+          say('');
+        }
+      }
+    }
+
+    /* -- sharing ------------------------------------------------------ */
+
+    async function startSharing() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        say('This browser cannot share a screen. Chrome, Edge or Firefox can.', 'warn');
+        return;
+      }
+
+      try {
+        localScreen = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      } catch (e) {
+        // Cancelling the picker is a normal thing to do, not an error.
+        say('');
+        return;
+      }
+
+      sharing = true;
+      shareLabel.textContent = 'Stop sharing';
+      shareBtn.classList.add('is-on');
+
+      stage.srcObject = localScreen;
+      stage.muted = true;               // never play your own audio back
+      stage.hidden = false;
+      stageIdle.hidden = true;
+      say('You are sharing your screen.', 'ok');
+
+      // Stopping from the browser's own bar must tidy up here too.
+      localScreen.getVideoTracks()[0].addEventListener('ended', stopSharing);
+
+      // Call everyone already in the room. connectionTo() attaches whatever
+      // we are sending, so the tracks come along with the offer.
+      known.forEach((id) => offerTo(id));
+
+      // And announce ourselves, in case somebody arrived without us hearing.
+      signal('hello', null, { name: meName });
+    }
+
+    function stopSharing() {
+      if (localScreen) {
+        localScreen.getTracks().forEach((t) => t.stop());
+        localScreen = null;
+      }
+
+      sharing = false;
+      shareLabel.textContent = 'Share my screen';
+      shareBtn.classList.remove('is-on');
+      stage.hidden = true;
+      stageIdle.hidden = false;
+      say('');
+      signal('bye', null, {});
+    }
+
+    shareBtn.addEventListener('click', () => (sharing ? stopSharing() : startSharing()));
+
+    micBtn.addEventListener('click', async () => {
+      if (localMic) {
+        localMic.getTracks().forEach((t) => t.stop());
+        localMic = null;
+        micLabel.textContent = 'Turn on microphone';
+        micBtn.setAttribute('aria-pressed', 'false');
+        micBtn.classList.remove('is-on');
+        return;
+      }
+
+      try {
+        localMic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        say('No microphone available, or permission was refused.', 'warn');
+        return;
+      }
+
+      micLabel.textContent = 'Mute microphone';
+      micBtn.setAttribute('aria-pressed', 'true');
+      micBtn.classList.add('is-on');
+
+      Object.keys(peers).forEach((id) => {
+        localMic.getTracks().forEach((t) => peers[id].addTrack(t, localMic));
+        offerTo(id);
+      });
+    });
+
+    /* -- polling ------------------------------------------------------ */
+
+    function pollSignals() {
+      fetch(base + '/signals?peer=' + encodeURIComponent(myPeer) + '&since=' + sinceSignal, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.ok) return;
+          sinceSignal = data.last || sinceSignal;
+          (data.signals || []).forEach(handle);
+        })
+        .catch(() => { /* a dropped poll is not worth reporting */ });
+    }
+
+    let lastNote = parseInt(cfg.dataset.lastNote || '0', 10);
+    const noteBox = $('[data-notes]');
+
+    function renderNote(n) {
+      const wrap = document.createElement('div');
+      wrap.className = 'note note--' + n.kind;
+
+      const meta = document.createElement('div');
+      meta.className = 'note__meta';
+
+      const who = document.createElement('span');
+      who.className = 'note__who';
+      who.textContent = n.author_name;
+
+      const at = document.createElement('span');
+      at.className = 'note__at';
+      at.textContent = (n.created_at || '').slice(11, 16);
+
+      meta.appendChild(who);
+      meta.appendChild(at);
+
+      const body = document.createElement('div');
+      body.className = 'note__body';
+      body.textContent = n.body;          // textContent, never innerHTML
+
+      wrap.appendChild(meta);
+      wrap.appendChild(body);
+      noteBox.appendChild(wrap);
+      noteBox.scrollTop = noteBox.scrollHeight;
+    }
+
+    function pollNotes() {
+      fetch(base + '/notes?since=' + lastNote, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.ok) return;
+          (data.notes || []).forEach((n) => { renderNote(n); lastNote = n.id; });
+        })
+        .catch(() => {});
+    }
+
+    const noteForm = $('[data-note-form]');
+
+    noteForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const body = noteForm.querySelector('[name=body]').value.trim();
+      if (!body) return;
+
+      const kind = (noteForm.querySelector('[name=kind]:checked') || {}).value || 'note';
+
+      post('/notes', { body: body, kind: kind }).then((data) => {
+        if (data.ok && data.note) { renderNote(data.note); lastNote = data.note.id; }
+        noteForm.querySelector('[name=body]').value = '';
+      });
+    });
+
+    // Announce ourselves, then keep listening.
+    signal('hello', null, { name: meName });
+    setInterval(pollSignals, 1500);
+    setInterval(pollNotes, 4000);
+    noteBox.scrollTop = noteBox.scrollHeight;
+
+    // Leaving without saying so leaves everyone else watching a frozen
+    // picture, so tell them on the way out.
+    window.addEventListener('beforeunload', () => {
+      navigator.sendBeacon(
+        base + '/signal',
+        new URLSearchParams({ _token: csrf(), from: myPeer, kind: 'bye', payload: '{}' })
+      );
+    });
+
+    const leave = $('[data-leave]');
+    if (leave) leave.addEventListener('click', (e) => { e.preventDefault(); stopSharing(); window.close(); });
+  }
+
+  /** Another blank row of guest fields on the meeting form. */
+  function initGuestRows() {
+    const btn = $('[data-add-guest]');
+    const box = $('[data-guest-rows]');
+    if (!btn || !box) return;
+
+    btn.addEventListener('click', () => {
+      const row = box.lastElementChild.cloneNode(true);
+      $$('input', row).forEach((i) => { i.value = ''; });
+      box.appendChild(row);
+      row.querySelector('input').focus();
+    });
+  }
+
   function initChat() {
     const panel = $('#chat-panel');
     if (!panel) return;
@@ -941,6 +1427,9 @@
     initJobItems();
     initStkPolling();
     initChat();
+    initMeetingRoom();
+    initWhatsApp();
+    initGuestRows();
     initUnreadPoll();
     initLinkedSelects();
     initRoleMatrix();
