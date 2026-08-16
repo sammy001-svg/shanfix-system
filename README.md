@@ -401,6 +401,40 @@ sending twice.
 
 ---
 
+## Stock and sales
+
+Inventory lines on an invoice move real stock. Add *500 blue pens* to an invoice
+and issue it, and the pen count drops by 500 — with a movement recorded against
+that invoice, so the ledger explains every change.
+
+| When | What happens |
+|---|---|
+| Invoice issued | Stock goes out, cost price captured on the line |
+| Invoice still a draft | Nothing moves — nothing has been sold yet |
+| Issued invoice edited | Everything is put back, then taken out again at the new quantities |
+| Invoice cancelled or deleted | Stock is returned |
+| Quotation or receipt | Never moves stock |
+
+That last row matters: a quotation is an offer, not a sale, and a receipt is a
+copy of an invoice that already moved the goods. Counting either would take the
+same stock out twice.
+
+**Overselling is allowed, not blocked.** If the count says 20 and you invoice 30,
+the sale goes through and the count goes to −10 with a warning. A wrong count
+should not stop you invoicing a customer standing at the counter — but a negative
+number is visible and gets fixed, where a silently blocked sale does not. You are
+also warned when an item drops to its reorder level.
+
+**Cost is captured at the moment of sale**, on the invoice line, not read from the
+item later. Margin worked out next year then uses the price that applied when the
+goods actually left, which is the only figure that means anything.
+
+> Invoices raised **before** this was added are not back-dated. Doing so would
+> double-count against the manual adjustments that were keeping the counts honest
+> until now. Take a stock count when you deploy it and adjust once.
+
+---
+
 ## Roles
 
 | Role | Access |

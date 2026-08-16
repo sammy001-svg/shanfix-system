@@ -106,6 +106,13 @@ class Auth
         'meetings.manage'   => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
         'meetings.delete'   => ['admin', 'manager'],
 
+        // Buying binds the company to a supplier and changes what stock is
+        // valued at, so it sits with the people who answer for the money.
+        'purchases.view'    => ['admin', 'manager', 'finance', 'production'],
+        'purchases.manage'  => ['admin', 'manager', 'finance'],
+        'purchases.receive' => ['admin', 'manager', 'finance', 'production'],
+        'purchases.delete'  => ['admin', 'manager'],
+
         // A campaign texts every client at once and spends real SMS units,
         // so it sits with management rather than with everyone who can send
         // a single message to one client.

@@ -19,6 +19,8 @@ class Numbering
         'client'        => 'client_prefix',
         'job'           => 'job_prefix',
         'delivery_note' => 'delivery_note_prefix',
+        'supplier'      => 'supplier_prefix',
+        'purchase_order'=> 'purchase_order_prefix',
     ];
 
     private const DEFAULTS = [
@@ -31,6 +33,8 @@ class Numbering
         'client'        => 'CL',
         'job'           => 'JOB',
         'delivery_note' => 'DN',
+        'supplier'      => 'SUP',
+        'purchase_order'=> 'PO',
     ];
 
     /**

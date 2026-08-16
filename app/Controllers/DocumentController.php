@@ -12,8 +12,10 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
+use App\Core\Logger;
 use App\Services\DocumentCalculator;
 use App\Services\Notifier;
+use App\Services\StockLedger;
 
 /**
  * Drives quotations, invoices and receipts from one table.
@@ -163,6 +165,12 @@ class DocumentController extends Controller
             self::TYPES[$type]['label'] . ' raised for client #' . $payload['document']['client_id']
         );
 
+        // An invoice created straight as issued sells the goods there and
+        // then. A draft does not: nothing has left the store yet.
+        if ($type === 'invoice' && ($payload['document']['status'] ?? 'draft') !== 'draft') {
+            $this->flashStockWarnings(StockLedger::postQuietly($id));
+        }
+
         Session::success(self::TYPES[$type]['label'] . ' created successfully.');
         Response::to(self::TYPES[$type]['path'] . '/' . $id);
     }
@@ -239,6 +247,19 @@ class DocumentController extends Controller
         });
 
         ActivityLog::record($type . '_updated', 'document', (int) $doc['id'], 'Updated ' . $doc['doc_number']);
+
+        // The lines were rewritten, so whatever stock this invoice took out
+        // no longer matches what it is selling. Put it all back and take out
+        // the new quantities.
+        if ($type === 'invoice' && $doc['stock_posted_at'] !== null) {
+            try {
+                $this->flashStockWarnings(StockLedger::repostForDocument((int) $doc['id'])['warnings']);
+            } catch (\Throwable $e) {
+                Logger::error('Stock repost failed: ' . $e->getMessage(), ['document' => $doc['id']]);
+                Session::warning('Stock could not be re-checked for this invoice — check the inventory ledger.');
+            }
+        }
+
         Session::success($doc['doc_number'] . ' updated.');
         Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
     }
@@ -379,6 +400,17 @@ class DocumentController extends Controller
         }
 
         Database::update('documents', $update, ['id' => $doc['id']]);
+
+        // Issuing an invoice is the moment the goods are sold; cancelling it
+        // puts them back. Both are no-ops if the stock state already matches,
+        // so a repeated status change cannot double-count.
+        if ($type === 'invoice') {
+            if ($status === 'cancelled') {
+                StockLedger::reverseQuietly((int) $doc['id']);
+            } elseif ($doc['status'] === 'draft' || $doc['status'] === 'cancelled') {
+                $this->flashStockWarnings(StockLedger::postQuietly((int) $doc['id']));
+            }
+        }
 
         ActivityLog::record(
             $type . '_status_changed',
@@ -665,10 +697,15 @@ class DocumentController extends Controller
         // Anything with money against it is cancelled, not erased.
         if ((float) $doc['amount_paid'] > 0) {
             Database::update('documents', ['status' => 'cancelled'], ['id' => $doc['id']]);
+            StockLedger::reverseQuietly((int) $doc['id']);
             ActivityLog::record($type . '_cancelled', 'document', (int) $doc['id'], 'Cancelled ' . $doc['doc_number']);
             Session::warning($doc['doc_number'] . ' has payments recorded, so it was cancelled instead of deleted.');
             Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
         }
+
+        // Before the row goes: the ledger looks the document up by id, and
+        // stock put back after deletion would have nothing to reverse.
+        StockLedger::reverseQuietly((int) $doc['id']);
 
         Database::delete('documents', ['id' => $doc['id']]);
         ActivityLog::record($type . '_deleted', 'document', (int) $doc['id'], 'Deleted ' . $doc['doc_number']);
@@ -677,6 +714,23 @@ class DocumentController extends Controller
     }
 
     // -- Internals -----------------------------------------------------
+
+    /**
+     * Surface stock consequences without burying the main message.
+     *
+     * A count going negative or hitting its reorder level is something the
+     * operator needs to see, but it must not look like the invoice failed.
+     */
+    private function flashStockWarnings(array $warnings): void
+    {
+        foreach (array_slice($warnings, 0, 5) as $warning) {
+            Session::warning($warning);
+        }
+
+        if (count($warnings) > 5) {
+            Session::warning((count($warnings) - 5) . ' more stock warning(s) — see the inventory list.');
+        }
+    }
 
     private function assertType(string $type): void
     {
