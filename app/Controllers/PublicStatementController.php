@@ -22,11 +22,15 @@ class PublicStatementController extends Controller
     {
         $client = $this->findByToken((string) $request->param('token'));
 
-        Database::update(
-            'clients',
-            ['statement_sent_at' => $client['statement_sent_at'] ?: date('Y-m-d H:i:s')],
-            ['id' => $client['id']]
-        );
+        // First open only — this records that the client saw it, which is a
+        // different fact from us having sent it.
+        if (empty($client['statement_viewed_at'])) {
+            Database::update(
+                'clients',
+                ['statement_viewed_at' => date('Y-m-d H:i:s')],
+                ['id' => $client['id']]
+            );
+        }
 
         $this->view('clients/statement', [
             'title'     => 'Statement · ' . $client['name'],

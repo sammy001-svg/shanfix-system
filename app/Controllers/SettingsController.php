@@ -381,6 +381,8 @@ class SettingsController extends Controller
             'notify_overdue_days' => $days !== '' ? preg_replace('/\s+/', '', $days) : '1,7,14',
             'notify_due_days'     => $lookAhead['notify_due_days'],
             'notify_expiry_days'  => $lookAhead['notify_expiry_days'],
+            // Capped at 28: a statement day of 30 would skip February.
+            'notify_statement_day' => max(0, min(28, $request->int('notify_statement_day', 1))),
             'notify_send_window'  => $window,
             'notify_max_attempts' => max(1, min(10, $request->int('notify_max_attempts', 3))),
 

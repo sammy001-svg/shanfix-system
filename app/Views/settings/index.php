@@ -751,6 +751,18 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           </div>
 
           <div class="field">
+            <label class="label" for="notify_statement_day">Send statements on day</label>
+            <input class="input <?= isset($errors['notify_statement_day']) ? 'has-error' : '' ?>"
+                   type="number" min="0" max="28" id="notify_statement_day" name="notify_statement_day"
+                   value="<?= e(setting('notify_statement_day', '1')) ?>">
+            <span class="field-hint">
+              Day of the month to send every client with a balance their statement.
+              0 turns it off. Capped at 28 so every month has that day.
+            </span>
+            <?= error_for($errors ?? [], 'notify_statement_day') ?>
+          </div>
+
+          <div class="field">
             <label class="label" for="notify_expiry_days">Chase a quotation before it expires</label>
             <input class="input <?= isset($errors['notify_expiry_days']) ? 'has-error' : '' ?>"
                    id="notify_expiry_days" name="notify_expiry_days"

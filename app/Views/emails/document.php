@@ -19,10 +19,11 @@ $muted = '#5A6B7D';
 $line  = '#DDE4EC';
 $bg    = '#F3F6F9';
 
-$doc      = $context['document'] ?? null;
-$job      = $context['job'] ?? null;
-$delivery = $context['delivery'] ?? null;
-$link     = $context['link'] ?? '';
+$doc       = $context['document'] ?? null;
+$job       = $context['job'] ?? null;
+$delivery  = $context['delivery'] ?? null;
+$statement = $context['statement'] ?? null;
+$link      = $context['link'] ?? '';
 
 $isOverdue = in_array($event, ['invoice_overdue', 'payment_reminder', 'quotation_expiring'], true);
 $isPaid    = in_array($event, ['payment_received', 'receipt_issued'], true);
@@ -278,6 +279,58 @@ if ($doc && !empty($doc['id'])) {
 
         $rows = array_filter($rows, static fn($v): bool => trim((string) $v) !== '');
         ?>
+
+        <?php if ($statement !== null): ?>
+          <!-- Statement: the balance, then how overdue it is. Enough for the
+               client to act on without opening the link. -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="border:1px solid <?= $line ?>;border-radius:6px;margin-bottom:20px">
+          <tr>
+            <td style="padding:16px;text-align:center">
+              <div style="font-size:12px;color:<?= $muted ?>;text-transform:uppercase;letter-spacing:1px">
+                Balance outstanding
+              </div>
+              <div style="font-size:26px;font-weight:bold;padding-top:4px;color:<?= (float) ($context['balance_raw'] ?? 0) > 0.004 ? '#A62A20' : $green ?>">
+                <?= e($context['balance'] ?? '') ?>
+              </div>
+              <?php if (!empty($context['invoice_count']) && (int) $context['invoice_count'] > 0): ?>
+                <div style="font-size:12px;color:<?= $muted ?>;padding-top:5px">
+                  across <?= e($context['invoice_count']) ?> unpaid invoice<?= (int) $context['invoice_count'] === 1 ? '' : 's' ?>
+                  <?php if (!empty($context['oldest_days'])): ?>
+                    · oldest <?= e($context['oldest_days'])?>
+                  <?php endif; ?>
+                </div>
+              <?php endif; ?>
+            </td>
+          </tr>
+          </table>
+
+          <?php
+          $ageing = $statement['ageing'] ?? [];
+          $labels = ['current' => 'Not due', '1_30' => '1–30 d', '31_60' => '31–60 d',
+                     '61_90' => '61–90 d', '90_plus' => '90+ d'];
+          $shown  = array_filter($labels, static fn($k) => (float) ($ageing[$k] ?? 0) > 0.004, ARRAY_FILTER_USE_KEY);
+          ?>
+          <?php if (count($shown) > 1): ?>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                   style="border-collapse:collapse;margin-bottom:20px;font-size:12px">
+              <tr>
+                <?php foreach ($shown as $key => $label): ?>
+                  <th style="background:<?= $navy ?>;color:#fff;padding:7px 6px;font-weight:normal">
+                    <?= e($label) ?>
+                  </th>
+                <?php endforeach; ?>
+              </tr>
+              <tr>
+                <?php foreach ($shown as $key => $label): ?>
+                  <td align="center" style="padding:9px 6px;border:1px solid <?= $line ?>;<?= $key === '90_plus' ? 'color:#A62A20;font-weight:bold' : '' ?>">
+                    <?= e(money($ageing[$key], false)) ?>
+                  </td>
+                <?php endforeach; ?>
+              </tr>
+            </table>
+          <?php endif; ?>
+        <?php endif; ?>
 
         <?php if ($rows !== []): ?>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"

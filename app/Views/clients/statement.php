@@ -60,14 +60,57 @@ $buckets = [
 
 <?php if (!$isPublic && $shareLink !== ''): ?>
   <div class="print-bar no-print" style="margin-bottom:14px">
-    <div class="alert alert--info mb-0" style="width:100%">
-      <?= icon('info') ?>
-      <div class="alert__body text-sm">
-        <strong>Share this statement:</strong>
-        <input class="input" style="margin-top:6px;font-size:12.5px"
+    <div class="card mb-0" style="width:100%">
+      <div class="card__body">
+        <div class="text-xs uppercase fw-700 text-muted mb-8">Send this statement</div>
+
+        <?php if (can('documents.manage')): ?>
+          <form method="post" action="<?= url('/clients/' . $client['id'] . '/statement/send') ?>"
+                class="flex gap-12 items-center flex-wrap">
+            <?= csrf_field() ?>
+
+            <label class="check">
+              <input type="checkbox" name="channels[]" value="email" checked
+                     <?= empty($client['email']) ? 'disabled' : '' ?>>
+              <span class="check__text">
+                <span>Email<?= empty($client['email']) ? ' — no address on file' : '' ?></span>
+              </span>
+            </label>
+
+            <label class="check">
+              <input type="checkbox" name="channels[]" value="sms"
+                     <?= empty($client['phone']) ? 'disabled' : '' ?>>
+              <span class="check__text">
+                <span>SMS<?= empty($client['phone']) ? ' — no number on file' : '' ?></span>
+              </span>
+            </label>
+
+            <button class="btn btn--primary btn--sm" type="submit"
+                    <?= empty($client['email']) && empty($client['phone']) ? 'disabled' : '' ?>>
+              <?= icon('send') ?> Send now
+            </button>
+
+            <?php if (!empty($client['statement_sent_at'])): ?>
+              <span class="text-xs text-muted">
+                Last sent <?= e(time_ago($client['statement_sent_at'])) ?>
+              </span>
+            <?php endif; ?>
+            <?php if (!empty($client['statement_viewed_at'])): ?>
+              <span class="text-xs text-muted">
+                · client opened it <?= e(time_ago($client['statement_viewed_at'])) ?>
+              </span>
+            <?php endif; ?>
+          </form>
+          <hr>
+        <?php endif; ?>
+
+        <label class="label" for="share-link">Or copy the link</label>
+        <input class="input" id="share-link" style="font-size:12.5px"
                value="<?= e($shareLink) ?>" readonly onfocus="this.select()">
-        Anyone with the link can view this client's account, so send it only
-        to them.
+        <span class="field-hint">
+          Anyone holding this link can see this client's whole account — send it
+          only to them.
+        </span>
       </div>
     </div>
   </div>

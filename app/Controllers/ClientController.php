@@ -396,6 +396,76 @@ class ClientController extends Controller
         ], 'print');
     }
 
+    /**
+     * Send this client their statement now.
+     *
+     * An operator pressing send overrides the per-event switches, but only
+     * on the channels they ticked — same rule as sending a document.
+     */
+    public function sendStatement(Request $request): void
+    {
+        $this->authorize('documents.manage');
+
+        $client    = $this->findOrFail($request->paramInt('id'));
+        $statement = Statement::build($client, null, date('Y-m-d'));
+
+        $channels = array_values(array_intersect(
+            $request->array('channels') ?: ['email'],
+            ['email', 'sms']
+        ));
+
+        if ($channels === []) {
+            Session::error('Choose at least one way to send it.');
+            Response::back('/clients/' . $client['id'] . '/statement');
+        }
+
+        $result = Notifier::dispatch(
+            'statement_sent',
+            Notifier::statementContext($client, $statement),
+            true,
+            $channels
+        );
+
+        if ($result['queued'] === 0) {
+            foreach ($result['skipped'] as $reason) {
+                Session::error($reason);
+            }
+            if ($result['skipped'] === []) {
+                Session::error('Nothing could be queued for sending.');
+            }
+            Response::back('/clients/' . $client['id'] . '/statement');
+        }
+
+        $send = Notifier::processQueue(10);
+
+        if ($send['sent'] > 0) {
+            Database::update(
+                'clients',
+                ['statement_sent_at' => date('Y-m-d H:i:s')],
+                ['id' => $client['id']]
+            );
+
+            ActivityLog::record(
+                'statement_sent',
+                'client',
+                (int) $client['id'],
+                'Statement sent to ' . $client['name']
+            );
+
+            Session::success($send['sent'] . ' message(s) sent to ' . $client['name'] . '.');
+        }
+
+        if ($send['failed'] > 0) {
+            Session::error('Some messages failed — check the message log.');
+        }
+
+        foreach ($result['skipped'] as $reason) {
+            Session::warning($reason);
+        }
+
+        Response::to('/clients/' . $client['id'] . '/statement');
+    }
+
     /** A yyyy-mm-dd query value, or null when absent or malformed. */
     private function dateInput(mixed $value): ?string
     {

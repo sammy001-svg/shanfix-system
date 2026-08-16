@@ -379,6 +379,26 @@ Drafts and cancelled invoices never appear, and receipts are left out
 deliberately — a receipt acknowledges a payment that is already on the statement
 as a credit, so including it would show the money twice.
 
+### Sending statements
+
+**Send now** on the statement page emails or texts it, on whichever channels you
+tick. The message carries the balance and the ageing breakdown, so the client can
+see where they stand without opening anything — the link is there for the detail.
+The page shows when you last sent it and whether the client has opened it.
+
+For the monthly run, set **Statement day** in Settings → Email &amp; SMS. On that
+day of each month, every active client carrying a balance is sent their statement
+automatically. Set it to `0` to switch the run off.
+
+Each client is sent one statement per calendar month. The lock is keyed by month
+rather than by date, so if cron misses its day — server down, or outside the
+sending window — it catches up on the next run instead of skipping the month or
+sending twice.
+
+> SMS is off by default for statements while email is on, since a statement is a
+> document rather than a one-line alert. Turn SMS on per event in Settings if you
+> want the balance texted too.
+
 ---
 
 ## Roles

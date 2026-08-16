@@ -307,6 +307,9 @@ $r->group(['auth'], function ($r) {
         $r->post('/clients/{id}', [ClientController::class, 'update']);
     });
 
+    $r->post('/clients/{id}/statement/send', [ClientController::class, 'sendStatement'],
+             ['permission:documents.manage', 'csrf']);
+
     $r->post('/clients/{id}/delete', [ClientController::class, 'destroy'], ['permission:clients.delete', 'csrf']);
 
     // -- Quotations, invoices, receipts

@@ -39,6 +39,9 @@ class Notifier
         // Delivery
         'delivery_dispatched' => 'Delivery dispatched — on the way',
         'delivery_confirmed'  => 'Delivery received and signed for',
+
+        // Account
+        'statement_sent'      => 'Statement of account',
     ];
 
     /**
@@ -384,6 +387,50 @@ class Notifier
         ];
     }
 
+    /**
+     * Context for a statement of account.
+     *
+     * @param array $client    clients row, including its public_token
+     * @param array $statement the built statement, for the figures
+     */
+    public static function statementContext(array $client, array $statement): array
+    {
+        $token   = Statement::ensureToken((int) $client['id'], $client['public_token'] ?? null);
+        $ageing  = $statement['ageing'] ?? [];
+        $overdue = array_sum($ageing) - (float) ($ageing['current'] ?? 0);
+
+        // The oldest bucket carrying anything, in words a client understands.
+        $oldest = '';
+        foreach (['90_plus' => 'over 90 days', '61_90' => 'over 60 days',
+                  '31_60' => 'over 30 days', '1_30' => 'up to 30 days'] as $key => $label) {
+            if ((float) ($ageing[$key] ?? 0) > 0.004) {
+                $oldest = $label;
+                break;
+            }
+        }
+
+        return [
+            'entity_type'     => 'client',
+            'entity_id'       => (int) $client['id'],
+            'client_id'       => (int) $client['id'],
+            'client_name'     => $client['name'] ?? '',
+            'contact_name'    => self::firstName($client['contact_person'] ?? ($client['name'] ?? '')),
+            'email'           => $client['email'] ?? '',
+            'phone'           => $client['phone'] ?? '',
+            'company_name'    => Settings::get('company_name', 'Shanfix Technology'),
+            'company_phone'   => Settings::get('company_phone', ''),
+            'balance'         => money($statement['closing'] ?? 0),
+            'balance_raw'     => (float) ($statement['closing'] ?? 0),
+            'overdue'         => money($overdue),
+            'oldest_days'     => $oldest,
+            'invoice_count'   => (string) count($statement['open_invoices'] ?? []),
+            'statement_month' => date('F Y'),
+            'link'            => self::absoluteUrl('/statement/' . $token),
+            'short_link'      => self::absoluteUrl('/s/' . substr($token, 0, self::SHORT_TOKEN_LENGTH)),
+            'statement'       => $statement,
+        ];
+    }
+
     /** Whole days from today until $date; null when there is no date. */
     private static function daysUntil(?string $date): string
     {
@@ -607,6 +654,85 @@ class Notifier
                AND DATEDIFF(d.valid_until, CURDATE()) = :days",
             'days_to_expiry'
         );
+    }
+
+    /**
+     * Monthly statements to everyone carrying a balance.
+     *
+     * Runs on one configured day of the month. The lock is keyed by month
+     * rather than by date, so a cron that misses its day — server down,
+     * outside the sending window — still catches up on the next run
+     * without sending twice to anyone who already had theirs.
+     *
+     * @return array{queued:int, checked:int}
+     */
+    public static function queueStatements(): array
+    {
+        $day = Settings::int('notify_statement_day', 0);
+
+        if ($day < 1 || $day > 28) {
+            return ['queued' => 0, 'checked' => 0];   // 0 or nonsense = switched off
+        }
+
+        // Only from the chosen day onwards, so an early run does nothing.
+        if ((int) date('j') < $day) {
+            return ['queued' => 0, 'checked' => 0];
+        }
+
+        if (!Settings::bool('notify_statement_sent_email')
+            && !Settings::bool('notify_statement_sent_sms')) {
+            return ['queued' => 0, 'checked' => 0];
+        }
+
+        $clients = Database::all(
+            "SELECT c.* FROM clients c
+              WHERE c.status = 'active'
+                AND EXISTS (SELECT 1 FROM documents d
+                             WHERE d.client_id = c.id
+                               AND d.doc_type = 'invoice'
+                               AND d.status NOT IN ('cancelled','paid','draft')
+                               AND d.balance > 0.004)"
+        );
+
+        $queued  = 0;
+        $checked = 0;
+        $month   = date('Y-m');
+
+        foreach ($clients as $client) {
+            $checked++;
+
+            try {
+                Database::run(
+                    'INSERT INTO notification_locks (lock_key) VALUES (:k)',
+                    ['k' => 'statement:' . $client['id'] . ':' . $month]
+                );
+            } catch (\Throwable) {
+                continue;   // already had this month's statement
+            }
+
+            $statement = Statement::build($client, null, date('Y-m-d'));
+            $result    = self::dispatch('statement_sent', self::statementContext($client, $statement));
+
+            if ($result['queued'] > 0) {
+                $queued += $result['queued'];
+                Database::update(
+                    'clients',
+                    ['statement_sent_at' => date('Y-m-d H:i:s')],
+                    ['id' => $client['id']]
+                );
+            }
+        }
+
+        if ($queued > 0) {
+            ActivityLog::record(
+                'statements_queued',
+                'notification',
+                null,
+                $queued . ' statement message(s) queued for ' . date('F Y')
+            );
+        }
+
+        return ['queued' => $queued, 'checked' => $checked];
     }
 
     /**
