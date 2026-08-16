@@ -106,6 +106,12 @@ class JobFileController extends Controller
             throw new HttpException(404, 'That file does not exist.');
         }
 
+        // Recording a client decision is queueable offline. A replay must not
+        // log the approval twice or bounce the job between stages. Guarded
+        // here rather than at the top so the redirect knows which job to
+        // return to — the lookup above is a read and safe to repeat.
+        $this->guardReplay($request, '/jobs/' . $file['job_id']);
+
         $feedback = trim((string) $request->input('client_feedback', ''));
 
         if ($decision === 'rejected' && $feedback === '') {

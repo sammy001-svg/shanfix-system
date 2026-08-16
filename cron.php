@@ -215,6 +215,12 @@ try {
     // -----------------------------------------------------------------
     Database::run('DELETE FROM notification_locks WHERE created_at < DATE_SUB(NOW(), INTERVAL 120 DAY)');
 
+    // Offline replay guards are only useful while a replay is still possible.
+    $prunedKeys = \App\Core\Idempotency::prune();
+    if ($prunedKeys > 0) {
+        say("Pruned {$prunedKeys} expired offline key(s)");
+    }
+
     // Keep the queue table from growing without bound.
     $pruned = Database::run(
         "DELETE FROM notifications

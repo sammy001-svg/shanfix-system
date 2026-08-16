@@ -2983,3 +2983,76 @@ a.card:active { transform: translateY(-1px) scale(.998); }
   .wa__threads { max-height: 240px; }
   .wa__messages { max-height: 420px; }
 }
+
+/* =====================================================================
+   Offline / PWA
+   ---------------------------------------------------------------------
+   A persistent strip while the connection is down or changes are still
+   waiting to sync, plus transient toasts confirming what was saved.
+   ===================================================================== */
+
+.offline-bar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 900;
+  padding: 9px 16px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--slate-600);
+  transform: translateY(100%);
+  transition: transform .22s ease;
+}
+
+.offline-bar.is-visible { transform: translateY(0); }
+.offline-bar.is-offline { background: #8A5A00; }
+.offline-bar.is-syncing { background: var(--green-600, #0F6B3E); }
+
+/* Clear of the strip so it never covers the last row of a table. The class
+   goes on <body>: the bar is appended after .layout, so a sibling selector
+   could never reach back to it. */
+body.has-offline-bar .content { padding-bottom: 56px; }
+
+.offline-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 64px;
+  z-index: 950;
+  transform: translate(-50%, 12px);
+  opacity: 0;
+  max-width: min(92vw, 460px);
+  padding: 11px 16px;
+  border-radius: var(--r);
+  background: var(--navy-900, #0C2B4A);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .28);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.offline-toast.is-in { opacity: 1; transform: translate(-50%, 0); }
+.offline-toast--queued { background: #8A5A00; }
+.offline-toast--error  { background: #A62A20; }
+.offline-toast--ok     { background: #0F6B3E; }
+
+/* An action that cannot work without a connection. */
+.needs-online[data-offline-blocked="1"] {
+  opacity: .55;
+  pointer-events: none;
+}
+
+.offline-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: var(--surface-2);
+}
+
+.offline-page__card { width: 100%; max-width: 460px; }
+
+@media print {
+  .offline-bar, .offline-toast { display: none !important; }
+}

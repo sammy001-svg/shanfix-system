@@ -20,6 +20,28 @@ abstract class Controller
     }
 
     /**
+     * Stop a replayed offline action from being applied twice.
+     *
+     * Call this first in any action a device is allowed to queue offline.
+     * On a replay it redirects with a neutral message instead of running
+     * again — the work is already done, and the user does not need to know
+     * their device sent it twice.
+     */
+    protected function guardReplay(Request $request, string $redirectTo): void
+    {
+        $key = $request->input('_idem') ?? ($_SERVER['HTTP_X_IDEMPOTENCY_KEY'] ?? null);
+
+        $route = parse_url($request->uri, PHP_URL_PATH) ?: $request->uri;
+
+        if (Idempotency::claim(is_string($key) ? $key : null, $route)) {
+            return;
+        }
+
+        Session::info('That change was already saved.');
+        Response::to($redirectTo);
+    }
+
+    /**
      * Build a LIMIT/OFFSET pager.
      *
      * @return array{page:int, perPage:int, offset:int, total:int, pages:int}

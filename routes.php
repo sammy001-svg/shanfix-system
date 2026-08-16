@@ -28,6 +28,7 @@ use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
 use App\Controllers\PublicProofController;
+use App\Controllers\PwaController;
 use App\Controllers\ReminderController;
 use App\Controllers\ReportController;
 use App\Controllers\ServiceController;
@@ -57,6 +58,23 @@ $r->post('/webhooks/kopokopo', [PaymentController::class, 'kopokopoCallback']);
 // is Meta, and what proves it is the signature on the body.
 $r->get('/webhooks/whatsapp',  [WhatsAppWebhookController::class, 'verify']);
 $r->post('/webhooks/whatsapp', [WhatsAppWebhookController::class, 'receive']);
+
+// ---------------------------------------------------------------------
+// Installable app
+//
+// Served by PHP, not as files under assets/. A service worker may only
+// control paths below its own URL, so it has to answer from the root —
+// and the flat cPanel build moves the document root, which a static file
+// would not survive.
+// ---------------------------------------------------------------------
+$r->get('/manifest.webmanifest', [PwaController::class, 'manifest']);
+$r->get('/sw.js',                [PwaController::class, 'serviceWorker']);
+$r->get('/icon-{size}.png',      [PwaController::class, 'icon']);
+$r->get('/offline',              [PwaController::class, 'offline']);
+
+// What to keep for offline reading. Needs a session — it is about this
+// user's own work.
+$r->get('/offline/precache', [PwaController::class, 'precache'], ['auth']);
 
 // Client-facing document view. No login: the 48-char token is the credential.
 $r->get('/view/{token}', [PublicDocumentController::class, 'show']);

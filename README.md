@@ -274,6 +274,55 @@ rather than asking the client to approve something that does not exist.
 
 ---
 
+## Installing it as an app
+
+The system is a PWA, so it installs on a phone, tablet or desktop and opens in
+its own window with no browser chrome.
+
+| Device | How |
+|---|---|
+| Android / Chrome | Menu → **Install app** (or the prompt that appears) |
+| iPhone / iPad | Share → **Add to Home Screen** |
+| Windows / Mac | The install icon in the address bar |
+
+The launcher icon is generated from your uploaded logo, so it carries your own
+branding with nothing extra to upload. **This needs HTTPS** — browsers refuse to
+install a PWA or run a service worker over plain HTTP.
+
+### Working offline
+
+Pages you have opened stay readable with no signal, and the system pre-loads your
+open jobs and recent clients when you sign in, so the job cards you need on the
+shop floor are there even if you have not opened them that day.
+
+A strip along the bottom tells you the connection is down and how many changes
+are waiting on the device.
+
+**What you can do offline:**
+
+- Move a job between production stages
+- Tick items off the production checklist
+- Add notes to a job
+- Record a client's proof decision
+
+Each one is saved on the device and sent automatically the moment you are back on
+the network — you do not have to remember to do anything.
+
+**What still needs a connection:** anything that touches money or allocates a
+document number — payments, invoices, quotations, receipts and delivery notes.
+This is deliberate. Those actions take the next number in a sequence and move an
+invoice balance, so two devices working offline would both claim the same invoice
+number and a replayed payment could be banked twice. They stay online-only rather
+than risk your books.
+
+> **Shared devices:** signing out clears the cached pages and any unsent changes
+> from that device. Sync before you hand the tablet over.
+
+If a queued change cannot be sent — the job was deleted while you were offline,
+say — it is discarded and you are told, rather than retried silently forever.
+
+---
+
 ## Roles
 
 | Role | Access |

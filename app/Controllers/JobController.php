@@ -474,6 +474,10 @@ class JobController extends Controller
     {
         $this->authorize('jobs.manage');
 
+        // Queueable offline, so a replay must not move the job twice or
+        // fire the client notification again.
+        $this->guardReplay($request, '/jobs/' . $request->paramInt('id'));
+
         $job   = $this->findOrFail($request->paramInt('id'));
         $stage = (string) $request->input('stage', '');
 
@@ -643,6 +647,10 @@ class JobController extends Controller
 
         $itemId = $request->paramInt('itemId');
 
+        // This one flips state rather than setting it, so a replay would
+        // untick what the user ticked. The guard matters most here.
+        $this->guardReplay($request, '/jobs/' . $request->paramInt('id'));
+
         $item = Database::first(
             'SELECT ji.*, j.job_number FROM job_items ji
                JOIN jobs j ON j.id = ji.job_id WHERE ji.id = :id',
@@ -667,6 +675,9 @@ class JobController extends Controller
     public function addNote(Request $request): void
     {
         $this->authorize('jobs.manage');
+
+        // Queueable offline; a replay would post the same note twice.
+        $this->guardReplay($request, '/jobs/' . $request->paramInt('id'));
 
         $job  = $this->findOrFail($request->paramInt('id'));
         $note = trim((string) $request->input('notes', ''));

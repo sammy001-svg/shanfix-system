@@ -154,7 +154,8 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
                 <tr>
                   <td>
                     <?php if (can('jobs.manage') && !$isClosed): ?>
-                      <form method="post" action="<?= url('/jobs/' . $job['id'] . '/items/' . $item['id'] . '/toggle') ?>">
+                      <form method="post" action="<?= url('/jobs/' . $job['id'] . '/items/' . $item['id'] . '/toggle') ?>"
+                            data-offline data-offline-label="Checklist tick">
                         <?= csrf_field() ?>
                         <button class="btn <?= $item['is_done'] ? 'btn--primary' : 'btn--outline' ?> btn--sm btn--icon"
                                 type="submit" title="<?= $item['is_done'] ? 'Mark not done' : 'Mark done' ?>">
@@ -406,7 +407,8 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
       <div class="card">
         <div class="card__head"><div class="card__title">Move the job on</div></div>
         <div class="card__body">
-          <form method="post" action="<?= url('/jobs/' . $job['id'] . '/stage') ?>">
+          <form method="post" action="<?= url('/jobs/' . $job['id'] . '/stage') ?>"
+                data-offline data-offline-label="Stage move">
             <?= csrf_field() ?>
 
             <div class="field mb-12">
@@ -682,7 +684,8 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
 
 <div class="modal-backdrop" id="note-modal">
   <div class="modal modal--sm">
-    <form method="post" action="<?= url('/jobs/' . $job['id'] . '/note') ?>">
+    <form method="post" action="<?= url('/jobs/' . $job['id'] . '/note') ?>"
+          data-offline data-offline-label="Job note">
       <?= csrf_field() ?>
       <div class="modal__head">
         <div class="modal__title">Add a note</div>

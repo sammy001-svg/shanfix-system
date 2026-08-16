@@ -72,6 +72,18 @@ if ($me && can('jobs.view')) {
 </script>
 <?= css_tag() ?>
 <link rel="icon" href="<?= asset('img/favicon.svg') ?>" type="image/svg+xml">
+
+<?php // Installable app. The base path lets offline.js build URLs that work
+      // whether the app sits at the domain root or in a sub-folder. ?>
+<meta name="app-base" content="<?= e(base_path()) ?>">
+<meta name="theme-color" content="#0C2B4A">
+<link rel="manifest" href="<?= url('manifest.webmanifest') ?>">
+
+<?php // iOS ignores the manifest and wants its own tags. ?>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="<?= e(setting('company_name', 'Shanfix')) ?>">
+<link rel="apple-touch-icon" href="<?= url('icon-192.png') ?>">
 </head>
 <body>
 
@@ -302,5 +314,6 @@ if ($me && can('jobs.view')) {
 </div>
 
 <?= js_tag() ?>
+<?= js_tag('js/offline.js') ?>
 </body>
 </html>
