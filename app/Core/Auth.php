@@ -106,6 +106,11 @@ class Auth
         'meetings.manage'   => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
         'meetings.delete'   => ['admin', 'manager'],
 
+        // A campaign texts every client at once and spends real SMS units,
+        // so it sits with management rather than with everyone who can send
+        // a single message to one client.
+        'sms.campaign'      => ['admin', 'manager'],
+
         'users.view'        => ['admin'],
         'users.manage'      => ['admin'],
         'settings.manage'   => ['admin'],
