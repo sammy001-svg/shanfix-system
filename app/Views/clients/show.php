@@ -31,6 +31,9 @@ $docPath = static fn(string $type): string => match ($type) {
   </div>
 
   <div class="page-head__actions">
+    <a class="btn btn--outline" href="<?= url('/clients/' . $client['id'] . '/statement') ?>">
+      <?= icon('file-text') ?> Statement
+    </a>
     <?php if (can('documents.manage')): ?>
       <a class="btn btn--outline" href="<?= url('/quotations/create?client_id=' . $client['id']) ?>">
         <?= icon('file-text') ?> New quotation

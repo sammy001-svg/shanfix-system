@@ -28,6 +28,7 @@ use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
 use App\Controllers\PublicProofController;
+use App\Controllers\PublicStatementController;
 use App\Controllers\PwaController;
 use App\Controllers\ReminderController;
 use App\Controllers\ReportController;
@@ -112,6 +113,10 @@ $r->post('/proof/{token}/decide',  [PublicProofController::class, 'decide'], ['c
 
 // Short form for SMS.
 $r->get('/p/{token}', [PublicProofController::class, 'show']);
+
+// A client's own statement of account, on the same token model.
+$r->get('/statement/{token}', [PublicStatementController::class, 'show']);
+$r->get('/s/{token}',         [PublicStatementController::class, 'show']);
 
 // The company logo, served without a login.
 //
@@ -292,8 +297,9 @@ $r->group(['auth'], function ($r) {
         $r->get('/clients',           [ClientController::class, 'index']);
         $r->get('/clients/export',    [ClientController::class, 'export']);
         $r->get('/clients/create',    [ClientController::class, 'create']);
-        $r->get('/clients/{id}',      [ClientController::class, 'show']);
-        $r->get('/clients/{id}/edit', [ClientController::class, 'edit']);
+        $r->get('/clients/{id}',           [ClientController::class, 'show']);
+        $r->get('/clients/{id}/statement', [ClientController::class, 'statement']);
+        $r->get('/clients/{id}/edit',      [ClientController::class, 'edit']);
     });
 
     $r->group(['permission:clients.manage', 'csrf'], function ($r) {

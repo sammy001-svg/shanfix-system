@@ -349,6 +349,38 @@ say — it is discarded and you are told, rather than retried silently forever.
 
 ---
 
+## Statements of account
+
+**Statement** on any client page shows their whole account: every invoice raised
+and every payment received in date order, with a running balance, and an ageing
+summary of what is still owed.
+
+| Bucket | Meaning |
+|---|---|
+| Not yet due | Invoiced, but the due date has not passed |
+| 1 – 30 days | Just overdue — usually a reminder is enough |
+| 31 – 60 days | Needs chasing |
+| 61 – 90 days | Needs a phone call |
+| Over 90 days | Highlighted in red; treat as at risk |
+
+An invoice with no due date ages from its issue date — no terms means due on
+issue, not "never overdue".
+
+Print it, or press **Client link** to get a share link the client opens with no
+login, exactly like a shared invoice. The link shows their full history and is
+generated the first time you open the statement, so a client you have never sent
+one to has no link that could leak.
+
+Narrow the period with `?from=2026-01-01&to=2026-03-31` on the URL; anything
+before the start date is folded into a single *balance brought forward* line so
+the figures still add up.
+
+Drafts and cancelled invoices never appear, and receipts are left out
+deliberately — a receipt acknowledges a payment that is already on the statement
+as a credit, so including it would show the money twice.
+
+---
+
 ## Roles
 
 | Role | Access |

@@ -10,7 +10,10 @@ use App\Core\Numbering;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
+use App\Core\Settings;
 use App\Core\Validator;
+use App\Services\Notifier;
+use App\Services\Statement;
 
 class ClientController extends Controller
 {
@@ -365,6 +368,44 @@ class ClientController extends Controller
             'credit_limit'   => $request->decimal('credit_limit'),
             'status'         => (string) $request->input('status', 'active'),
         ];
+    }
+
+    /**
+     * Statement of account for one client.
+     *
+     * The share token is minted the first time an operator opens this, not
+     * when the client record is created — a client nobody has ever sent a
+     * statement to has no link that could leak.
+     */
+    public function statement(Request $request): void
+    {
+        $client = $this->findOrFail($request->paramInt('id'));
+
+        $from = $this->dateInput($request->query('from'));
+        $to   = $this->dateInput($request->query('to')) ?? date('Y-m-d');
+
+        $token = Statement::ensureToken((int) $client['id'], $client['public_token'] ?? null);
+
+        $this->view('clients/statement', [
+            'title'     => 'Statement · ' . $client['name'],
+            'statement' => Statement::build($client, $from, $to),
+            'company'   => Settings::company(),
+            'isPublic'  => false,
+            'shareLink' => Notifier::absoluteUrl('/statement/' . $token),
+            'autoPrint' => $request->query('auto') === '1',
+        ], 'print');
+    }
+
+    /** A yyyy-mm-dd query value, or null when absent or malformed. */
+    private function dateInput(mixed $value): ?string
+    {
+        $value = is_string($value) ? trim($value) : '';
+
+        if ($value === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return null;
+        }
+
+        return $value;
     }
 
     private function findOrFail(int $id): array
