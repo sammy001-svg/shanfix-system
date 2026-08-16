@@ -34,6 +34,7 @@ use App\Controllers\ReportController;
 use App\Controllers\ServiceController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\SettingsController;
+use App\Controllers\SmsCampaignController;
 use App\Controllers\UserController;
 use App\Controllers\WhatsAppController;
 use App\Controllers\WhatsAppWebhookController;
@@ -500,6 +501,19 @@ $r->group(['auth'], function ($r) {
              ['permission:documents.manage', 'csrf']);
     $r->post('/jobs/{id}/notify-ready', [NotificationController::class, 'sendJobReady'],
              ['permission:jobs.manage', 'csrf']);
+
+    // -- Bulk SMS campaigns
+    //
+    // Separate from the message log: a campaign spends real credit across
+    // the whole client list, so it sits behind its own permission.
+    $r->get('/sms-campaigns',      [SmsCampaignController::class, 'index'],  ['permission:sms.campaign']);
+    $r->get('/sms-campaigns/new',  [SmsCampaignController::class, 'create'], ['permission:sms.campaign']);
+    $r->get('/sms-campaigns/{id}', [SmsCampaignController::class, 'show'],   ['permission:sms.campaign']);
+
+    $r->post('/sms-campaigns/preview', [SmsCampaignController::class, 'preview'],
+             ['permission:sms.campaign', 'csrf']);
+    $r->post('/sms-campaigns',         [SmsCampaignController::class, 'send'],
+             ['permission:sms.campaign', 'csrf']);
 
     $r->group(['permission:settings.manage', 'csrf'], function ($r) {
         $r->post('/notifications/run',           [NotificationController::class, 'runQueue']);

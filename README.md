@@ -231,6 +231,32 @@ the connection and shows your remaining units without spending one.
 SMS is billed in units per 160 characters — the settings page shows the length and
 credit count for each template as you edit it.
 
+### Bulk SMS campaigns
+
+**Bulk SMS** in the sidebar sends one message to a whole group of clients — a price
+change, a holiday closure, a promotion. Administrators and managers only, since a
+campaign spends real credit across your entire client list.
+
+Choose an audience — all active clients, companies or individuals only, anyone with
+an unpaid balance, or anyone invoiced in the last 90 days — then press **Check
+recipients &amp; cost**. Nothing is sent yet. You get the exact recipient count, the
+credits per message, the total, and your live gateway balance, with a warning if the
+balance will not cover it. Only then does the send button appear.
+
+| Detail | Behaviour |
+|---|---|
+| Duplicates | A client listed twice under different formats (`0712…` and `+254712…`) is texted and billed once |
+| Bad numbers | Anything that is not a valid Kenyan number is dropped before sending and listed as skipped |
+| Double submit | Refreshing the confirmation page cannot send the campaign twice |
+| Curly quotes | Flagged before you send — a single `’` pasted from Word cuts the limit from 160 characters to 70 and doubles the bill |
+
+Every campaign is kept with its message, audience, counts, units charged and the
+full recipient list, so you can answer "did Acme get that message?" later.
+
+> "Delivered to gateway" means Shanfix Bulk SMS accepted it for sending. It is not
+> proof the handset received it — the gateway reports totals per batch, not a
+> status per number.
+
 ### Scheduled sending
 
 Messages send immediately when you press a button. Overdue reminders and retries

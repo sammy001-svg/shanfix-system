@@ -219,6 +219,13 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php if (can('sms.campaign')): ?>
+        <a class="nav-link <?= is_active_nav('/sms-campaigns') ? 'is-active' : '' ?>"
+           href="<?= url('/sms-campaigns') ?>">
+          <?= icon('message', 'nav-link__icon') ?> Bulk SMS
+        </a>
+      <?php endif; ?>
+
       <?php if (can('users.view') || can('settings.manage')): ?>
         <div class="nav-group__label">Administration</div>
         <?php if (can('users.view')): ?>
