@@ -132,6 +132,10 @@ class NotificationController extends Controller
             Response::back('/invoices/' . $id);
         }
 
+        // Remember where the queue ended, so the rows this send creates can
+        // be picked out from anything already waiting.
+        $queueMark = (int) Database::scalar('SELECT COALESCE(MAX(id), 0) FROM notifications', [], 0);
+
         $result  = Notifier::dispatch($event, $context, true, $channels);
         $skipped = $result['skipped'];
 
@@ -145,7 +149,29 @@ class NotificationController extends Controller
             Response::back('/invoices/' . $id);
         }
 
-        $sendResult = Notifier::processQueue(10);
+        // Send exactly what this button queued, and nothing else.
+        //
+        // Working the front of the queue instead would mean that whenever a
+        // backlog exists — cron paused for an hour is enough — pressing Send
+        // on an invoice processes ten unrelated older messages and leaves the
+        // invoice sitting there, while the page reports on messages the
+        // operator never asked about.
+        $mine = Database::all(
+            "SELECT id FROM notifications
+              WHERE id > :mark AND entity_type = 'document' AND entity_id = :doc
+           ORDER BY id ASC",
+            ['mark' => $queueMark, 'doc' => $id]
+        );
+
+        $sendResult = ['processed' => 0, 'sent' => 0, 'failed' => 0];
+
+        foreach ($mine as $row) {
+            $one = Notifier::processQueue(1, (int) $row['id']);
+
+            $sendResult['processed'] += $one['processed'];
+            $sendResult['sent']      += $one['sent'];
+            $sendResult['failed']    += $one['failed'];
+        }
 
         $path = match ($doc['doc_type']) {
             'quotation' => '/quotations/',
