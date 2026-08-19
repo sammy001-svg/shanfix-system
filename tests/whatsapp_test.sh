@@ -1,8 +1,7 @@
 #!/bin/bash
 # WhatsApp: the shared inbox, the webhook Meta calls, and the 24-hour rule
 # that decides whether a reply can be typed at all.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 TMP="C:/Users/Shanfix/AppData/Local/Temp"
 D="$(dirname "$0")"
 JAR="$D/wa.txt"; rm -f "$JAR"
@@ -35,7 +34,7 @@ $MYSQL -e "DELETE FROM activity_log WHERE action='login_failed';
 
 # Connect with test credentials so the module behaves as it would live.
 php -r '
-  require "c:/Shanfix System/app/bootstrap.php";
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
   App\Core\Config::load(CONFIG_PATH."/config.php");
   App\Core\Database::connect(App\Core\Config::get("db"));
   App\Core\Settings::set("whatsapp_app_secret", "test_app_secret_xyz");
@@ -100,7 +99,7 @@ hook "$UNI" > /dev/null
 # asserting through it would report a fault in the data that is not there.
 # PHP is the path the application actually reads by.
 eq "stored exactly as sent" "$(php -r '
-  require "c:/Shanfix System/app/bootstrap.php";
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
   App\Core\Config::load(CONFIG_PATH."/config.php");
   App\Core\Database::connect(App\Core\Config::get("db"));
   $m = App\Core\Database::first("SELECT body FROM whatsapp_messages WHERE wa_message_id=\x27wamid.T2\x27");
@@ -161,7 +160,7 @@ eq "production has no business there"        "$(probe production)" "403"
 echo ""
 echo "=== 11. Switched off, the module says so rather than half-working ==="
 php -r '
-  require "c:/Shanfix System/app/bootstrap.php";
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
   App\Core\Config::load(CONFIG_PATH."/config.php");
   App\Core\Database::connect(App\Core\Config::get("db"));
   App\Core\Settings::set("whatsapp_enabled", "0");
@@ -172,7 +171,7 @@ eq "explains it is not connected" "$(curl -s -b "$JAR" "$BASE/whatsapp" | grep -
 $MYSQL -e "DELETE FROM whatsapp_conversations;
            DELETE FROM users WHERE email LIKE 'wa%@shanfix.co.ke';"
 php -r '
-  require "c:/Shanfix System/app/bootstrap.php";
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
   App\Core\Config::load(CONFIG_PATH."/config.php");
   App\Core\Database::connect(App\Core\Config::get("db"));
   foreach (["whatsapp_enabled","whatsapp_phone_number_id","whatsapp_access_token",

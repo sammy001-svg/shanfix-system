@@ -1,8 +1,7 @@
 #!/bin/bash
 # Meetings: scheduling, the room, guests joining on a link, minutes, and
 # the reminders that go out before it starts.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 D="$(dirname "$0")"
 JAR="$D/mtg.txt"; GJAR="$D/mtg_guest.txt"
 rm -f "$JAR" "$GJAR"

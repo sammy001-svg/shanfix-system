@@ -1,8 +1,7 @@
 #!/bin/bash
 # Paying an invoice from the share link sent by SMS or email.
 # The endpoint has no login, so most of this is about what it refuses.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 D="$(dirname "$0")"
 JAR="$D/pay.txt"; rm -f "$JAR"
 PASS=0; FAIL=0

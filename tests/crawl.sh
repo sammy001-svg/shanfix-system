@@ -8,8 +8,7 @@
 # The point is the 500s. A permission refusal is a 302 and expected; a
 # 500 is a page nobody can open, and those hide in the corners of a
 # system this size until somebody walks into one.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 D="$(dirname "$0")"
 q() { $MYSQL -N -e "$1"; }
 
@@ -54,7 +53,7 @@ id_for() {
 # expanded by hand because routes.php builds those paths in a loop.
 build_pages() {
   php -r '
-    $src = file_get_contents("c:/Shanfix System/routes.php");
+    $src = file_get_contents("$ROOT/routes.php");
     preg_match_all("/\\\$r->get\(\s*[\x27\"]([^\x27\"]+)[\x27\"]/", $src, $m);
     $out = [];
     foreach (array_unique($m[1]) as $p) {

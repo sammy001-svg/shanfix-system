@@ -7,8 +7,7 @@
 # line. Each of those costs money and tells the recipient nothing the
 # first one did not, so most of these assertions are about the alerts
 # that must NOT be sent.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 D="$(dirname "$0")"
 PASS=0; FAIL=0
 

@@ -1,8 +1,7 @@
 #!/bin/bash
 # End-to-end smoke test for the Shanfix BMS.
-BASE="http://127.0.0.1:8000"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 JAR="$(dirname "$0")/cookies.txt"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
 rm -f "$JAR"
 
 PASS=0; FAIL=0

@@ -1,8 +1,7 @@
 #!/bin/bash
 # Simulates the KopoKopo STK Push callback against a real pending request,
 # and checks the payment posts and the invoice reconciles.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 API_KEY="test_api_key_123"   # matches what unit.php stored
 
 PASS=0; FAIL=0

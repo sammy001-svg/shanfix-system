@@ -2,8 +2,7 @@
 # Roles and permissions: what each role may reach, what several roles
 # together add up to, and the guards that stop the last administrator
 # being removed.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 D="$(dirname "$0")"
 PASS=0; FAIL=0
 

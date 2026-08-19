@@ -1,8 +1,7 @@
 #!/bin/bash
 # Recurring services: register one, invoice a period, chase the client,
 # take the payment, and prove a period is never billed twice.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 D="$(dirname "$0")"
 JAR="$D/renew.txt"; rm -f "$JAR"
 PASS=0; FAIL=0
@@ -87,7 +86,7 @@ eq "receipt issued"  "$(q "SELECT COUNT(*) FROM documents WHERE doc_type='receip
 
 echo ""
 echo "=== 7. Cron reconciles the renewal ==="
-php "c:/Shanfix System/cron.php" > /dev/null 2>&1
+php "$ROOT/cron.php" > /dev/null 2>&1
 eq "renewal marked paid" "$(q "SELECT status FROM subscription_renewals WHERE subscription_id=$SID;")" "paid"
 eq "nothing owing on it" "$(q "SELECT COALESCE(SUM(d.balance),0) FROM subscription_renewals r JOIN documents d ON d.id=r.document_id WHERE r.subscription_id=$SID;")" "0.00"
 

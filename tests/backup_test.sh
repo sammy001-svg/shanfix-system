@@ -4,9 +4,8 @@
 # The assertion that matters most is the restore. Everything else here is
 # in service of it — a backup that cannot be loaded back is not a backup,
 # it is a file that makes people feel safe.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
-ROOT="c:/Shanfix System"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+ROOT="$ROOT"
 DIR="$ROOT/storage/backups"
 D="$(dirname "$0")"
 PASS=0; FAIL=0
@@ -70,10 +69,10 @@ cp "$D/good.gz" "$DIR/$NAME.sql.gz"; rm -f "$D/good.gz"
 echo ""
 echo "=== 3. It restores ==="
 # The assertion the rest of the suite exists to support.
-/c/xampp/mysql/bin/mysql.exe -u root -e "DROP DATABASE IF EXISTS shanfix_bktest;
+$MYSQL_NODB -e "DROP DATABASE IF EXISTS shanfix_bktest;
                                          CREATE DATABASE shanfix_bktest CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-gunzip < "$DIR/$NAME.sql.gz" | /c/xampp/mysql/bin/mysql.exe -u root shanfix_bktest 2>/dev/null
-R="/c/xampp/mysql/bin/mysql.exe -u root -N shanfix_bktest"
+gunzip < "$DIR/$NAME.sql.gz" | $MYSQL_NODB shanfix_bktest 2>/dev/null
+R="$MYSQL_NODB -N shanfix_bktest"
 
 eq "same number of tables" \
    "$($R -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='shanfix_bktest' AND table_type='BASE TABLE';")" \
@@ -91,7 +90,7 @@ eq "settings are byte-identical" \
    "$($R -e "SELECT MD5(GROUP_CONCAT(setting_key,setting_value ORDER BY setting_key)) FROM settings;")" \
    "$(q  "SELECT MD5(GROUP_CONCAT(setting_key,setting_value ORDER BY setting_key)) FROM settings;")"
 
-/c/xampp/mysql/bin/mysql.exe -u root -e "DROP DATABASE shanfix_bktest;"
+$MYSQL_NODB -e "DROP DATABASE shanfix_bktest;"
 
 echo ""
 echo "=== 4. Downloading it ==="
@@ -130,7 +129,7 @@ echo "=== 7. Old copies are dropped, but never the last one ==="
 signin admin Shanfix@2026
 $MYSQL -e "UPDATE settings SET setting_value='2' WHERE setting_key='backup_keep';"
 php -r '
-require "c:/Shanfix System/app/bootstrap.php";
+require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
 App\Core\Config::load(CONFIG_PATH."/config.php");
 App\Core\Database::connect(App\Core\Config::get("db"));
 for ($i = 0; $i < 3; $i++) { App\Services\Backup::run(false); sleep(1); }

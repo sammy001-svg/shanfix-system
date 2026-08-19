@@ -1,8 +1,7 @@
 #!/bin/bash
 # End-to-end test of the production workflow:
 # invoice -> job card -> artwork -> proof -> client approval -> print -> ready -> delivered
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 JAR="$(dirname "$0")/jobs.txt"; rm -f "$JAR"
 PASS=0; FAIL=0
 

@@ -1,8 +1,7 @@
 #!/bin/bash
 # End-to-end: configure messaging, send an invoice, verify the queue,
 # the captured email, and the client-facing public link.
-BASE="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 DIR="$(dirname "$0")"
 JAR="$DIR/notify.txt"; rm -f "$JAR"
 EML="$DIR/queue.eml"
@@ -153,7 +152,7 @@ $MYSQL -e "UPDATE documents SET due_date = DATE_SUB(CURDATE(), INTERVAL 7 DAY), 
            UPDATE settings SET setting_value='127.0.0.1' WHERE setting_key='smtp_host';
            UPDATE settings SET setting_value='59998' WHERE setting_key='smtp_port';"
 php -r '
-require "c:/Shanfix System/app/bootstrap.php";
+require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
 \App\Core\Config::load(CONFIG_PATH."/config.php");
 \App\Core\Database::connect(\App\Core\Config::get("db"));
 $r = \App\Services\Notifier::queueOverdueReminders();
@@ -165,7 +164,7 @@ echo "queued=".$r["queued"]."\n";
 eq "first run queues one" "$($MYSQL -N -e "SELECT COUNT(*) FROM notifications WHERE event='invoice_overdue' AND entity_id=$INV;")" "1"
 
 php -r '
-require "c:/Shanfix System/app/bootstrap.php";
+require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
 \App\Core\Config::load(CONFIG_PATH."/config.php");
 \App\Core\Database::connect(\App\Core\Config::get("db"));
 \App\Services\Notifier::queueOverdueReminders();
@@ -175,7 +174,7 @@ eq "lock recorded" "$($MYSQL -N -e "SELECT COUNT(*) FROM notification_locks WHER
 
 echo ""
 echo "=== 11. Cron runs cleanly ==="
-CRON=$(php "c:/Shanfix System/cron.php" --verbose 2>&1)
+CRON=$(php "$ROOT/cron.php" --verbose 2>&1)
 if echo "$CRON" | grep -qi "error\|fatal\|exception"; then bad "cron ran without errors" "errors" "clean"; else ok "cron ran without errors" "clean"; fi
 has "cron reports done" "$CRON" "Done in"
 

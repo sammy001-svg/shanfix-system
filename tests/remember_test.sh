@@ -2,7 +2,7 @@
 # Verifies the "keep me signed in" token: it works, it rotates, it cannot be
 # forged, and it dies when it should.
 B="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 D="$(dirname "$0")"
 P=0; F=0
 

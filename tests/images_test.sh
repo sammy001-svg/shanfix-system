@@ -2,7 +2,7 @@
 # Product images: upload, resize, primary selection, deletion, and the
 # checks that stop a disguised file being stored.
 B="http://127.0.0.1:8000"
-MYSQL="/c/xampp/mysql/bin/mysql.exe -u root shanfix_test"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 D="$(dirname "$0")"
 J="$D/img.txt"; rm -f "$J"
 P=0; F=0
@@ -44,7 +44,7 @@ eq "signed in" "$(curl -s -o /dev/null -w '%{http_code}' -b "$J" "$B/dashboard")
 # Step 9 deletes this item, so the suite makes its own rather than
 # consuming a seeded one — otherwise repeated runs empty the catalogue
 # and every later run fails on a 404 that has nothing to do with images.
-PRODDIR="c:/Shanfix System/storage/uploads/products"
+PRODDIR="$ROOT/storage/uploads/products"
 pngs() { ls "$PRODDIR"/*.png 2>/dev/null | wc -l | tr -d ' '; }
 BASE_FILES=$(pngs)   # other items' photos are none of this suite's business
 
