@@ -57,6 +57,11 @@ class Auth
         'clients.manage'    => ['admin', 'manager', 'sales', 'reception'],
         'clients.delete'    => ['admin'],
 
+        // Asking a client what they want, and reading what they said.
+        // Reception raise these at the counter, so they are included.
+        'requests.view'     => ['admin', 'manager', 'sales', 'production', 'reception', 'designer', 'staff'],
+        'requests.manage'   => ['admin', 'manager', 'sales', 'reception'],
+
         'leads.view'        => ['admin', 'manager', 'sales', 'reception', 'staff'],
         // Everyone else sees only the leads allocated to them. Reception
         // is included because they log walk-ins before anyone owns them.

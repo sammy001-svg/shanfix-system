@@ -22,6 +22,7 @@ use App\Controllers\DocumentController;
 use App\Controllers\ExpenseController;
 use App\Controllers\InventoryController;
 use App\Controllers\JobController;
+use App\Controllers\JobRequestController;
 use App\Controllers\JobFileController;
 use App\Controllers\LeadController;
 use App\Controllers\MeetingController;
@@ -30,6 +31,7 @@ use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
 use App\Controllers\PublicArtworkController;
+use App\Controllers\PublicJobRequestController;
 use App\Controllers\PublicProofController;
 use App\Controllers\PublicStatementController;
 use App\Controllers\PurchaseOrderController;
@@ -125,6 +127,15 @@ $r->post('/proof/{token}/decide',  [PublicProofController::class, 'decide'], ['c
 
 // Short form for SMS.
 $r->get('/p/{token}', [PublicProofController::class, 'show']);
+
+// The job brief a client fills in for us. Same token model: there is no
+// client login anywhere in this system, so holding the link is what
+// proves it was sent to you.
+$r->get('/brief/{token}',  [PublicJobRequestController::class, 'show']);
+$r->post('/brief/{token}', [PublicJobRequestController::class, 'submit'], ['csrf']);
+
+// Short form for SMS.
+$r->get('/b/{token}', [PublicJobRequestController::class, 'show']);
 
 // A client's own statement of account, on the same token model.
 $r->get('/statement/{token}', [PublicStatementController::class, 'show']);
@@ -645,6 +656,20 @@ $r->group(['auth'], function ($r) {
     // nothing, and a POST would need a form per row.
     $r->get('/settings/backups',                  [BackupController::class, 'index'],    ['permission:settings.manage']);
     $r->get('/settings/backups/{name}/download',  [BackupController::class, 'download'], ['permission:settings.manage']);
+
+    // -- Job detail requests
+    $r->get('/requests',      [JobRequestController::class, 'index'], ['permission:requests.view']);
+    $r->get('/requests/{id}', [JobRequestController::class, 'show'],  ['permission:requests.view']);
+    $r->get('/requests/{id}/files/{fileId}', [JobRequestController::class, 'download'], ['permission:requests.view']);
+
+    $r->group(['permission:requests.manage', 'csrf'], function ($r) {
+        $r->post('/requests',             [JobRequestController::class, 'store']);
+        $r->post('/requests/{id}/send',   [JobRequestController::class, 'send']);
+        $r->post('/requests/{id}/status', [JobRequestController::class, 'status']);
+        $r->post('/requests/{id}/fill',   [JobRequestController::class, 'saveFill']);
+    });
+
+    $r->get('/requests/{id}/fill', [JobRequestController::class, 'fill'], ['permission:requests.manage']);
 
     // -- Reports
     $r->get('/reports',           [ReportController::class, 'index'],           ['permission:reports.view']);

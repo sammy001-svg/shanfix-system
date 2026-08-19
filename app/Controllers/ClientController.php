@@ -186,6 +186,17 @@ class ClientController extends Controller
             'activities'   => [],
             'openInvoices' => [],
             'stkEnabled'   => \App\Core\Settings::bool('kopokopo_enabled'),
+
+            // What the client has told us they want. Answered ones first:
+            // those are the ones with something in them to work from.
+            'jobRequests'  => Database::all(
+                "SELECT id, reference, brief_type, status, title, created_at, submitted_at
+                   FROM job_requests
+                  WHERE client_id = :id AND status <> 'cancelled'
+               ORDER BY FIELD(status, 'submitted','opened','sent','draft','actioned'),
+                        created_at DESC",
+                ['id' => $client['id']]
+            ),
         ];
 
         // Invoices with a balance — the STK Push panel targets these.

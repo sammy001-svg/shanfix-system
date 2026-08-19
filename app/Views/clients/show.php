@@ -31,6 +31,11 @@ $docPath = static fn(string $type): string => match ($type) {
   </div>
 
   <div class="page-head__actions">
+    <?php if (can('requests.manage')): ?>
+      <button class="btn btn--outline" type="button" data-modal-open="ask-details">
+        <?= icon('inbox') ?> Ask for job details
+      </button>
+    <?php endif; ?>
     <a class="btn btn--outline" href="<?= url('/clients/' . $client['id'] . '/statement') ?>">
       <?= icon('file-text') ?> Statement
     </a>
@@ -353,6 +358,44 @@ $docPath = static fn(string $type): string => match ($type) {
   </div>
 
   <aside>
+    <?php if (!empty($jobRequests)): ?>
+      <?php
+        $jrBadge = [
+            'draft'     => ['grey',  'Not sent'],
+            'sent'      => ['navy',  'Waiting'],
+            'opened'    => ['amber', 'Opened'],
+            'submitted' => ['green', 'Answered'],
+            'actioned'  => ['grey',  'Dealt with'],
+        ];
+      ?>
+      <div class="card">
+        <div class="card__head">
+          <?= icon('inbox') ?>
+          <div>
+            <div class="card__title">Job details asked for</div>
+            <div class="card__sub">What this client says they want</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <?php foreach ($jobRequests as $jr): ?>
+            <?php $b = $jrBadge[$jr['status']] ?? ['grey', $jr['status']]; ?>
+            <div class="siterow">
+              <div class="siterow__main">
+                <a class="siterow__name" href="<?= url('/requests/' . $jr['id']) ?>">
+                  <?= e(\App\Services\JobBrief::TYPES[$jr['brief_type']] ?? $jr['brief_type']) ?>
+                </a>
+                <div class="text-xs text-muted">
+                  <?= e($jr['title'] ?: $jr['reference']) ?>
+                  · <?= e(date('j M Y', strtotime((string) $jr['created_at']))) ?>
+                </div>
+              </div>
+              <span class="badge badge--<?= e($b[0]) ?>"><?= e($b[1]) ?></span>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    <?php endif; ?>
+
     <?php if (!empty($subscriptions)): ?>
       <div class="card">
         <div class="card__head">
@@ -547,3 +590,59 @@ $docPath = static fn(string $type): string => match ($type) {
     <?php endif; ?>
   </aside>
 </div>
+
+<?php if (can('requests.manage')): ?>
+  <div class="modal-backdrop" id="ask-details">
+    <div class="modal__panel">
+      <form method="post" action="<?= url('/requests') ?>">
+        <?= csrf_field() ?>
+        <input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>">
+        <div class="modal__head">
+          <div class="card__title">Ask <?= e($client['name']) ?> for job details</div>
+          <button class="modal__close" type="button" data-modal-close>&times;</button>
+        </div>
+        <div class="modal__body">
+          <p class="text-sm text-muted">
+            They get a link by email and text, fill in what they need in their
+            own words, and can attach anything they already have. What comes
+            back lands on this profile.
+          </p>
+
+          <div class="field">
+            <label class="label">What is it for?</label>
+            <div class="checkgrid">
+              <?php foreach (\App\Services\JobBrief::TYPES as $key => $label): ?>
+                <label class="check-row">
+                  <input type="radio" name="brief_type" value="<?= e($key) ?>"
+                         <?= $key === 'design' ? 'checked' : '' ?> required>
+                  <span><?= e($label) ?></span>
+                </label>
+              <?php endforeach; ?>
+            </div>
+            <span class="field-hint">
+              One per request. A client wanting a logo and a website gets two,
+              which keeps each brief to the point.
+            </span>
+          </div>
+
+          <div class="field">
+            <label class="label" for="jr_title">What to call it <span class="text-muted">(optional)</span></label>
+            <input class="input" id="jr_title" name="title" maxlength="200"
+                   placeholder="e.g. Shop front signage">
+            <span class="field-hint">Just for us, to tell several requests apart.</span>
+          </div>
+
+          <div class="field">
+            <label class="label" for="jr_note">Internal note <span class="text-muted">(optional)</span></label>
+            <textarea class="textarea" id="jr_note" name="note" rows="2"
+                      placeholder="Anything the team should know. Never shown to the client."></textarea>
+          </div>
+        </div>
+        <div class="modal__foot">
+          <button class="btn btn--ghost" type="button" data-modal-close>Cancel</button>
+          <button class="btn btn--primary" type="submit">Create the request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+<?php endif; ?>
