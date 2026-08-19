@@ -341,12 +341,23 @@ class DocumentController extends Controller
             $publicLink = \App\Services\Notifier::publicUrl($token);
         }
 
+        // A proposal or an agreement mostly IS its prose. Showing only the
+        // line items left the page omitting the substance of the document,
+        // readable only by opening the print view.
+        $sections = in_array($type, self::NARRATIVE_TYPES, true)
+            ? Database::all(
+                'SELECT * FROM document_sections WHERE document_id = :id ORDER BY sort_order, id',
+                ['id' => $doc['id']]
+              )
+            : [];
+
         $this->view('documents/show', [
             'title'       => $doc['doc_number'],
             'type'        => $type,
             'meta'        => self::TYPES[$type],
             'statuses'    => self::STATUSES[$type],
             'doc'         => $doc,
+            'sections'    => $sections,
             'items'       => $items,
             'payments'    => $payments,
             'related'     => $related,

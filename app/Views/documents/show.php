@@ -180,6 +180,36 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
 
 <div class="grid-sidebar">
   <div>
+    <?php if (!empty($sections)): ?>
+      <?php
+        // The written part of a proposal or agreement. It sits above the
+        // pricing here for the same reason it does on the printed copy: it
+        // is what the client actually reads, and the figures only make
+        // sense once they have.
+      ?>
+      <div class="card">
+        <div class="card__head">
+          <?= icon('file-text') ?>
+          <div>
+            <div class="card__title">
+              <?= $type === 'agreement' ? 'Clauses' : 'What the client reads' ?>
+            </div>
+            <div class="card__sub"><?= count($sections) ?> section(s)</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <?php foreach ($sections as $section): ?>
+            <div style="margin-bottom:16px">
+              <div class="fw-600 mb-4"><?= e($section['heading']) ?></div>
+              <?php if (!empty($section['body'])): ?>
+                <div class="text-sm" style="white-space:pre-line;color:var(--slate-700)"><?= e($section['body']) ?></div>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    <?php endif; ?>
+
     <div class="card">
       <div class="card__head">
         <div>
