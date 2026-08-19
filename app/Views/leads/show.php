@@ -232,6 +232,13 @@ $activityIcon = static fn(string $type): string => match ($type) {
     <?php endif; ?>
   </div>
 
+    <?php
+    $threadType  = 'lead';
+    $threadId    = (int) $lead['id'];
+    $threadTitle = $lead['lead_number'];
+    require APP_PATH . '/Views/partials/thread.php';
+    ?>
+
   <aside>
     <div class="card">
       <div class="card__head"><div class="card__title">Lead details</div></div>
