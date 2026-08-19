@@ -7,6 +7,8 @@
 # Runtime data
 /storage/logs/*
 !/storage/logs/.gitkeep
+/storage/backups/*
+!/storage/backups/.gitkeep
 /storage/uploads/*
 !/storage/uploads/.gitkeep
 

@@ -197,6 +197,13 @@ img { max-width: 100%; height: auto; display: block; }
 hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
 
 code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
+/* A command meant to be copied and run. Scrolls rather than wrapping,
+   because a wrapped shell command is a command typed wrong. */
+.code {
+  background: var(--navy-900); color: #E6EDF5;
+  padding: 12px 14px; border-radius: var(--r);
+  overflow-x: auto; white-space: pre; margin: 10px 0;
+}
 
 ::selection { background: var(--tint-green); color: var(--on-green); }
 

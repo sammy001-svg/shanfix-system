@@ -501,3 +501,26 @@ if (!function_exists('query_string')) {
         return $params === [] ? '' : '?' . http_build_query($params);
     }
 }
+
+if (!function_exists('human_bytes')) {
+    /** A file size a person can read at a glance. */
+    function human_bytes(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes . ' B';
+        }
+
+        $units = ['KB', 'MB', 'GB', 'TB'];
+        $value = $bytes / 1024;
+        $i     = 0;
+
+        while ($value >= 1024 && $i < count($units) - 1) {
+            $value /= 1024;
+            $i++;
+        }
+
+        // One decimal below 10 so "1.4 MB" does not round to "1 MB"; none
+        // above, where the extra digit is noise.
+        return ($value < 10 ? number_format($value, 1) : number_format($value)) . ' ' . $units[$i];
+    }
+}

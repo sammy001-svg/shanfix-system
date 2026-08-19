@@ -28,6 +28,9 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     <a class="tab <?= $tab === 'categories' ? 'is-active' : '' ?>" href="<?= e($tabUrl('categories')) ?>">
       <?= icon('layers') ?> Categories
     </a>
+    <a class="tab" href="<?= url('/settings/backups') ?>">
+      <?= icon('archive') ?> Backups
+    </a>
   </nav>
 </div>
 

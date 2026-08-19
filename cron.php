@@ -27,7 +27,9 @@ use App\Core\Config;
 use App\Core\Database;
 use App\Core\Logger;
 use App\Core\Settings;
+use App\Services\Backup;
 use App\Services\Notifier;
+use App\Services\StaffNotifier;
 use App\Services\Renewals;
 
 $verbose = in_array('--verbose', $argv, true) || in_array('-v', $argv, true);
@@ -212,7 +214,73 @@ try {
     }
 
     // -----------------------------------------------------------------
-    // 5. Housekeeping — weekly-ish, cheap enough to attempt every run
+    // 5. Take a copy of everything
+    // -----------------------------------------------------------------
+    // Before the housekeeping below starts deleting things, not after.
+    if (Backup::isDue()) {
+        $backup = Backup::run(Settings::bool('backup_uploads', true));
+
+        if ($backup['ok']) {
+            say(sprintf(
+                'Backup %s: %d tables, %s rows, %s',
+                $backup['name'],
+                $backup['tables'],
+                number_format($backup['rows']),
+                human_bytes($backup['bytes'])
+            ));
+        } else {
+            // Worth waking somebody for. The whole point of a backup is
+            // that it exists on the day it is needed.
+            alert('Backup failed: ' . $backup['error']);
+        }
+    }
+
+    // A backup that quietly stopped running is worse than none, because
+    // everybody carries on believing there is one.
+    $latest   = Backup::all()[0] ?? null;
+    $warnDays = max(1, Settings::int('backup_warn_days', 3));
+
+    $stale = Settings::bool('backup_enabled', true)
+        && ($latest === null || (time() - $latest['at']) > $warnDays * 86400);
+
+    // Cron runs every few minutes on most hosts. Without a lock this would
+    // email the administrators every few minutes for as long as the problem
+    // lasts, which is how a real warning ends up filtered into a folder
+    // nobody reads. Once a day is enough to be heard.
+    $warnedToday = false;
+
+    if ($stale) {
+        try {
+            Database::run(
+                'INSERT INTO notification_locks (lock_key) VALUES (:k)',
+                ['k' => 'backup:stale:' . date('Y-m-d')]
+            );
+        } catch (\Throwable) {
+            $warnedToday = true;   // already said so today
+        }
+    }
+
+    if ($stale && !$warnedToday) {
+        $howLong = $latest === null
+            ? 'There is no backup at all.'
+            : 'The most recent is from ' . date('j M Y', $latest['at']) . '.';
+
+        StaffNotifier::notify(
+            StaffNotifier::withRole(['admin']),
+            [
+                'event' => 'backup_stale',
+                'title' => 'No recent backup of the system',
+                'body'  => $howLong . ' Open Settings to take one now and check the scheduled task is still running.',
+                'link'  => '/settings?tab=backups',
+            ],
+            ['email' => true, 'sms' => false]
+        );
+
+        say('Warned the administrators: ' . $howLong);
+    }
+
+    // -----------------------------------------------------------------
+    // 6. Housekeeping — weekly-ish, cheap enough to attempt every run
     // -----------------------------------------------------------------
     Database::run('DELETE FROM notification_locks WHERE created_at < DATE_SUB(NOW(), INTERVAL 120 DAY)');
 

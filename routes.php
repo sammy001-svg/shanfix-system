@@ -12,6 +12,7 @@
  */
 
 use App\Controllers\ArtworkController;
+use App\Controllers\BackupController;
 use App\Controllers\AuthController;
 use App\Controllers\ChatController;
 use App\Controllers\ClientController;
@@ -632,7 +633,18 @@ $r->group(['auth'], function ($r) {
         $r->post('/notifications/{id}/cancel',   [NotificationController::class, 'cancel']);
         $r->post('/settings/messaging',          [SettingsController::class, 'saveMessaging']);
         $r->post('/settings/messaging/test',     [NotificationController::class, 'sendTest']);
+
+        // -- Backups
+        $r->post('/settings/backups',                 [BackupController::class, 'create']);
+        $r->post('/settings/backups/schedule',        [BackupController::class, 'save']);
+        $r->post('/settings/backups/{name}/verify',   [BackupController::class, 'verify']);
+        $r->post('/settings/backups/{name}/delete',   [BackupController::class, 'delete']);
     });
+
+    // Downloading is a GET so the browser can save it directly; it changes
+    // nothing, and a POST would need a form per row.
+    $r->get('/settings/backups',                  [BackupController::class, 'index'],    ['permission:settings.manage']);
+    $r->get('/settings/backups/{name}/download',  [BackupController::class, 'download'], ['permission:settings.manage']);
 
     // -- Reports
     $r->get('/reports',           [ReportController::class, 'index'],           ['permission:reports.view']);
