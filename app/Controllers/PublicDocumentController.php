@@ -58,6 +58,11 @@ class PublicDocumentController extends Controller
             ['id' => $doc['id']]
         );
 
+        $sections = Database::all(
+            'SELECT * FROM document_sections WHERE document_id = :id ORDER BY sort_order, id',
+            ['id' => $doc['id']]
+        );
+
         // Record the first open so the team can see the client received it.
         if (empty($doc['viewed_at'])) {
             Database::update('documents', ['viewed_at' => date('Y-m-d H:i:s')], ['id' => $doc['id']]);
@@ -67,6 +72,7 @@ class PublicDocumentController extends Controller
             'title'     => $doc['doc_number'],
             'doc'       => $doc,
             'items'     => $items,
+            'sections'  => $sections,
             'payments'  => $payments,
             'company'   => Settings::company(),
             'token'     => $doc['public_token'],
@@ -316,5 +322,63 @@ class PublicDocumentController extends Controller
             },
             'balance' => money($fresh['balance'] ?? 0),
         ]);
+    }
+
+    /**
+     * The client accepting an agreement on their share link.
+     *
+     * What makes this stand as evidence is not the click but the record of
+     * it: who typed their name, when, and from where. Kept on the document
+     * so it prints alongside the clauses that were agreed.
+     */
+    public function accept(Request $request): void
+    {
+        $token = (string) $request->param('token');
+        $doc   = $this->findByToken($token);
+
+        if ($doc['doc_type'] !== 'agreement') {
+            throw new HttpException(404, 'This document is not an agreement.');
+        }
+
+        if ($doc['status'] === 'cancelled') {
+            Session::error('This agreement has been withdrawn. Please contact us.');
+            Response::to('/view/' . $token);
+        }
+
+        // Already accepted: show it rather than letting a stale tab or a
+        // forwarded link record a second, contradictory acceptance.
+        if (!empty($doc['accepted_at'])) {
+            Session::info('This agreement was already accepted on ' . fdate($doc['accepted_at']) . '.');
+            Response::to('/view/' . $token);
+        }
+
+        $name = trim((string) $request->input('accepted_name', ''));
+
+        if ($name === '') {
+            Session::error('Please type your full name to accept.');
+            Response::to('/view/' . $token);
+        }
+
+        if (!$request->bool('confirm')) {
+            Session::error('Please tick the box to confirm you have read and agree to the terms.');
+            Response::to('/view/' . $token);
+        }
+
+        Database::update('documents', [
+            'status'        => 'accepted',
+            'accepted_at'   => date('Y-m-d H:i:s'),
+            'accepted_name' => mb_substr($name, 0, 160),
+            'accepted_ip'   => mb_substr((string) ($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+        ], ['id' => $doc['id']]);
+
+        ActivityLog::record(
+            'agreement_accepted',
+            'document',
+            (int) $doc['id'],
+            $doc['doc_number'] . ' accepted online by ' . $name
+        );
+
+        Session::success('Thank you — your acceptance is recorded and we will be in touch to begin.');
+        Response::to('/view/' . $token);
     }
 }

@@ -29,12 +29,14 @@ use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
 use App\Controllers\PublicProofController;
 use App\Controllers\PublicStatementController;
+use App\Controllers\PurchaseOrderController;
 use App\Controllers\PwaController;
 use App\Controllers\ReminderController;
 use App\Controllers\ReportController;
 use App\Controllers\ServiceController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\SettingsController;
+use App\Controllers\SupplierController;
 use App\Controllers\SmsCampaignController;
 use App\Controllers\UserController;
 use App\Controllers\WhatsAppController;
@@ -92,6 +94,11 @@ $r->post('/view/{token}/pay',       [PublicDocumentController::class, 'pay'], ['
 $r->get('/view/{token}/pay/status', [PublicDocumentController::class, 'payStatus']);
 $r->post('/v/{token}/pay',          [PublicDocumentController::class, 'pay'], ['csrf']);
 $r->get('/v/{token}/pay/status',    [PublicDocumentController::class, 'payStatus']);
+
+// Accepting an agreement from the share link. No login — the token is the
+// credential, as for viewing it. CSRF still applies: we served the form.
+$r->post('/view/{token}/accept', [PublicDocumentController::class, 'accept'], ['csrf']);
+$r->post('/v/{token}/accept',    [PublicDocumentController::class, 'accept'], ['csrf']);
 
 // Joining a meeting from a shared link. No login: the token is the
 // credential, as with a shared invoice. A guest gives their name at the
@@ -274,6 +281,39 @@ $r->group(['auth'], function ($r) {
         $r->post('/inventory/images/{imageId}/primary',     [InventoryController::class, 'setPrimaryImage']);
     });
 
+    // -- Suppliers and purchasing
+    //
+    // The other half of inventory: stock arrives here at a real cost price
+    // rather than through a hand-typed adjustment.
+    $r->group(['permission:purchases.view'], function ($r) {
+        $r->get('/suppliers',             [SupplierController::class, 'index']);
+        $r->get('/suppliers/create',      [SupplierController::class, 'create']);
+        $r->get('/suppliers/{id}',        [SupplierController::class, 'show']);
+        $r->get('/suppliers/{id}/edit',   [SupplierController::class, 'edit']);
+
+        $r->get('/purchase-orders',           [PurchaseOrderController::class, 'index']);
+        $r->get('/purchase-orders/create',    [PurchaseOrderController::class, 'create']);
+        $r->get('/purchase-orders/{id}',      [PurchaseOrderController::class, 'show']);
+        $r->get('/purchase-orders/{id}/edit', [PurchaseOrderController::class, 'edit']);
+    });
+
+    $r->group(['permission:purchases.manage', 'csrf'], function ($r) {
+        $r->post('/suppliers',                    [SupplierController::class, 'store']);
+        $r->post('/suppliers/{id}',               [SupplierController::class, 'update']);
+        $r->post('/purchase-orders',              [PurchaseOrderController::class, 'store']);
+        $r->post('/purchase-orders/{id}',         [PurchaseOrderController::class, 'update']);
+        $r->post('/purchase-orders/{id}/status',  [PurchaseOrderController::class, 'updateStatus']);
+    });
+
+    // Receiving is production's job as much as finance's.
+    $r->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive'],
+             ['permission:purchases.receive', 'csrf']);
+
+    $r->post('/suppliers/{id}/delete',        [SupplierController::class, 'destroy'],
+             ['permission:purchases.delete', 'csrf']);
+    $r->post('/purchase-orders/{id}/delete',  [PurchaseOrderController::class, 'destroy'],
+             ['permission:purchases.delete', 'csrf']);
+
     // -- Services
     $r->group(['permission:services.view'], function ($r) {
         $r->get('/services',           [ServiceController::class, 'index']);
@@ -312,9 +352,15 @@ $r->group(['auth'], function ($r) {
 
     $r->post('/clients/{id}/delete', [ClientController::class, 'destroy'], ['permission:clients.delete', 'csrf']);
 
-    // -- Quotations, invoices, receipts
+    // -- Proposals, quotations, invoices, receipts and agreements
     // The doc type is bound by the route, so it can never come from user input.
-    foreach (['quotation' => 'quotations', 'invoice' => 'invoices', 'receipt' => 'receipts'] as $type => $path) {
+    foreach ([
+        'proposal'  => 'proposals',
+        'quotation' => 'quotations',
+        'invoice'   => 'invoices',
+        'receipt'   => 'receipts',
+        'agreement' => 'agreements',
+    ] as $type => $path) {
 
         $r->get("/{$path}", function (Request $req) use ($type) {
             (new DocumentController())->index($req, $type);
@@ -360,6 +406,15 @@ $r->group(['auth'], function ($r) {
     $r->post('/quotations/{id}/convert', [DocumentController::class, 'convertToInvoice'],
              ['permission:documents.manage', 'csrf']);
     $r->post('/invoices/{id}/receipt',   [DocumentController::class, 'generateReceipt'],
+             ['permission:documents.manage', 'csrf']);
+
+    // Proposal → Quotation, and the agreement a client signs. Both keep the
+    // parent link, so each document shows what it came from.
+    $r->post('/proposals/{id}/convert',  [DocumentController::class, 'convertToQuotation'],
+             ['permission:documents.manage', 'csrf']);
+    $r->post('/proposals/{id}/agreement',  [DocumentController::class, 'generateAgreement'],
+             ['permission:documents.manage', 'csrf']);
+    $r->post('/quotations/{id}/agreement', [DocumentController::class, 'generateAgreement'],
              ['permission:documents.manage', 'csrf']);
 
     // -- Production job cards

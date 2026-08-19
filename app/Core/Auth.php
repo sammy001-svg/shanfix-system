@@ -57,6 +57,9 @@ class Auth
         'clients.delete'    => ['admin'],
 
         'leads.view'        => ['admin', 'manager', 'sales', 'reception', 'staff'],
+        // Everyone else sees only the leads allocated to them. Reception
+        // is included because they log walk-ins before anyone owns them.
+        'leads.view_all'    => ['admin', 'manager', 'reception'],
         'leads.manage'      => ['admin', 'manager', 'sales', 'reception'],
         'leads.delete'      => ['admin', 'manager'],
 
@@ -66,13 +69,13 @@ class Auth
 
         // Production floor
         'jobs.view'         => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
-        'jobs.manage'       => ['admin', 'manager', 'sales', 'production'],
+        'jobs.manage'       => ['admin', 'manager', 'production'],
         'jobs.delete'       => ['admin', 'manager'],
         'jobs.assign'       => ['admin', 'manager', 'production'],
         'jobs.cost'         => ['admin', 'manager', 'finance'],
 
         'delivery.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception'],
-        'delivery.manage'   => ['admin', 'manager', 'sales', 'production'],
+        'delivery.manage'   => ['admin', 'manager', 'production'],
 
         // Reception may see what is owed and send an STK push to collect it,
         // but recording or reversing a payment stays with finance.
@@ -87,7 +90,7 @@ class Auth
         // look one up to answer "when does our site renew?"; changing the
         // arrangement or its price is for sales, finance and management.
         'subscriptions.view'   => ['admin', 'manager', 'finance', 'sales', 'reception'],
-        'subscriptions.manage' => ['admin', 'manager', 'finance', 'sales'],
+        'subscriptions.manage' => ['admin', 'manager', 'finance'],
 
         'reports.view'      => ['admin', 'manager', 'finance'],
 

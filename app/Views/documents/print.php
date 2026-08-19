@@ -87,6 +87,16 @@ $logoPath = $company['logo'] ? url('files/' . $company['logo']) : null;
     </div>
   </section>
 
+  <?php // A proposal or agreement is mostly prose; it prints above the pricing. ?>
+  <?php foreach (($sections ?? []) as $section): ?>
+    <section class="doc-section doc-section--narrative">
+      <div class="doc-section__label"><?= e($section['heading']) ?></div>
+      <?php if (!empty($section['body'])): ?>
+        <div class="doc-section__body"><?= e($section['body']) ?></div>
+      <?php endif; ?>
+    </section>
+  <?php endforeach; ?>
+
   <table class="doc-table">
     <thead>
       <tr>
@@ -210,6 +220,39 @@ $logoPath = $company['logo'] ? url('files/' . $company['logo']) : null;
     </section>
   <?php endif; ?>
 
+
+  <?php if (($type ?? '') === 'agreement'): ?>
+    <?php if (!empty($doc['accepted_at'])): ?>
+      <?php // Accepted online. The record of who and when is the evidence,
+            // so it prints as part of the agreement itself. ?>
+      <div class="doc-accept">
+        <strong>Accepted by the client</strong><br>
+        <?= e($doc['accepted_name']) ?>
+        accepted this agreement on <?= e(fdate($doc['accepted_at'], 'd M Y \a\t H:i')) ?>
+        <?php if (!empty($doc['accepted_ip'])): ?>
+          from <?= e($doc['accepted_ip']) ?>
+        <?php endif; ?>.
+        <div style="font-size:11.5px;margin-top:5px;color:var(--slate-600)">
+          Recorded electronically against <?= e($doc['doc_number']) ?>. No wet signature is required.
+        </div>
+      </div>
+    <?php else: ?>
+      <div class="doc-sign">
+        <div class="doc-sign__box">
+          <div class="doc-sign__line"></div>
+          <div class="doc-sign__label">
+            For <?= e($company['name']) ?> — name, signature &amp; date
+          </div>
+        </div>
+        <div class="doc-sign__box">
+          <div class="doc-sign__line"></div>
+          <div class="doc-sign__label">
+            For <?= e($doc['client_name']) ?> — name, signature &amp; date
+          </div>
+        </div>
+      </div>
+    <?php endif; ?>
+  <?php endif; ?>
   <?php if ($isQuote): ?>
     <div class="doc-sign">
       <div class="doc-sign__box">

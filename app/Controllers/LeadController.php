@@ -55,6 +55,14 @@ class LeadController extends Controller
             $params['assigned'] = $assigned;
         }
 
+        // Without leads.view_all a person sees only what is allocated to
+        // them. Applied in the query rather than filtered afterwards, so a
+        // lead they may not see never reaches the page or its totals.
+        if (!Auth::can('leads.view_all')) {
+            $where[] = 'EXISTS (SELECT 1 FROM lead_assignees la2 WHERE la2.lead_id = l.id AND la2.user_id = :me)';
+            $params['me'] = Auth::id();
+        }
+
         if (in_array($source, self::SOURCES, true)) {
             $where[] = 'l.source = :source';
             $params['source'] = $source;

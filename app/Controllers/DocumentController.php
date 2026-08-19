@@ -27,12 +27,16 @@ class DocumentController extends Controller
         'quotation' => ['label' => 'Quotation', 'path' => '/quotations', 'plural' => 'Quotations'],
         'invoice'   => ['label' => 'Invoice',   'path' => '/invoices',   'plural' => 'Invoices'],
         'receipt'   => ['label' => 'Receipt',   'path' => '/receipts',   'plural' => 'Receipts'],
+        'proposal'  => ['label' => 'Proposal',  'path' => '/proposals',  'plural' => 'Proposals'],
+        'agreement' => ['label' => 'Agreement', 'path' => '/agreements', 'plural' => 'Agreements'],
     ];
 
     private const STATUSES = [
         'quotation' => ['draft', 'sent', 'accepted', 'rejected', 'expired', 'cancelled'],
         'invoice'   => ['draft', 'sent', 'unpaid', 'partial', 'paid', 'overdue', 'cancelled'],
         'receipt'   => ['paid'],
+        'proposal'  => ['draft', 'sent', 'accepted', 'rejected', 'expired', 'cancelled'],
+        'agreement' => ['draft', 'sent', 'accepted', 'cancelled'],
     ];
 
     // -- Listing -------------------------------------------------------
@@ -154,6 +158,7 @@ class DocumentController extends Controller
 
             $docId = Database::insert('documents', $doc);
             $this->saveItems($docId, $payload['items']);
+            $this->saveSections($docId, $payload['sections']);
 
             return $docId;
         });
@@ -244,6 +249,9 @@ class DocumentController extends Controller
 
             Database::delete('document_items', ['document_id' => $doc['id']]);
             $this->saveItems((int) $doc['id'], $payload['items']);
+
+            Database::delete('document_sections', ['document_id' => $doc['id']]);
+            $this->saveSections((int) $doc['id'], $payload['sections']);
         });
 
         ActivityLog::record($type . '_updated', 'document', (int) $doc['id'], 'Updated ' . $doc['doc_number']);
@@ -362,12 +370,18 @@ class DocumentController extends Controller
             ['id' => $doc['id']]
         );
 
+        $sections = Database::all(
+            'SELECT * FROM document_sections WHERE document_id = :id ORDER BY sort_order, id',
+            ['id' => $doc['id']]
+        );
+
         $this->view('documents/print', [
             'title'     => $doc['doc_number'],
             'type'      => $type,
             'meta'      => self::TYPES[$type],
             'doc'       => $doc,
             'items'     => $items,
+            'sections'  => $sections,
             'payments'  => $payments,
             'company'   => Settings::company(),
             'autoPrint' => $request->query('auto') === '1',
@@ -435,6 +449,199 @@ class DocumentController extends Controller
         Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
     }
 
+
+    /**
+     * Proposal → Quotation, carrying the pricing across.
+     *
+     * The two stay linked through parent_document_id, so the quotation
+     * shows what it came from and the proposal shows what it became. The
+     * narrative does not follow: a quotation is a price, and the case for
+     * the work has already been made.
+     */
+    public function convertToQuotation(Request $request): void
+    {
+        $this->authorize('documents.manage');
+
+        $proposal = $this->findOrFail($request->paramInt('id'), 'proposal');
+
+        $existing = Database::first(
+            "SELECT id, doc_number FROM documents
+              WHERE parent_document_id = :id AND doc_type = 'quotation' AND status <> 'cancelled'
+              LIMIT 1",
+            ['id' => $proposal['id']]
+        );
+
+        if ($existing) {
+            Session::warning('This proposal already became quotation ' . $existing['doc_number'] . '.');
+            Response::to('/quotations/' . $existing['id']);
+        }
+
+        $items = Database::all(
+            'SELECT * FROM document_items WHERE document_id = :id ORDER BY sort_order, id',
+            ['id' => $proposal['id']]
+        );
+
+        if (!$items) {
+            Session::error('This proposal has no priced lines, so there is nothing to quote.');
+            Response::to('/proposals/' . $proposal['id']);
+        }
+
+        $validity = Settings::int('quotation_validity_days', 30);
+
+        $quoteId = Database::transaction(function () use ($proposal, $items, $validity) {
+            $quoteId = Database::insert('documents', [
+                'doc_type'           => 'quotation',
+                'doc_number'         => Numbering::next('quotation'),
+                'client_id'          => $proposal['client_id'],
+                'lead_id'            => $proposal['lead_id'],
+                'parent_document_id' => $proposal['id'],
+                'title'              => $proposal['title'],
+                'issue_date'         => date('Y-m-d'),
+                'valid_until'        => date('Y-m-d', strtotime("+{$validity} days")),
+                'status'             => 'draft',
+                'currency'           => $proposal['currency'],
+                'subtotal'           => $proposal['subtotal'],
+                'discount_type'      => $proposal['discount_type'],
+                'discount_value'     => $proposal['discount_value'],
+                'discount_amount'    => $proposal['discount_amount'],
+                'vat_mode'           => $proposal['vat_mode'],
+                'vat_rate'           => $proposal['vat_rate'],
+                'vat_amount'         => $proposal['vat_amount'],
+                'total'              => $proposal['total'],
+                'balance'            => $proposal['total'],
+                'notes'              => $proposal['notes'],
+                'terms'              => Settings::get('quotation_terms', ''),
+                'created_by'         => Auth::id(),
+            ]);
+
+            foreach ($items as $i => $item) {
+                Database::insert('document_items', [
+                    'document_id' => $quoteId,
+                    'item_type'   => $item['item_type'],
+                    'ref_id'      => $item['ref_id'],
+                    'description' => $item['description'],
+                    'quantity'    => $item['quantity'],
+                    'unit'        => $item['unit'],
+                    'unit_price'  => $item['unit_price'],
+                    'line_total'  => $item['line_total'],
+                    'sort_order'  => $i,
+                ]);
+            }
+
+            if ($proposal['status'] !== 'accepted') {
+                Database::update('documents', ['status' => 'accepted'], ['id' => $proposal['id']]);
+            }
+
+            return $quoteId;
+        });
+
+        ActivityLog::record('proposal_converted', 'document', $quoteId,
+            $proposal['doc_number'] . ' became a quotation');
+
+        Session::success('Quotation raised from ' . $proposal['doc_number'] . '. Check it before sending.');
+        Response::to('/quotations/' . $quoteId);
+    }
+
+    /**
+     * Draw up the agreement a client signs before work starts.
+     *
+     * Raised from a proposal or a quotation so the scope and the price on
+     * the agreement are the ones already discussed, rather than retyped.
+     */
+    public function generateAgreement(Request $request): void
+    {
+        $this->authorize('documents.manage');
+
+        $source = Database::first(
+            "SELECT d.*, c.name AS client_name FROM documents d
+               JOIN clients c ON c.id = d.client_id
+              WHERE d.id = :id AND d.doc_type IN ('proposal','quotation')",
+            ['id' => $request->paramInt('id')]
+        );
+
+        if (!$source) {
+            throw new HttpException(404, 'An agreement is raised from a proposal or a quotation.');
+        }
+
+        $existing = Database::first(
+            "SELECT id, doc_number FROM documents
+              WHERE parent_document_id = :id AND doc_type = 'agreement' AND status <> 'cancelled'
+              LIMIT 1",
+            ['id' => $source['id']]
+        );
+
+        if ($existing) {
+            Session::warning('An agreement already exists for this: ' . $existing['doc_number'] . '.');
+            Response::to('/agreements/' . $existing['id']);
+        }
+
+        $items    = Database::all(
+            'SELECT * FROM document_items WHERE document_id = :id ORDER BY sort_order, id',
+            ['id' => $source['id']]
+        );
+        $sections = self::defaultSections('agreement');
+
+        $agreementId = Database::transaction(function () use ($source, $items, $sections) {
+            $agreementId = Database::insert('documents', [
+                'doc_type'           => 'agreement',
+                'doc_number'         => Numbering::next('agreement'),
+                'client_id'          => $source['client_id'],
+                'lead_id'            => $source['lead_id'],
+                'parent_document_id' => $source['id'],
+                'title'              => $source['title'] ?: 'Service agreement',
+                'issue_date'         => date('Y-m-d'),
+                'status'             => 'draft',
+                'currency'           => $source['currency'],
+                'subtotal'           => $source['subtotal'],
+                'discount_type'      => $source['discount_type'],
+                'discount_value'     => $source['discount_value'],
+                'discount_amount'    => $source['discount_amount'],
+                'vat_mode'           => $source['vat_mode'],
+                'vat_rate'           => $source['vat_rate'],
+                'vat_amount'         => $source['vat_amount'],
+                'total'              => $source['total'],
+                'balance'            => $source['total'],
+                'terms'              => Settings::get('invoice_terms', ''),
+                'created_by'         => Auth::id(),
+            ]);
+
+            foreach ($items as $i => $item) {
+                Database::insert('document_items', [
+                    'document_id' => $agreementId,
+                    'item_type'   => $item['item_type'],
+                    'ref_id'      => $item['ref_id'],
+                    'description' => $item['description'],
+                    'quantity'    => $item['quantity'],
+                    'unit'        => $item['unit'],
+                    'unit_price'  => $item['unit_price'],
+                    'line_total'  => $item['line_total'],
+                    'sort_order'  => $i,
+                ]);
+            }
+
+            // The standard clauses, with the parties filled in so nobody
+            // sends an agreement still saying {client_name}.
+            foreach ($sections as $i => $section) {
+                Database::insert('document_sections', [
+                    'document_id' => $agreementId,
+                    'heading'     => $section['heading'],
+                    'body'        => strtr($section['body'], [
+                        '{client_name}'  => $source['client_name'],
+                        '{company_name}' => Settings::get('company_name', 'Shanfix Technology'),
+                    ]),
+                    'sort_order'  => $i,
+                ]);
+            }
+
+            return $agreementId;
+        });
+
+        ActivityLog::record('agreement_created', 'document', $agreementId,
+            'Agreement drawn up from ' . $source['doc_number']);
+
+        Session::success('Agreement drafted. Review the clauses before sending it.');
+        Response::to('/agreements/' . $agreementId);
+    }
     /** Quotation → Invoice, copying line items across. */
     public function convertToInvoice(Request $request): void
     {
@@ -791,11 +998,22 @@ class DocumentController extends Controller
             'inventory'     => $inventory,
             'services'      => $services,
             'existingItems' => [],
+            'existingSections' => $doc
+                ? Database::all(
+                    'SELECT * FROM document_sections WHERE document_id = :id ORDER BY sort_order, id',
+                    ['id' => $doc['id']]
+                  )
+                : self::defaultSections($type),
+            'isNarrative'   => in_array($type, self::NARRATIVE_TYPES, true),
             'vatRate'       => Settings::vatRate(),
             'defaultTerms'  => $type === 'quotation'
                 ? Settings::get('quotation_terms', '')
                 : Settings::get('invoice_terms', ''),
-            'validityDays'  => Settings::int('quotation_validity_days', 30),
+            // A proposal usually stands longer than a quotation, so it has
+            // its own window rather than borrowing the quotation's.
+            'validityDays'  => $type === 'proposal'
+                ? Settings::int('proposal_validity_days', 30)
+                : Settings::int('quotation_validity_days', 30),
             'dueDays'       => Settings::int('invoice_due_days', 14),
         ];
     }
@@ -936,9 +1154,80 @@ class DocumentController extends Controller
             $document['balance']     = $totals['total'];
         }
 
-        return ['document' => $document, 'items' => $items];
+        return [
+            'document' => $document,
+            'items'    => $items,
+            'sections' => $this->sectionsFromRequest($request),
+        ];
     }
 
+
+    /**
+     * Section blocks posted from the form.
+     *
+     * A block with neither a heading nor a body is a row the operator left
+     * behind, not an instruction to print an empty box.
+     */
+    private function sectionsFromRequest(Request $request): array
+    {
+        $out = [];
+
+        foreach ((array) $request->input('sections', []) as $i => $row) {
+            $heading = trim((string) ($row['heading'] ?? ''));
+            $body    = trim((string) ($row['body'] ?? ''));
+
+            if ($heading === '' && $body === '') {
+                continue;
+            }
+
+            $out[] = [
+                'heading'    => mb_substr($heading !== '' ? $heading : 'Section', 0, 200),
+                'body'       => $body !== '' ? $body : null,
+                'sort_order' => (int) $i,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function saveSections(int $documentId, array $sections): void
+    {
+        foreach ($sections as $section) {
+            Database::insert('document_sections', $section + ['document_id' => $documentId]);
+        }
+    }
+
+    /**
+     * The headings a new proposal or agreement starts from.
+     *
+     * Held in Settings as "Heading|Body" lines so an operator can shape
+     * their own house style once instead of retyping it every time.
+     *
+     * @return array<int,array{heading:string, body:string}>
+     */
+    private static function defaultSections(string $type): array
+    {
+        if (!in_array($type, self::NARRATIVE_TYPES, true)) {
+            return [];
+        }
+
+        $raw = (string) Settings::get('tpl_' . $type . '_sections', '');
+        $out = [];
+
+        foreach (preg_split('/\R/', $raw) as $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            [$heading, $body] = array_pad(explode('|', $line, 2), 2, '');
+
+            $out[] = ['heading' => trim($heading), 'body' => trim($body)];
+        }
+
+        return $out;
+    }
     private function saveItems(int $documentId, array $items): void
     {
         foreach ($items as $item) {

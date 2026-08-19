@@ -121,6 +121,62 @@ $watching = (int) \App\Core\Session::get('public_stk_id', 0);
   </div>
 <?php endif; ?>
 
+
+<?php if ($doc['doc_type'] === 'agreement'): ?>
+  <?php if (!empty($doc['accepted_at'])): ?>
+    <div class="print-bar no-print" style="margin-bottom:14px">
+      <div class="alert alert--success mb-0" style="width:100%">
+        <?= icon('check-circle') ?>
+        <div class="alert__body">
+          <strong>You accepted this agreement.</strong>
+          <?= e($doc['accepted_name']) ?> on <?= e(fdate($doc['accepted_at'], 'd M Y \a\t H:i')) ?>.
+          Keep a copy using <strong>Print</strong> above.
+        </div>
+      </div>
+    </div>
+  <?php else: ?>
+    <div class="print-bar no-print" style="margin-bottom:14px">
+      <div class="card mb-0" style="width:100%">
+        <div class="card__body">
+          <div class="text-xs uppercase fw-700 text-muted mb-8">Accept this agreement</div>
+          <p class="text-sm text-muted">
+            Please read the terms below. Typing your name and accepting has the
+            same effect as signing it.
+          </p>
+
+          <form method="post" action="<?= url('view/' . $token . '/accept') ?>">
+            <?= csrf_field() ?>
+
+            <div class="field">
+              <label class="label" for="accepted_name">Your full name</label>
+              <input class="input" id="accepted_name" name="accepted_name"
+                     maxlength="160" required
+                     value="<?= e($doc['client_contact'] ?? '') ?>">
+            </div>
+
+            <label class="check">
+              <input type="checkbox" name="confirm" value="1" required>
+              <span class="check__text">
+                <span>
+                  I have read and agree to the terms of
+                  <strong><?= e($doc['doc_number']) ?></strong>, on behalf of
+                  <strong><?= e($doc['client_name']) ?></strong>.
+                </span>
+              </span>
+            </label>
+
+            <button class="btn btn--primary btn--block mt-12" type="submit">
+              <?= icon('check') ?> Accept and proceed
+            </button>
+            <p class="field-hint mt-8 mb-0" style="text-align:center">
+              The date, time and your network address are recorded with your acceptance.
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>
+  <?php endif; ?>
+<?php endif; ?>
 <div class="doc-sheet">
 
   <header class="doc-head">
@@ -186,6 +242,16 @@ $watching = (int) \App\Core\Session::get('public_stk_id', 0);
       <?php endif; ?>
     </div>
   </section>
+
+  <?php // A proposal or agreement is mostly prose; it prints above the pricing. ?>
+  <?php foreach (($sections ?? []) as $section): ?>
+    <section class="doc-section doc-section--narrative">
+      <div class="doc-section__label"><?= e($section['heading']) ?></div>
+      <?php if (!empty($section['body'])): ?>
+        <div class="doc-section__body"><?= e($section['body']) ?></div>
+      <?php endif; ?>
+    </section>
+  <?php endforeach; ?>
 
   <table class="doc-table">
     <thead>

@@ -124,6 +124,54 @@ $rows = $existingItems ?: [];
     </div>
   </div>
 
+
+  <?php if (!empty($isNarrative)): ?>
+    <?php
+    // A proposal or an agreement is mostly prose. New documents start from
+    // the house headings in Settings, so nobody retypes them each time.
+    $sectionRows = $existingSections ?: [];
+    $sectionRows[] = ['heading' => '', 'body' => ''];
+    ?>
+    <div class="card">
+      <div class="card__head">
+        <?= icon('file-text') ?>
+        <div>
+          <div class="card__title">
+            <?= $type === 'agreement' ? 'Clauses' : 'What the client reads' ?>
+          </div>
+          <div class="card__sub">
+            <?= $type === 'agreement'
+                ? 'The terms being agreed. Edit them to fit this piece of work.'
+                : 'Your case for the work. The pricing goes in the lines below.' ?>
+            Leave a block empty to drop it.
+          </div>
+        </div>
+        <div class="card__actions">
+          <button class="btn btn--outline btn--sm" type="button" id="add-section">
+            <?= icon('plus') ?> Add block
+          </button>
+        </div>
+      </div>
+      <div class="card__body" id="sections-wrap">
+        <?php foreach ($sectionRows as $i => $sec): ?>
+          <div class="section-block" data-section>
+            <div class="field">
+              <input class="input fw-600" name="sections[<?= $i ?>][heading]"
+                     value="<?= e($sec['heading'] ?? '') ?>"
+                     placeholder="Heading — for example, Scope of work">
+            </div>
+            <div class="field">
+              <textarea class="textarea" rows="4" name="sections[<?= $i ?>][body]"
+                        placeholder="Write this section…"><?= e($sec['body'] ?? '') ?></textarea>
+            </div>
+            <button class="btn btn--outline btn--sm" type="button" data-remove-section>
+              <?= icon('trash') ?> Remove
+            </button>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  <?php endif; ?>
   <div class="grid-sidebar">
     <div>
       <div class="card">
@@ -395,3 +443,47 @@ $rows = $existingItems ?: [];
 <script src="<?= asset('js/catalog-init.js') ?>"></script>
 
 <?php endif; ?>
+
+<?php // Adding and removing narrative blocks. Indexes are renumbered on
+      // submit so a removed block does not leave a hole in the array. ?>
+<script nonce="<?= e(csp_nonce()) ?>">
+(function () {
+  var wrap = document.getElementById('sections-wrap');
+  var add  = document.getElementById('add-section');
+  if (!wrap || !add) return;
+
+  function renumber() {
+    wrap.querySelectorAll('[data-section]').forEach(function (block, i) {
+      var h = block.querySelector('[name*="[heading]"]');
+      var b = block.querySelector('[name*="[body]"]');
+      if (h) h.name = 'sections[' + i + '][heading]';
+      if (b) b.name = 'sections[' + i + '][body]';
+    });
+  }
+
+  add.addEventListener('click', function () {
+    var last  = wrap.querySelector('[data-section]:last-child');
+    var block = last.cloneNode(true);
+    block.querySelectorAll('input, textarea').forEach(function (f) { f.value = ''; });
+    wrap.appendChild(block);
+    renumber();
+    var heading = block.querySelector('input');
+    if (heading) heading.focus();
+  });
+
+  wrap.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-remove-section]');
+    if (!btn) return;
+
+    // Never remove the last one, or there is no way to add another back.
+    if (wrap.querySelectorAll('[data-section]').length <= 1) {
+      btn.closest('[data-section]').querySelectorAll('input, textarea')
+         .forEach(function (f) { f.value = ''; });
+      return;
+    }
+
+    btn.closest('[data-section]').remove();
+    renumber();
+  });
+})();
+</script>

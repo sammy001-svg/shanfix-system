@@ -53,6 +53,29 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
           <?= csrf_field() ?>
           <button class="btn btn--primary" type="submit"><?= icon('arrow-right') ?> Convert to invoice</button>
         </form>
+
+      <?php if ($type === 'proposal' && !in_array($doc['status'], ['cancelled', 'rejected'], true)): ?>
+        <form method="post" action="<?= url('/proposals/' . $doc['id'] . '/convert') ?>" style="display:inline"
+              data-confirm="Raise a quotation from <?= e($doc['doc_number']) ?>?">
+          <?= csrf_field() ?>
+          <button class="btn btn--primary" type="submit">
+            <?= icon('arrow-right') ?> Convert to quotation
+          </button>
+        </form>
+      <?php endif; ?>
+
+      <?php // An agreement is drawn up from whatever was actually agreed. ?>
+      <?php if (in_array($type, ['proposal', 'quotation'], true)
+                && !in_array($doc['status'], ['cancelled', 'rejected'], true)): ?>
+        <form method="post" action="<?= url('/' . $type . 's/' . $doc['id'] . '/agreement') ?>"
+              style="display:inline"
+              data-confirm="Draw up a service agreement from <?= e($doc['doc_number']) ?>?">
+          <?= csrf_field() ?>
+          <button class="btn btn--outline" type="submit">
+            <?= icon('shield') ?> Draw up agreement
+          </button>
+        </form>
+      <?php endif; ?>
       <?php endif; ?>
 
       <?php if ($isInvoice && $paid > 0): ?>

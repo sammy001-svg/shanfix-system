@@ -3056,3 +3056,24 @@ body.has-offline-bar .content { padding-bottom: 56px; }
 @media print {
   .offline-bar, .offline-toast { display: none !important; }
 }
+
+/* Narrative blocks on a proposal or agreement. */
+.section-block {
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+.section-block:last-child { margin-bottom: 0; }
+.section-block .field { margin-bottom: 10px; }
+
+/* Narrative blocks reuse .doc-section, which terms already use. They only
+   need to survive a page break and keep their heading with their body. */
+.doc-section--narrative { page-break-inside: avoid; }
+
+.doc-accept {
+  margin-top: 22px; padding: 16px 18px;
+  border: 2px solid var(--green-600, #0F6B3E); border-radius: var(--r);
+  background: var(--tint-green, #EDF8F2);
+}

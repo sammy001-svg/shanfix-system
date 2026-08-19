@@ -13,7 +13,7 @@ cPanel by uploading files.
 | **Dashboard** | Cash collected, outstanding balances, overdue invoices, hot deals, low stock, your follow-ups |
 | **Leads** | Kanban pipeline (New → Contacted → Qualified → Proposal → Negotiation → Won/Lost), activity logging, follow-up reminders, one-click conversion to a client |
 | **Clients** | Register clients, then raise quotations, invoices and receipts from their profile; full billing history and outstanding balance |
-| **Quotations → Invoices → Receipts** | One document engine. Convert a quote to an invoice in a click, issue a receipt once paid. A4 print/PDF view with your logo |
+| **Proposals → Quotations → Invoices → Receipts** | One document engine. Convert a quote to an invoice in a click, issue a receipt once paid. A4 print/PDF view with your logo |
 | **Production** | Job cards from an invoice in one click. Board across Queued → Artwork → Proof Sent → Approved → In Production → Finishing → Ready → Delivered. Artwork/proof uploads with versioning, recorded client approval, shop-floor checklist, printable job card, per-job costing |
 | **Delivery Notes** | Raised from a job card, printed with a signature line. Confirming receipt closes the job automatically |
 | **Email & SMS** | Send quotations and invoices to clients, payment confirmations, automatic overdue chasing, and "your order is ready" texts. Every send is logged with its delivery status |
@@ -434,6 +434,97 @@ goods actually left, which is the only figure that means anything.
 > until now. Take a stock count when you deploy it and adjust once.
 
 ---
+
+
+---
+
+## Buying: suppliers and purchase orders
+
+Stock used to arrive only through a manual adjustment, and `cost_price` was
+whatever somebody typed — so every margin figure rested on a guess. Purchasing
+replaces that with a real trail.
+
+**Suppliers** hold contact details, KRA PIN and payment terms. A supplier you
+have bought from is retired rather than deleted, so old orders keep their name.
+
+**Raise a purchase order**, mark it *ordered* when it goes to the supplier, then
+book the goods in when they arrive. Only an order that has been placed can
+receive goods — a draft is still a working document.
+
+### What happens when goods arrive
+
+| | |
+|---|---|
+| Stock lines | Quantity goes up, and a movement is recorded against the order |
+| Non-stock lines | Delivery charges and the like are costed, but nothing goes on a shelf |
+| Part deliveries | Enter what actually turned up; the order sits at *partial* until the rest arrives |
+| Over-delivery | Capped at what was outstanding, with a warning — a supplier sending extra is a conversation, not a silent stock gain |
+
+### Cost prices look after themselves
+
+Receiving updates `cost_price` as a **weighted average**. Hold 900 pens at KES 10
+and take in 100 at KES 20, and the cost becomes KES 11 — not KES 20. A single
+delivery at a new price does not rewrite the value of everything already on the
+shelf; it moves the average in proportion to how much of each you hold.
+
+That number is what gets stamped onto an invoice line when you sell, so margin is
+worked out against what the goods actually cost you.
+
+> Receiving is deliberately separate from paying. The order records what you
+> bought and what it cost; recording the money going out is still an expense
+> against that supplier.
+
+
+---
+
+## Proposals and agreements
+
+Two more document types on the same engine as quotations and invoices, so they
+share numbering, client links, VAT, printing and the share link.
+
+### Proposal → Quotation
+
+A proposal is the written pitch **and** the price. It opens with your house
+headings — introduction, understanding of the requirement, approach, scope, what
+is not included, timeline — which you edit once in Settings rather than retyping
+on every job. Underneath sit ordinary priced lines, picked from your inventory
+and services in the usual way.
+
+Press **Convert to quotation** and the pricing carries straight across. The two
+stay linked, so the quotation shows what it came from and the proposal shows what
+it became. The narrative does not follow: a quotation is a price, and the case for
+the work has already been made.
+
+The quotation then converts to an invoice exactly as before, giving a full chain:
+
+```
+Proposal → Quotation → Invoice → Receipt
+```
+
+### Purchase agreements
+
+**Draw up agreement** on a proposal or a quotation drafts the contract from what
+was actually agreed, so the scope and the price are the ones already discussed
+rather than retyped. It starts from a standard set of clauses — parties, services,
+fees, client responsibilities, intellectual property, confidentiality, variations,
+termination and governing law — with the two company names already filled in.
+Edit them to fit the work before sending.
+
+### How a client accepts
+
+Send the agreement and the client opens it on the same kind of share link as an
+invoice. They read the clauses, type their full name, tick the confirmation and
+accept.
+
+What makes that stand as evidence is not the click but the record of it: **who
+typed their name, when, and from which address**, stored against the agreement and
+printed alongside the clauses. An agreement already accepted cannot be accepted
+again, so a forwarded link or a stale tab cannot produce a second, contradictory
+record.
+
+If the client would rather sign on paper, print it — an unaccepted agreement
+carries signature blocks for both parties, and those disappear once it has been
+accepted online.
 
 ## Roles
 

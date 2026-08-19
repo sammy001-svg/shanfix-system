@@ -124,6 +124,9 @@ if ($me && can('jobs.view')) {
       <?php endif; ?>
 
       <?php if (can('documents.view')): ?>
+        <a class="nav-link <?= is_active_nav('/proposals') ? 'is-active' : '' ?>" href="<?= url('/proposals') ?>">
+          <?= icon('briefcase', 'nav-link__icon') ?> Proposals
+        </a>
         <a class="nav-link <?= is_active_nav('/quotations') ? 'is-active' : '' ?>" href="<?= url('/quotations') ?>">
           <?= icon('file-text', 'nav-link__icon') ?> Quotations
         </a>
@@ -132,6 +135,9 @@ if ($me && can('jobs.view')) {
         </a>
         <a class="nav-link <?= is_active_nav('/receipts') ? 'is-active' : '' ?>" href="<?= url('/receipts') ?>">
           <?= icon('check-circle', 'nav-link__icon') ?> Receipts
+        </a>
+        <a class="nav-link <?= is_active_nav('/agreements') ? 'is-active' : '' ?>" href="<?= url('/agreements') ?>">
+          <?= icon('shield', 'nav-link__icon') ?> Agreements
         </a>
       <?php endif; ?>
 
@@ -154,6 +160,11 @@ if ($me && can('jobs.view')) {
       <?php if (can('inventory.view')): ?>
         <a class="nav-link <?= is_active_nav('/inventory') ? 'is-active' : '' ?>" href="<?= url('/inventory') ?>">
           <?= icon('package', 'nav-link__icon') ?> Inventory
+        </a>
+      <?php endif; ?>
+      <?php if (can('purchases.view')): ?>
+        <a class="nav-link <?= is_active_nav('/purchase-orders') ? 'is-active' : '' ?>" href="<?= url('/purchase-orders') ?>">
+          <?= icon('inbox', 'nav-link__icon') ?> Purchasing
         </a>
       <?php endif; ?>
       <?php if (can('services.view')): ?>
