@@ -31,6 +31,15 @@ class DocumentController extends Controller
         'agreement' => ['label' => 'Agreement', 'path' => '/agreements', 'plural' => 'Agreements'],
     ];
 
+    /**
+     * The document types that are mostly prose rather than line items.
+     *
+     * A quotation or an invoice is a table of things and prices. A proposal
+     * argues for the work and an agreement sets out terms, so both carry
+     * headed sections of writing above the pricing — and both start from the
+     * house wording held in Settings rather than a blank page.
+     */
+    private const NARRATIVE_TYPES = ['proposal', 'agreement'];
     private const STATUSES = [
         'quotation' => ['draft', 'sent', 'accepted', 'rejected', 'expired', 'cancelled'],
         'invoice'   => ['draft', 'sent', 'unpaid', 'partial', 'paid', 'overdue', 'cancelled'],
