@@ -51,7 +51,7 @@ class LeadController extends Controller
         }
 
         if ($assigned > 0) {
-            $where[] = 'l.assigned_to = :assigned';
+            $where[] = 'EXISTS (SELECT 1 FROM lead_assignees la WHERE la.lead_id = l.id AND la.user_id = :assigned)';
             $params['assigned'] = $assigned;
         }
 
