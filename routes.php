@@ -41,6 +41,7 @@ use App\Controllers\SubscriptionController;
 use App\Controllers\SettingsController;
 use App\Controllers\SupplierController;
 use App\Controllers\SmsCampaignController;
+use App\Controllers\ThreadController;
 use App\Controllers\UserController;
 use App\Controllers\WhatsAppController;
 use App\Controllers\WhatsAppWebhookController;
@@ -516,6 +517,10 @@ $r->group(['auth'], function ($r) {
         $r->post('/leads/{id}/reminder',  [LeadController::class, 'addReminder']);
     });
 
+    // A lead becomes a quotation or proposal without anyone retyping it.
+    $r->post('/leads/{id}/document', [LeadController::class, 'raiseDocument'],
+             ['permission:documents.manage', 'csrf']);
+
     $r->post('/leads/{id}/convert', [LeadController::class, 'convert'], ['permission:clients.manage', 'csrf']);
     $r->post('/leads/{id}/delete',  [LeadController::class, 'destroy'], ['permission:leads.delete', 'csrf']);
 
@@ -634,6 +639,9 @@ $r->group(['auth'], function ($r) {
     $r->get('/reports/statement', [ReportController::class, 'exportStatement'], ['permission:reports.view']);
 
     // -- Chat
+    // Discussion attached to a job, client, document or artwork request.
+    $r->post('/threads/post', [ThreadController::class, 'post'], ['permission:chat.use', 'csrf']);
+
     $r->group(['permission:chat.use'], function ($r) {
         $r->get('/chat',                [ChatController::class, 'index']);
         $r->get('/chat/poll',           [ChatController::class, 'poll']);

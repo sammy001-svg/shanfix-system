@@ -199,6 +199,13 @@ $canSend  = $latest !== null && can('artwork.design')
       <?php endif; ?>
     </div>
 
+    <?php
+    $threadType  = 'artwork';
+    $threadId    = (int) $artwork['id'];
+    $threadTitle = $artwork['request_number'];
+    require APP_PATH . '/Views/partials/thread.php';
+    ?>
+
   </div>
 
   <aside>

@@ -400,6 +400,13 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
       </div>
     </div>
   </div>
+    <?php
+    $threadType  = 'job';
+    $threadId    = (int) $job['id'];
+    $threadTitle = $job['job_number'];
+    require APP_PATH . '/Views/partials/thread.php';
+    ?>
+
 
   <aside>
     <!-- Stage control -->

@@ -9,6 +9,7 @@ use App\Core\HttpException;
 use App\Core\Numbering;
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\Settings;
 use App\Core\Session;
 use App\Core\Validator;
 
@@ -409,6 +410,174 @@ class LeadController extends Controller
         Response::to('/leads/' . $lead['id']);
     }
 
+
+    /**
+     * Raise a quotation or proposal straight from a lead.
+     *
+     * A document needs a client, and a lead is not one yet — so the client
+     * record is created here if it does not exist. That is not the same as
+     * winning the deal: quoting somebody makes them a prospect worth having
+     * on file, and the lead stays in the pipeline until they say yes.
+     */
+    public function raiseDocument(Request $request): void
+    {
+        $this->authorize('documents.manage');
+
+        $lead = $this->findOrFail($request->paramInt('id'));
+        $type = (string) $request->input('type', 'quotation');
+
+        if (!in_array($type, ['quotation', 'proposal'], true)) {
+            throw new HttpException(422, 'A lead can become a quotation or a proposal.');
+        }
+
+        if (in_array($lead['stage'], ['lost'], true)) {
+            Session::error('This lead is marked lost. Reopen it before quoting.');
+            Response::to('/leads/' . $lead['id']);
+        }
+
+        $clientId = $this->ensureClient($lead);
+
+        $validity = Settings::int($type === 'proposal' ? 'proposal_validity_days' : 'quotation_validity_days', 30);
+        $value    = (float) $lead['estimated_value'];
+        $vatRate  = Settings::vatRate();
+
+        // The estimate is a starting figure, not a quote. It is entered as a
+        // single line so the person can break it up properly before sending.
+        $vat   = round($value * ($vatRate / 100), 2);
+        $total = round($value + $vat, 2);
+
+        $docId = Database::transaction(function () use ($lead, $type, $clientId, $validity, $value, $vatRate, $vat, $total) {
+            $docId = Database::insert('documents', [
+                'doc_type'    => $type,
+                'doc_number'  => Numbering::next($type),
+                'client_id'   => $clientId,
+                'lead_id'     => $lead['id'],
+                'title'       => $lead['requirement']
+                    ? mb_substr(trim(preg_replace('/\s+/', ' ', $lead['requirement'])), 0, 200)
+                    : $lead['name'],
+                'issue_date'  => date('Y-m-d'),
+                'valid_until' => date('Y-m-d', strtotime("+{$validity} days")),
+                'status'      => 'draft',
+                'currency'    => Settings::currency(),
+                'subtotal'    => $value,
+                'vat_mode'    => 'exclusive',
+                'vat_rate'    => $vatRate,
+                'vat_amount'  => $vat,
+                'total'       => $total,
+                'balance'     => $total,
+                'notes'       => 'Raised from lead ' . $lead['lead_number'] . '.',
+                'terms'       => Settings::get($type === 'proposal' ? 'invoice_terms' : 'quotation_terms', ''),
+                'created_by'  => Auth::id(),
+            ]);
+
+            if ($value > 0) {
+                Database::insert('document_items', [
+                    'document_id' => $docId,
+                    'item_type'   => $lead['service_id'] ? 'service' : 'custom',
+                    'ref_id'      => $lead['service_id'] ?: null,
+                    'description' => $lead['service_name']
+                        ?: ($lead['requirement'] ? mb_substr($lead['requirement'], 0, 500) : 'As discussed'),
+                    'quantity'    => 1,
+                    'unit'        => null,
+                    'unit_price'  => $value,
+                    'line_total'  => $value,
+                    'sort_order'  => 0,
+                ]);
+            }
+
+            // Quoting moves the lead along, but never backwards: a lead
+            // already in negotiation should not drop to proposal because
+            // somebody raised a revised quote.
+            $order = array_keys(self::STAGES);
+            $now   = array_search($lead['stage'], $order, true);
+            $to    = array_search('proposal', $order, true);
+
+            if ($now !== false && $to !== false && $now < $to) {
+                Database::update('leads', [
+                    'stage'       => 'proposal',
+                    'probability' => self::STAGES['proposal']['probability'],
+                ], ['id' => $lead['id']]);
+            }
+
+            Database::insert('lead_activities', [
+                'lead_id'       => $lead['id'],
+                'user_id'       => Auth::id(),
+                'activity_type' => 'quotation_sent',
+                'subject'       => ucfirst($type) . ' raised',
+                'notes'         => ucfirst($type) . ' drafted from this lead.',
+            ]);
+
+            return $docId;
+        });
+
+        ActivityLog::record(
+            'lead_' . $type,
+            'lead',
+            (int) $lead['id'],
+            $lead['lead_number'] . ' became a ' . $type
+        );
+
+        Session::success(
+            ucfirst($type) . ' drafted from ' . $lead['lead_number']
+            . '. Check the lines and the price before sending it.'
+        );
+
+        Response::to(($type === 'proposal' ? '/proposals/' : '/quotations/') . $docId . '/edit');
+    }
+
+    /**
+     * The client record behind a lead, created on demand.
+     *
+     * Shared with convert(), which additionally marks the lead won. Keeping
+     * the two apart is the point: quoting someone should not close the deal
+     * on their behalf.
+     */
+    private function ensureClient(array $lead): int
+    {
+        if ($lead['converted_client_id']) {
+            return (int) $lead['converted_client_id'];
+        }
+
+        // An existing client with the same number or address is almost always
+        // the same person, so reuse them rather than making a second record.
+        if ($lead['phone'] || $lead['email']) {
+            $existing = Database::first(
+                'SELECT id FROM clients
+                  WHERE (phone IS NOT NULL AND phone = :phone)
+                     OR (email IS NOT NULL AND email = :email)
+                  LIMIT 1',
+                ['phone' => $lead['phone'] ?: '~none~', 'email' => $lead['email'] ?: '~none~']
+            );
+
+            if ($existing) {
+                Database::update(
+                    'leads',
+                    ['converted_client_id' => $existing['id']],
+                    ['id' => $lead['id']]
+                );
+
+                return (int) $existing['id'];
+            }
+        }
+
+        $clientId = Database::insert('clients', [
+            'client_code'    => Numbering::next('client'),
+            'client_type'    => $lead['company'] ? 'company' : 'individual',
+            'name'           => $lead['company'] ?: $lead['name'],
+            'contact_person' => $lead['company'] ? $lead['name'] : null,
+            'email'          => $lead['email'],
+            'phone'          => $lead['phone'],
+            'notes'          => 'Created from lead ' . $lead['lead_number'] . ' when quoting.',
+            'source_lead_id' => $lead['id'],
+            'status'         => 'active',
+            'created_by'     => Auth::id(),
+        ]);
+
+        // Linked, but the lead is not marked won — that is convert()'s job.
+        Database::update('leads', ['converted_client_id' => $clientId], ['id' => $lead['id']]);
+
+        return (int) $clientId;
+    }
     /** Won lead → client record, carrying the details across. */
     public function convert(Request $request): void
     {

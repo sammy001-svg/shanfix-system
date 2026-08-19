@@ -35,6 +35,26 @@ $activityIcon = static fn(string $type): string => match ($type) {
   </div>
 
   <div class="page-head__actions">
+    <?php // A lead becomes a priced document without anyone retyping it. ?>
+    <?php if (can('documents.manage') && $lead['stage'] !== 'lost'): ?>
+      <form method="post" action="<?= url('/leads/' . $lead['id'] . '/document') ?>"
+            style="display:inline">
+        <?= csrf_field() ?>
+        <input type="hidden" name="type" value="quotation">
+        <button class="btn btn--outline" type="submit">
+          <?= icon('file-text') ?> Raise quotation
+        </button>
+      </form>
+      <form method="post" action="<?= url('/leads/' . $lead['id'] . '/document') ?>"
+            style="display:inline">
+        <?= csrf_field() ?>
+        <input type="hidden" name="type" value="proposal">
+        <button class="btn btn--outline" type="submit">
+          <?= icon('briefcase') ?> Raise proposal
+        </button>
+      </form>
+    <?php endif; ?>
+
     <?php if (can('leads.manage') && !$isClosed): ?>
       <button class="btn btn--primary" type="button" data-modal-open="activity-modal">
         <?= icon('plus') ?> Log activity
