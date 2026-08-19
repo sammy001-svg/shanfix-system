@@ -128,11 +128,12 @@ if ($me && can('jobs.view')) {
           <?= icon('users', 'nav-link__icon') ?> Clients
         </a>
 
-        <?php if (can('requests.view')): ?>
-          <a class="nav-link <?= is_active_nav('/requests') ? 'is-active' : '' ?>" href="<?= url('/requests') ?>">
-            <?= icon('inbox', 'nav-link__icon') ?> Job briefs
-          </a>
-        <?php endif; ?>
+      <?php endif; ?>
+
+      <?php if (can('requests.view')): ?>
+        <a class="nav-link <?= is_active_nav('/requests') ? 'is-active' : '' ?>" href="<?= url('/requests') ?>">
+          <?= icon('inbox', 'nav-link__icon') ?> Job briefs
+        </a>
       <?php endif; ?>
 
       <?php if (can('documents.view')): ?>

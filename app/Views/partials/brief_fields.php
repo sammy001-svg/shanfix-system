@@ -13,9 +13,9 @@ $answers = $answers ?? [];
 // A failed submission comes back with everything still typed in, which on
 // a phone is the difference between finishing and giving up.
 $valueFor = static function (array $field) use ($answers) {
-    $old = Session::old('answers', null);
+    $old = old_array('answers');
 
-    if (is_array($old) && array_key_exists($field['key'], $old)) {
+    if (array_key_exists($field['key'], $old)) {
         return $old[$field['key']];
     }
 
