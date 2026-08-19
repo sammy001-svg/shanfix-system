@@ -811,12 +811,36 @@ class LeadController extends Controller
         return Database::all('SELECT id, name, selling_price FROM inventory_items WHERE is_active = 1 ORDER BY name');
     }
 
+    /**
+     * Everyone who can be given a lead to work.
+     *
+     * Derived from who holds leads.manage rather than a list of role names
+     * written out again here. That matters twice over: reception log and
+     * chase walk-ins, so they belong in the box; and a second hand-kept list
+     * is exactly the thing that quietly stops matching the permission table
+     * it is meant to mirror.
+     *
+     * Matched against user_roles, not users.role. Someone may hold sales as
+     * a second role, and reading only the primary one would leave them out
+     * of a list they plainly belong in.
+     */
     private function salesUsers(): array
     {
+        $roles = Auth::rolesWith('leads.manage');
+
+        if ($roles === []) {
+            return [];
+        }
+
+        $slots = implode(',', array_fill(0, count($roles), '?'));
+
         return Database::all(
-            "SELECT id, name, role, avatar_color FROM users
-              WHERE is_active = 1 AND role IN ('admin','manager','sales')
-           ORDER BY name"
+            "SELECT DISTINCT u.id, u.name, u.role, u.avatar_color
+               FROM users u
+               JOIN user_roles ur ON ur.user_id = u.id
+              WHERE u.is_active = 1 AND ur.role IN ({$slots})
+           ORDER BY u.name",
+            $roles
         );
     }
 }

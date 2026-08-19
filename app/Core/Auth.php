@@ -601,6 +601,20 @@ class Auth
         return array_intersect($allowed, $held) !== [];
     }
 
+    /**
+     * Which roles hold a permission.
+     *
+     * Lets a query ask "who could own this?" without a second hand-written
+     * list of role names drifting out of step with the table above. The
+     * roles that may act on leads, for instance, are exactly the roles that
+     * should appear in the box that assigns one.
+     *
+     * @return string[]
+     */
+    public static function rolesWith(string $permission): array
+    {
+        return self::PERMISSIONS[$permission] ?? [];
+    }
     /** Abort with 403 unless the current user holds the permission. */
     public static function authorize(string $permission): void
     {
