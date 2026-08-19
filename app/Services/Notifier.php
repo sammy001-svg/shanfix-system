@@ -42,12 +42,12 @@ class Notifier
 
         // Account
         'statement_sent'      => 'Statement of account',
+
+        // Artwork
+        'artwork_ready'       => 'Artwork ready for client approval',
+        'artwork_approved'    => 'Artwork approved — thank you',
     ];
 
-    /**
-     * Events whose message is about a job or a delivery rather than a
-     * document. The email template uses this to pick the detail block.
-     */
     /**
      * Characters of the share token used in the SMS short link. Ten hex
      * characters is 40 bits — far too many to guess — and saves about 41
@@ -56,6 +56,10 @@ class Notifier
      */
     public const SHORT_TOKEN_LENGTH = 10;
 
+    /**
+     * Events whose message is about a job or a delivery rather than a
+     * document. The email template uses this to pick the detail block.
+     */
     public const JOB_EVENTS = [
         'proof_ready', 'job_in_production', 'job_ready',
         'delivery_dispatched', 'delivery_confirmed',

@@ -28,6 +28,7 @@ class Auth
         'finance'    => 'Finance — invoicing, payments, expenses and reports',
         'sales'      => 'Sales — leads, clients, quotations and invoices',
         'production' => 'Production — job cards, artwork, printing and delivery notes',
+        'designer'   => 'Designer — artwork requests, proofs and client approvals',
         'reception'  => 'Reception — front desk: walk-in clients and enquiries, quotations, taking payment, job status',
         'staff'      => 'Staff — read-only across modules, plus team chat',
     ];
@@ -44,15 +45,15 @@ class Auth
      * anyone's account.
      */
     private const PERMISSIONS = [
-        'dashboard.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'dashboard.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
 
-        'inventory.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'inventory.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'inventory.manage'  => ['admin', 'manager', 'production'],
 
-        'services.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'services.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'services.manage'   => ['admin', 'manager'],
 
-        'clients.view'      => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'clients.view'      => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'clients.manage'    => ['admin', 'manager', 'sales', 'reception'],
         'clients.delete'    => ['admin'],
 
@@ -63,12 +64,12 @@ class Auth
         'leads.manage'      => ['admin', 'manager', 'sales', 'reception'],
         'leads.delete'      => ['admin', 'manager'],
 
-        'documents.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'documents.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'documents.manage'  => ['admin', 'manager', 'finance', 'sales', 'reception'],
         'documents.delete'  => ['admin', 'manager'],
 
         // Production floor
-        'jobs.view'         => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'jobs.view'         => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'jobs.manage'       => ['admin', 'manager', 'production'],
         'jobs.delete'       => ['admin', 'manager'],
         'jobs.assign'       => ['admin', 'manager', 'production'],
@@ -94,7 +95,7 @@ class Auth
 
         'reports.view'      => ['admin', 'manager', 'finance'],
 
-        'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
 
         // The company WhatsApp is one number answered by many people.
         // Everyone client-facing can read and reply; production and general
@@ -105,8 +106,8 @@ class Auth
         // Meetings are a workplace tool, like the chat: anyone on the team
         // can call one and take minutes in it. Only management can delete
         // a meeting, because its minutes are a record of what was agreed.
-        'meetings.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
-        'meetings.manage'   => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff'],
+        'meetings.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
+        'meetings.manage'   => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'meetings.delete'   => ['admin', 'manager'],
 
         // Buying binds the company to a supplier and changes what stock is
@@ -120,6 +121,14 @@ class Auth
         // so it sits with management rather than with everyone who can send
         // a single message to one client.
         'sms.campaign'      => ['admin', 'manager'],
+
+        // Artwork. A designer works their own queue and sends proofs to a
+        // client; allocating the work is for whoever runs the studio.
+        'artwork.view'      => ['admin', 'manager', 'designer', 'sales', 'production', 'reception'],
+        'artwork.manage'    => ['admin', 'manager', 'designer', 'sales', 'reception'],
+        'artwork.assign'    => ['admin', 'manager'],
+        'artwork.design'    => ['admin', 'manager', 'designer'],
+        'artwork.delete'    => ['admin', 'manager'],
 
         'users.view'        => ['admin'],
         'users.manage'      => ['admin'],

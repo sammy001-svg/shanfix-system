@@ -11,6 +11,7 @@
  * @var \App\Core\App $app
  */
 
+use App\Controllers\ArtworkController;
 use App\Controllers\AuthController;
 use App\Controllers\ChatController;
 use App\Controllers\ClientController;
@@ -27,6 +28,7 @@ use App\Controllers\NotificationController;
 use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
+use App\Controllers\PublicArtworkController;
 use App\Controllers\PublicProofController;
 use App\Controllers\PublicStatementController;
 use App\Controllers\PurchaseOrderController;
@@ -34,6 +36,7 @@ use App\Controllers\PwaController;
 use App\Controllers\ReminderController;
 use App\Controllers\ReportController;
 use App\Controllers\ServiceController;
+use App\Controllers\StaffNotificationController;
 use App\Controllers\SubscriptionController;
 use App\Controllers\SettingsController;
 use App\Controllers\SupplierController;
@@ -124,6 +127,13 @@ $r->get('/p/{token}', [PublicProofController::class, 'show']);
 // A client's own statement of account, on the same token model.
 $r->get('/statement/{token}', [PublicStatementController::class, 'show']);
 $r->get('/s/{token}',         [PublicStatementController::class, 'show']);
+
+// Client-facing artwork review. On /review rather than /artwork so it cannot
+// swallow the staff module's /artwork/{id}. No login: the token is the credential.
+$r->get('/review/{token}',         [PublicArtworkController::class, 'show']);
+$r->get('/review/{token}/file',    [PublicArtworkController::class, 'file']);
+$r->post('/review/{token}/decide', [PublicArtworkController::class, 'decide'], ['csrf']);
+$r->get('/a/{token}',              [PublicArtworkController::class, 'show']);
 
 // The company logo, served without a login.
 //
@@ -416,6 +426,38 @@ $r->group(['auth'], function ($r) {
              ['permission:documents.manage', 'csrf']);
     $r->post('/quotations/{id}/agreement', [DocumentController::class, 'generateAgreement'],
              ['permission:documents.manage', 'csrf']);
+
+    // -- Artwork: a design request through to approved artwork
+    //
+    // Registered before the {id} routes so /artwork/create is not read as
+    // a request for the artwork numbered "create".
+    $r->group(['permission:artwork.view'], function ($r) {
+        $r->get('/artwork',           [ArtworkController::class, 'index']);
+        $r->get('/artwork/create',    [ArtworkController::class, 'create']);
+        $r->get('/artwork/{id}',      [ArtworkController::class, 'show']);
+        $r->get('/artwork/{id}/edit', [ArtworkController::class, 'edit']);
+    });
+
+    $r->group(['permission:artwork.manage', 'csrf'], function ($r) {
+        $r->post('/artwork',                 [ArtworkController::class, 'store']);
+        $r->post('/artwork/{id}',            [ArtworkController::class, 'update']);
+        $r->post('/artwork/{id}/upload',     [ArtworkController::class, 'upload']);
+        $r->post('/artwork/{id}/decide',     [ArtworkController::class, 'decide']);
+        $r->post('/artwork/{id}/production', [ArtworkController::class, 'pushToProduction']);
+    });
+
+    $r->post('/artwork/{id}/assign', [ArtworkController::class, 'assign'],
+             ['permission:artwork.assign', 'csrf']);
+    $r->post('/artwork/{id}/send',   [ArtworkController::class, 'sendProof'],
+             ['permission:artwork.design', 'csrf']);
+    $r->post('/artwork/{id}/delete', [ArtworkController::class, 'destroy'],
+             ['permission:artwork.delete', 'csrf']);
+
+    // -- The bell: what the system needs to tell whoever is signed in.
+    // Any signed-in user has alerts, so this needs no permission of its own.
+    $r->get('/alerts',           [StaffNotificationController::class, 'index']);
+    $r->get('/alerts/{id}/open', [StaffNotificationController::class, 'open']);
+    $r->post('/alerts/read-all', [StaffNotificationController::class, 'readAll'], ['csrf']);
 
     // -- Production job cards
     $r->group(['permission:jobs.view'], function ($r) {

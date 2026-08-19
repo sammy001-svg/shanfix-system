@@ -31,6 +31,12 @@ if ($me && can('documents.view')) {
     );
 }
 
+// The bell: things addressed to this person that they have not read.
+$myAlerts = 0;
+if ($me) {
+    $myAlerts = \App\Services\StaffNotifier::unreadCount((int) $me['id']);
+}
+
 // Jobs badge: what this user still has to produce.
 $openJobs = 0;
 if ($me && can('jobs.view')) {
@@ -143,6 +149,13 @@ if ($me && can('jobs.view')) {
 
       <?php if (can('jobs.view')): ?>
         <div class="nav-group__label">Production</div>
+      <?php endif; ?>
+      <?php if (can('artwork.view')): ?>
+        <a class="nav-link <?= is_active_nav('/artwork') ? 'is-active' : '' ?>" href="<?= url('/artwork') ?>">
+          <?= icon('image', 'nav-link__icon') ?> Artwork
+        </a>
+      <?php endif; ?>
+      <?php if (can('jobs.view')): ?>
         <a class="nav-link <?= is_active_nav('/jobs') ? 'is-active' : '' ?>" href="<?= url('/jobs') ?>">
           <?= icon('printer', 'nav-link__icon') ?> Job Board
           <?php if (!empty($openJobs)): ?>
@@ -267,6 +280,19 @@ if ($me && can('jobs.view')) {
       <div class="topbar__title"><?= e($title ?? 'Dashboard') ?></div>
 
       <div class="topbar__spacer"></div>
+
+      <?php // The bell. Only drawn when there is something unread — an
+            // always-visible zero teaches people to stop looking. ?>
+      <a class="icon-btn" href="<?= url('/alerts') ?>" title="My alerts"
+         style="position:relative">
+        <?= icon('bell') ?>
+        <?php if (!empty($myAlerts)): ?>
+          <span class="nav-link__badge"
+                style="position:absolute;top:2px;right:2px;background:var(--red-600)">
+            <?= (int) $myAlerts > 9 ? '9+' : (int) $myAlerts ?>
+          </span>
+        <?php endif; ?>
+      </a>
 
       <form class="topbar__search" action="<?= url('/search') ?>" method="get" role="search">
         <?= icon('search') ?>

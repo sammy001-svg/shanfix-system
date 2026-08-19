@@ -23,6 +23,7 @@ class Numbering
         'purchase_order'=> 'purchase_order_prefix',
         'proposal'      => 'proposal_prefix',
         'agreement'     => 'agreement_prefix',
+        'artwork'       => 'artwork_prefix',
     ];
 
     private const DEFAULTS = [
@@ -39,6 +40,7 @@ class Numbering
         'purchase_order'=> 'PO',
         'proposal'      => 'PRO',
         'agreement'     => 'AGR',
+        'artwork'       => 'ART',
     ];
 
     /**

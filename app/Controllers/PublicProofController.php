@@ -142,6 +142,31 @@ class PublicProofController extends Controller
             $proof['job_number'] . ': client ' . $decision . ' proof v' . $proof['version'] . ' online'
         );
 
+        // Until now the client's decision reached nobody on our side until
+        // somebody happened to open the job. Tell the people it affects.
+        \App\Services\StaffNotifier::notify(
+            array_merge(
+                [$proof['assigned_to'] ?? null],
+                \App\Services\StaffNotifier::withRole(
+                    $decision === 'approved' ? ['admin', 'manager', 'production'] : ['admin', 'manager', 'designer']
+                )
+            ),
+            [
+                'event'       => 'proof_' . $decision,
+                'title'       => $decision === 'approved'
+                    ? 'Proof approved: ' . $proof['job_number']
+                    : 'Changes requested: ' . $proof['job_number'],
+                'body'        => $proof['job_title'] . ' for ' . $proof['client_name']
+                                 . ($decision === 'approved'
+                                     ? ' — cleared for production.'
+                                     : ' — ' . mb_substr($feedback, 0, 200)),
+                'link'        => '/jobs/' . $proof['job_id'],
+                'entity_type' => 'job',
+                'entity_id'   => (int) $proof['job_id'],
+            ],
+            ['email' => true, 'sms' => true]
+        );
+
         Session::success(
             $decision === 'approved'
                 ? 'Thank you — your approval is recorded and we are starting production.'
@@ -168,7 +193,7 @@ class PublicProofController extends Controller
 
         $rows = Database::all(
             'SELECT f.*, j.id AS job_id, j.job_number, j.title AS job_title,
-                    j.stage AS job_stage, c.name AS client_name
+                    j.stage AS job_stage, j.assigned_to, c.name AS client_name
                FROM job_files f
                JOIN jobs j ON j.id = f.job_id
                JOIN clients c ON c.id = j.client_id
