@@ -97,6 +97,12 @@ class Auth
 
         'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
 
+        // Who may put people into a channel or take them out. The
+        // channel's own creator can do it too — see ChatController —
+        // so a team lead need not ask an administrator to add someone
+        // to a channel they set up themselves.
+        'chat.moderate'     => ['admin', 'manager'],
+
         // The company WhatsApp is one number answered by many people.
         // Everyone client-facing can read and reply; production and general
         // staff have no reason to be inside a customer's conversation.

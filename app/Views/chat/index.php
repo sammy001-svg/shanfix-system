@@ -187,9 +187,30 @@ $lastDay = null;
                   <span class="avatar avatar--sm" style="background:<?= e($m['avatar_color']) ?>">
                     <?= e(initials($m['name'])) ?>
                   </span>
-                  <?= e($m['name']) ?>
+                  <span class="flex-1"><?= e($m['name']) ?></span>
+
+                  <?php if (!empty($canModerate) && (int) $m['id'] !== (int) $conversation['created_by']): ?>
+                    <?php // Removing somebody is a click here rather than a trip to a settings page. ?>
+                    <form method="post"
+                          action="<?= url('/chat/' . $conversationId . '/members/' . $m['id'] . '/remove') ?>"
+                          data-confirm="Remove <?= e($m['name']) ?> from #<?= e($conversation['name']) ?>?"
+                          style="display:inline">
+                      <?= csrf_field() ?>
+                      <button class="icon-btn icon-btn--sm" type="submit" title="Remove from channel">
+                        <?= icon('x') ?>
+                      </button>
+                    </form>
+                  <?php endif; ?>
                 </span>
               <?php endforeach; ?>
+
+              <?php if (!empty($canModerate)): ?>
+                <div class="dropdown__divider"></div>
+                <button class="dropdown__item" type="button" data-modal-open="add-members">
+                  <?= icon('plus') ?> Add people
+                </button>
+              <?php endif; ?>
+
               <div class="dropdown__divider"></div>
               <form method="post" action="<?= url('/chat/' . $conversationId . '/leave') ?>"
                     data-confirm="Leave #<?= e($conversation['name']) ?>?">
@@ -360,3 +381,53 @@ $lastDay = null;
     </div>
   </div>
 </div>
+
+<?php if ($conversation && $conversation['type'] === 'channel' && !empty($canModerate)): ?>
+  <?php
+    // Only people not already in it — offering somebody who is already a
+    // member just produces a silent no-op and looks broken.
+    $memberIds = array_map(static fn($m) => (int) $m['id'], $members);
+    $canAdd    = array_values(array_filter(
+        $colleagues,
+        static fn($u) => !in_array((int) $u['id'], $memberIds, true)
+    ));
+  ?>
+  <div class="modal-backdrop" id="add-members">
+    <div class="modal__panel">
+      <form method="post" action="<?= url('/chat/' . $conversationId . '/members') ?>">
+        <?= csrf_field() ?>
+        <div class="modal__head">
+          <div class="card__title">Add people to #<?= e($conversation['name']) ?></div>
+          <button class="modal__close" type="button" data-modal-close>&times;</button>
+        </div>
+        <div class="modal__body">
+          <?php if (!$canAdd): ?>
+            <p class="text-sm text-muted mb-0">Everyone on the team is already in this channel.</p>
+          <?php else: ?>
+            <div class="checkgrid">
+              <?php foreach ($canAdd as $u): ?>
+                <label class="check-row">
+                  <input type="checkbox" name="user_ids[]" value="<?= (int) $u['id'] ?>">
+                  <span>
+                    <strong><?= e($u['name']) ?></strong>
+                    <span class="text-xs text-muted d-block"><?= e($u['job_title'] ?: label_of($u['role'])) ?></span>
+                  </span>
+                </label>
+              <?php endforeach; ?>
+            </div>
+            <div class="text-xs text-muted mt-8">
+              They are emailed to say they have been added, and can read the
+              channel's history from the moment they join.
+            </div>
+          <?php endif; ?>
+        </div>
+        <div class="modal__foot">
+          <button class="btn btn--ghost" type="button" data-modal-close>Cancel</button>
+          <?php if ($canAdd): ?>
+            <button class="btn btn--primary" type="submit">Add to channel</button>
+          <?php endif; ?>
+        </div>
+      </form>
+    </div>
+  </div>
+<?php endif; ?>

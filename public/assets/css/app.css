@@ -360,6 +360,11 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 }
 .icon-btn:hover { background: var(--surface-2); border-color: var(--border); color: var(--on-navy); }
 .icon-btn svg { width: 18px; height: 18px; }
+/* Sits inside a list row rather than a toolbar, so it takes the row's height. */
+.icon-btn--sm { width: 24px; height: 24px; border-radius: 6px; }
+.icon-btn--sm svg { width: 14px; height: 14px; }
+.icon-btn--sm:hover { color: var(--red-600); background: var(--red-100); border-color: transparent; }
+
 .icon-btn__dot {
   position: absolute; top: 6px; right: 6px;
   width: 7px; height: 7px;

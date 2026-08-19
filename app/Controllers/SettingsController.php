@@ -446,6 +446,14 @@ class SettingsController extends Controller
             $updates["notify_{$event}_sms"]   = $request->bool("notify_{$event}_sms") ? '1' : '0';
         }
 
+        // Team chat alerts. Not one of the client events above: it has no
+        // template, and the two numbers are what stop a busy conversation
+        // from costing a text message per line.
+        $updates['chat_alerts_enabled']       = $request->bool('chat_alerts_enabled') ? '1' : '0';
+        $updates['notify_chat_message_email'] = $request->bool('notify_chat_message_email') ? '1' : '0';
+        $updates['notify_chat_message_sms']   = $request->bool('notify_chat_message_sms') ? '1' : '0';
+        $updates['chat_alert_cooldown']       = (string) max(1, min(240, $request->int('chat_alert_cooldown', 15)));
+        $updates['chat_alert_active_mins']    = (string) max(1, min(60, $request->int('chat_alert_active_mins', 3)));
         // Templates
         foreach ($request->all() as $key => $value) {
             if (str_starts_with((string) $key, 'tpl_') && is_string($value)) {

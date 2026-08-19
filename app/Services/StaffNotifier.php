@@ -165,7 +165,7 @@ class StaffNotifier
                 'subject'        => $channel === 'email' ? mb_substr($notice['title'], 0, 255) : null,
                 'body'           => $channel === 'email'
                     ? self::emailBody($notice)
-                    : mb_substr($notice['title'] . '. ' . self::absoluteLink($notice), 0, 300),
+                    : self::smsBody($notice),
                 'entity_type'    => $notice['entity_type'] ?? null,
                 'entity_id'      => $notice['entity_id'] ?? null,
                 'created_by'     => Auth::id(),
@@ -179,6 +179,32 @@ class StaffNotifier
         unset($body);
     }
 
+    /**
+     * The SMS text.
+     *
+     * A text message that says only "Alice messaged you" makes the reader
+     * open the app to find out whether it mattered. Carrying a line of the
+     * thing itself lets them decide without doing that. The link is
+     * reserved out of the 300 characters first so it always survives.
+     */
+    private static function smsBody(array $notice): string
+    {
+        $link = self::absoluteLink($notice);
+        $text = trim($notice['title']);
+        $brief = trim((string) ($notice['body'] ?? ''));
+
+        if ($brief !== '') {
+            $text .= ': ' . $brief;
+        }
+
+        $room = 300 - ($link === '' ? 0 : mb_strlen($link) + 1);
+
+        if (mb_strlen($text) > $room) {
+            $text = rtrim(mb_substr($text, 0, max(0, $room - 1))) . '…';
+        }
+
+        return $link === '' ? $text : $text . ' ' . $link;
+    }
     private static function absoluteLink(array $notice): string
     {
         return isset($notice['link']) && $notice['link'] !== ''

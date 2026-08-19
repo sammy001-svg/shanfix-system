@@ -653,6 +653,12 @@ $r->group(['auth'], function ($r) {
         $r->post('/chat/send',            [ChatController::class, 'send'],          ['csrf']);
         $r->post('/chat/channels',        [ChatController::class, 'createChannel'], ['csrf']);
         $r->post('/chat/{id}/leave',      [ChatController::class, 'leaveChannel'],  ['csrf']);
+
+        // Who is in a channel. Guarded inside the controller rather than
+        // by middleware, because the channel's creator may do this too
+        // and that is not something a role check can express.
+        $r->post('/chat/{id}/members',                 [ChatController::class, 'addMember'],    ['csrf']);
+        $r->post('/chat/{id}/members/{userId}/remove', [ChatController::class, 'removeMember'], ['csrf']);
         $r->post('/chat/message/{id}/delete', [ChatController::class, 'deleteMessage'], ['csrf']);
     });
 

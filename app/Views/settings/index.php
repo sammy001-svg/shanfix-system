@@ -692,6 +692,73 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
       </div>
     </div>
 
+    <!-- Team chat alerts -->
+    <div class="card">
+      <div class="card__head">
+        <?= icon('message') ?>
+        <div>
+          <div class="card__title">Team chat alerts</div>
+          <div class="card__sub">Telling a colleague a message is waiting when they are away from the screen</div>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="field">
+          <label class="check">
+            <input type="checkbox" name="chat_alerts_enabled" value="1"
+                   <?= setting('chat_alerts_enabled', '1') === '1' ? 'checked' : '' ?>>
+            <span>
+              <strong>Alert people about chat messages</strong>
+              <span class="field-hint">
+                Off means the bell in the top bar is the only place a message shows up.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="check">
+              <input type="checkbox" name="notify_chat_message_email" value="1"
+                     <?= setting('notify_chat_message_email', '1') === '1' ? 'checked' : '' ?>>
+              <span>Send an email</span>
+            </label>
+          </div>
+          <div class="field">
+            <label class="check">
+              <input type="checkbox" name="notify_chat_message_sms" value="1"
+                     <?= setting('notify_chat_message_sms', '1') === '1' ? 'checked' : '' ?>>
+              <span>Send a text message</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="label" for="chat_alert_cooldown">Wait between alerts</label>
+            <input class="input" type="number" min="1" max="240"
+                   id="chat_alert_cooldown" name="chat_alert_cooldown"
+                   value="<?= e(setting('chat_alert_cooldown', '15')) ?>">
+            <span class="field-hint">
+              Minutes. A conversation is a back and forth, so one person is told
+              at most once per conversation in this window however many messages
+              arrive. Raise it if the team finds the alerts noisy.
+            </span>
+          </div>
+
+          <div class="field">
+            <label class="label" for="chat_alert_active_mins">Count as still reading for</label>
+            <input class="input" type="number" min="1" max="60"
+                   id="chat_alert_active_mins" name="chat_alert_active_mins"
+                   value="<?= e(setting('chat_alert_active_mins', '3')) ?>">
+            <span class="field-hint">
+              Minutes since they last opened the conversation. Somebody with it
+              on screen has already seen the message and is not emailed.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Which events send -->
     <div class="card">
       <div class="card__head">

@@ -1,12 +1,14 @@
 <?php
 namespace App\Controllers;
 
+use App\Core\ActivityLog;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\Settings;
 use App\Core\Session;
 use App\Core\Validator;
 
@@ -75,6 +77,8 @@ class ChatController extends Controller
             'messages'       => $messages,
             'members'        => $members,
             'colleagues'     => $colleagues,
+            // Whether this person may change who is in the channel.
+            'canModerate'    => $conversation !== null && $this->canModerate($conversation),
             'lastId'         => $messages ? (int) end($messages)['id'] : 0,
         ]);
     }
@@ -255,6 +259,15 @@ class ChatController extends Controller
             }
         }
 
+        // Everyone else in the conversation, throttled — see the method.
+        $this->alertParticipants(
+            $conversationId,
+            $conversation,
+            $body,
+            $storedName,
+            $mentioned ?? []
+        );
+
         if ($request->wantsJson()) {
             $me = Auth::user();
 
@@ -411,6 +424,211 @@ class ChatController extends Controller
 
         Session::info('You left #' . $conversation['name'] . '.');
         Response::to('/chat');
+    }
+
+    /**
+     * Whether this person may change who is in a channel.
+     *
+     * Management can, anywhere. So can whoever created the channel — they
+     * set it up, and needing an administrator to add one more person to
+     * your own channel is the kind of friction that stops people using it.
+     */
+    private function canModerate(array $conversation): bool
+    {
+        return Auth::can('chat.moderate')
+            || (int) ($conversation['created_by'] ?? 0) === (int) Auth::id();
+    }
+
+    public function addMember(Request $request): void
+    {
+        $conversationId = $request->paramInt('id');
+        $conversation   = $this->assertMember($conversationId);
+
+        if ($conversation['type'] !== 'channel') {
+            Session::error('Only channels have a member list.');
+            Response::to('/chat/' . $conversationId);
+        }
+
+        if (!$this->canModerate($conversation)) {
+            Session::error('Only an administrator or the channel creator can add people.');
+            Response::to('/chat/' . $conversationId);
+        }
+
+        $userIds = array_filter(array_map('intval', (array) $request->input('user_ids', [])));
+        $added   = 0;
+
+        foreach ($userIds as $userId) {
+            $user = Database::first(
+                'SELECT id, name FROM users WHERE id = :id AND is_active = 1',
+                ['id' => $userId]
+            );
+
+            if (!$user) {
+                continue;
+            }
+
+            try {
+                Database::insert('chat_participants', [
+                    'conversation_id' => $conversationId,
+                    'user_id'         => $userId,
+                ]);
+                $added++;
+            } catch (\Throwable) {
+                continue;
+            }
+
+            \App\Services\StaffNotifier::notify([$userId], [
+                'event'       => 'chat_added',
+                'title'       => Auth::user()['name'] . ' added you to #' . $conversation['name'],
+                'body'        => $conversation['description'] ?: null,
+                'link'        => '/chat/' . $conversationId,
+                'entity_type' => 'chat',
+                'entity_id'   => $conversationId,
+            ], ['email' => true, 'sms' => false]);
+        }
+
+        if ($added === 0) {
+            Session::error('Nobody was added — pick at least one person who is not already in the channel.');
+            Response::to('/chat/' . $conversationId);
+        }
+
+        ActivityLog::record('chat_member_added', 'chat', $conversationId,
+            $added . ' person(s) added to #' . $conversation['name']);
+
+        Session::success($added === 1 ? 'One person added to the channel.' : $added . ' people added to the channel.');
+        Response::to('/chat/' . $conversationId);
+    }
+
+    public function removeMember(Request $request): void
+    {
+        $conversationId = $request->paramInt('id');
+        $conversation   = $this->assertMember($conversationId);
+
+        if ($conversation['type'] !== 'channel') {
+            Session::error('Only channels have a member list.');
+            Response::to('/chat/' . $conversationId);
+        }
+
+        if (!$this->canModerate($conversation)) {
+            Session::error('Only an administrator or the channel creator can remove people.');
+            Response::to('/chat/' . $conversationId);
+        }
+
+        $userId = $request->paramInt('userId');
+
+        if ($userId === (int) $conversation['created_by']) {
+            Session::error('The person who created the channel cannot be removed from it.');
+            Response::to('/chat/' . $conversationId);
+        }
+
+        $user = Database::first('SELECT name FROM users WHERE id = :id', ['id' => $userId]);
+
+        Database::delete('chat_participants', [
+            'conversation_id' => $conversationId,
+            'user_id'         => $userId,
+        ]);
+
+        ActivityLog::record('chat_member_removed', 'chat', $conversationId,
+            ($user['name'] ?? 'Someone') . ' removed from #' . $conversation['name']);
+
+        Session::success(($user['name'] ?? 'They') . ' has been removed from the channel.');
+        Response::to('/chat/' . $conversationId);
+    }
+
+    /**
+     * Tell the people in a conversation that a message is waiting.
+     *
+     * The hard part is not sending; it is not sending too much. A chat is a
+     * back-and-forth, and alerting on every message would text somebody a
+     * dozen times about one exchange — each costing an SMS unit, and none of
+     * them saying anything the first did not. So a person is told only when
+     * all of this holds:
+     *
+     *   - it is not their own message
+     *   - they were not named in it (a mention already alerted them, louder)
+     *   - they are not looking at the conversation right now
+     *   - they have not already been told about it inside the cooldown
+     *
+     * @param array<int,int> $mentioned already alerted by name
+     */
+    private function alertParticipants(
+        int $conversationId,
+        array $conversation,
+        string $body,
+        ?string $attachmentName,
+        array $mentioned
+    ): void {
+        if (!Settings::bool('chat_alerts_enabled', true)) {
+            return;
+        }
+
+        $cooldown = max(1, Settings::int('chat_alert_cooldown', 15));
+        $active   = max(1, Settings::int('chat_alert_active_mins', 3));
+
+        $candidates = Database::all(
+            'SELECT p.user_id, p.last_read_at
+               FROM chat_participants p
+              WHERE p.conversation_id = :c AND p.user_id <> :me',
+            ['c' => $conversationId, 'me' => Auth::id()]
+        );
+
+        $mentionedIds = array_map('intval', $mentioned);
+        $tell         = [];
+
+        foreach ($candidates as $row) {
+            $userId = (int) $row['user_id'];
+
+            if (in_array($userId, $mentionedIds, true)) {
+                continue;
+            }
+
+            // Reading it as we speak: the message is already in front of them.
+            if ($row['last_read_at'] !== null
+                && (time() - strtotime((string) $row['last_read_at'])) < $active * 60) {
+                continue;
+            }
+
+            $recent = Database::first(
+                "SELECT id FROM staff_notifications
+                  WHERE user_id = :u AND event = 'chat_message'
+                    AND entity_type = 'chat' AND entity_id = :c
+                    AND created_at > DATE_SUB(NOW(), INTERVAL {$cooldown} MINUTE)
+                  LIMIT 1",
+                ['u' => $userId, 'c' => $conversationId]
+            );
+
+            if ($recent) {
+                continue;
+            }
+
+            $tell[] = $userId;
+        }
+
+        if ($tell === []) {
+            return;
+        }
+
+        $me    = Auth::user();
+        $where = $conversation['type'] === 'channel'
+            ? '#' . ($conversation['name'] ?? 'a channel')
+            : 'a direct message';
+
+        // A line of what was actually said, so the alert is worth opening.
+        $excerpt = $body !== ''
+            ? mb_substr($body, 0, 160) . (mb_strlen($body) > 160 ? '…' : '')
+            : ('sent an attachment: ' . ($attachmentName ?: 'a file'));
+
+        \App\Services\StaffNotifier::notify($tell, [
+            'event'       => 'chat_message',
+            'title'       => $me['name'] . ' messaged you in ' . $where,
+            'body'        => $excerpt,
+            'link'        => '/chat/' . $conversationId,
+            'entity_type' => 'chat',
+            'entity_id'   => $conversationId,
+        ], [
+            'email' => Settings::bool('notify_chat_message_email', true),
+            'sms'   => Settings::bool('notify_chat_message_sms', true),
+        ]);
     }
 
     // -- Internals -----------------------------------------------------
