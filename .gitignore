@@ -30,3 +30,7 @@ Thumbs.db
 # Local dumps
 *.sql.gz
 *.bak
+
+# Cookie jars and captured output the suites leave behind.
+/tests/*.txt
+/tests/*.eml
