@@ -526,6 +526,57 @@ If the client would rather sign on paper, print it — an unaccepted agreement
 carries signature blocks for both parties, and those disappear once it has been
 accepted online.
 
+
+---
+
+## Sales: allocation and visibility
+
+### A dashboard for selling
+
+Someone whose job is sales gets their own dashboard instead of the general one:
+their open pipeline by stage with values, follow-ups due today or overdue,
+proposals and quotations still waiting on a client, and — most usefully — the
+leads **going quiet**, meaning nothing has been logged against them for a
+fortnight.
+
+Every figure is scoped to leads allocated to that person, so each one can be
+opened and acted on. A manager who also holds the sales role keeps the full
+dashboard, since they need the whole picture to allocate work.
+
+### Who sees which leads
+
+| Role | Sees |
+|---|---|
+| Administrator, Manager, Reception | Every lead |
+| Sales, Staff | Only leads allocated to them |
+
+Reception is included because they log walk-ins and phone enquiries before
+anyone owns them.
+
+The scoping is applied in the query, not filtered afterwards, so a lead someone
+may not see never reaches their page or their totals. Opening one by URL is
+guarded the same way, and reads as *not found* rather than *forbidden* — there is
+no reason to confirm to someone that a lead exists but is not theirs.
+
+### Allocating a lead to several people
+
+A lead has an **owner** — the name in the list, who takes the follow-up
+reminders — plus anyone else ticked under *Also working this lead*. A technical
+lead can pair with an account manager, someone can cover a colleague on leave,
+and a big account can carry two people.
+
+Everyone allocated sees it on their own board and dashboard. The owner is always
+included automatically, so the name on the list always belongs to someone who can
+actually open it.
+
+### What sales can reach
+
+Sales handles leads, clients, proposals, quotations, invoices, receipts,
+agreements, payments, WhatsApp, chat and meetings. They can **see** job cards,
+deliveries and recurring services so they can answer a client, but running
+production, raising delivery notes and changing a recurring arrangement belong to
+production and finance respectively.
+
 ## Roles
 
 | Role | Access |

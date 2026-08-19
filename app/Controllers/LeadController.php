@@ -122,6 +122,7 @@ class LeadController extends Controller
             'summary'          => $summary,
             'overdueFollowups' => $overdueFollowups,
             'users'            => $this->salesUsers(),
+            'assignees' => [],
             'filters'          => compact('search', 'assigned', 'source'),
         ]);
     }
@@ -151,6 +152,8 @@ class LeadController extends Controller
 
         $id = Database::transaction(function () use ($data, $request) {
             $id = Database::insert('leads', $data);
+
+            $this->syncAssignees($id, $request->array('assignees'), $data['assigned_to'] ?: Auth::id());
 
             Database::insert('lead_activities', [
                 'lead_id'       => $id,
@@ -234,6 +237,7 @@ class LeadController extends Controller
             'services'  => $this->services(),
             'inventory' => $this->inventory(),
             'users'     => $this->salesUsers(),
+            'assignees' => $this->assigneeIds((int) $lead['id']),
             'stages'    => self::STAGES,
             'sources'   => self::SOURCES,
         ]);
@@ -250,6 +254,7 @@ class LeadController extends Controller
         unset($data['stage'], $data['probability']);
 
         Database::update('leads', $data, ['id' => $lead['id']]);
+        $this->syncAssignees((int) $lead['id'], $request->array('assignees'), $data['assigned_to'] ?? null);
 
         ActivityLog::record('lead_updated', 'lead', (int) $lead['id'], 'Updated lead ' . $data['name']);
         Session::success('Lead updated.');
@@ -557,6 +562,38 @@ class LeadController extends Controller
         ];
     }
 
+
+    /**
+     * Replace who a lead is allocated to.
+     *
+     * The owner in leads.assigned_to is always one of them, so the name in
+     * a list and the follow-up reminders always belong to someone who can
+     * actually see the lead.
+     */
+
+    /** Ids of everyone this lead is allocated to. */
+    private function assigneeIds(int $leadId): array
+    {
+        return array_map('intval', array_column(Database::all(
+            'SELECT user_id FROM lead_assignees WHERE lead_id = :id',
+            ['id' => $leadId]
+        ), 'user_id'));
+    }
+    private function syncAssignees(int $leadId, array $userIds, ?int $owner): void
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $userIds))));
+
+        if ($owner) {
+            array_unshift($ids, $owner);
+            $ids = array_values(array_unique($ids));
+        }
+
+        Database::delete('lead_assignees', ['lead_id' => $leadId]);
+
+        foreach ($ids as $userId) {
+            Database::insert('lead_assignees', ['lead_id' => $leadId, 'user_id' => $userId]);
+        }
+    }
     private function findOrFail(int $id): array
     {
         $lead = Database::first(
@@ -575,6 +612,21 @@ class LeadController extends Controller
 
         if (!$lead) {
             throw new HttpException(404, 'That lead does not exist.');
+        }
+
+        // Scoped users may only open a lead allocated to them. Enforced
+        // here rather than only in the list, so a guessed URL is refused
+        // the same way.
+        if (!Auth::can('leads.view_all')) {
+            $mine = (int) Database::scalar(
+                'SELECT COUNT(*) FROM lead_assignees WHERE lead_id = :id AND user_id = :me',
+                ['id' => $id, 'me' => Auth::id()],
+                0
+            );
+
+            if ($mine === 0) {
+                throw new HttpException(404, 'That lead does not exist.');
+            }
         }
 
         return $lead;

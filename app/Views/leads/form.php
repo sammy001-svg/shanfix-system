@@ -163,6 +163,31 @@ $val = static function (string $key, $fallback = '') use ($lead) {
             </select>
           </div>
 
+          <div class="field mb-12">
+            <label class="label">Also working this lead</label>
+            <?php
+            // The owner above is who the lead belongs to; these are everyone
+            // else who can see and work it. Ticked people see it on their own
+            // pipeline, so this is what controls visibility.
+            $current = $assignees ?? [];
+            ?>
+            <div class="check-list">
+              <?php foreach ($users as $u): ?>
+                <label class="check">
+                  <input type="checkbox" name="assignees[]" value="<?= (int) $u['id'] ?>"
+                         <?= in_array((int) $u['id'], $current, true) ? 'checked' : '' ?>>
+                  <span class="check__text">
+                    <span><?= e($u['name']) ?></span>
+                  </span>
+                </label>
+              <?php endforeach; ?>
+            </div>
+            <span class="field-hint">
+              The owner above is always included. Anyone ticked here also sees
+              this lead on their own board.
+            </span>
+          </div>
+
           <div class="field">
             <label class="label" for="expected_close_date">Expected close date</label>
             <input class="input" type="date" id="expected_close_date" name="expected_close_date"

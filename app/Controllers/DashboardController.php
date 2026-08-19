@@ -12,6 +12,12 @@ class DashboardController extends Controller
     {
         $userId = (int) Auth::id();
 
+        // A salesperson gets their own pipeline instead of the general view.
+        if ($this->isSalesFocused()) {
+            $this->salesDashboard($userId);
+            return;
+        }
+
         // The dashboard is assembled from what this person is allowed to see.
         // The figures are gated in the view as well; skipping the queries here
         // means the numbers are never fetched for someone who may not see
@@ -190,6 +196,114 @@ class DashboardController extends Controller
         ]);
     }
 
+
+    /**
+     * Is this a salesperson rather than someone running the place?
+     *
+     * A manager who also holds the sales role wants the whole picture, so
+     * the general dashboard wins whenever someone can see all leads.
+     */
+    private function isSalesFocused(): bool
+    {
+        return Auth::is('sales') && !Auth::can('leads.view_all');
+    }
+
+    /**
+     * The dashboard a salesperson actually needs: their own pipeline, the
+     * follow-ups due today, and what their quotations have turned into.
+     *
+     * Every figure is scoped to leads allocated to them, so it matches the
+     * pipeline they can open. A number they cannot drill into would only
+     * raise questions nobody could answer.
+     */
+    private function salesDashboard(int $userId): void
+    {
+        $stages = LeadController::STAGES;
+
+        $pipeline = Database::all(
+            "SELECT l.stage,
+                    COUNT(*) AS count,
+                    COALESCE(SUM(l.estimated_value), 0) AS value
+               FROM leads l
+              WHERE EXISTS (SELECT 1 FROM lead_assignees la
+                             WHERE la.lead_id = l.id AND la.user_id = :me)
+                AND l.stage NOT IN ('won', 'lost')
+           GROUP BY l.stage",
+            ['me' => $userId]
+        );
+
+        $byStage = [];
+        $openValue = 0.0;
+        $openCount = 0;
+
+        foreach ($pipeline as $row) {
+            $byStage[$row['stage']] = $row;
+            $openValue += (float) $row['value'];
+            $openCount += (int) $row['count'];
+        }
+
+        $thisMonth = Database::first(
+            "SELECT COUNT(CASE WHEN l.stage = 'won'  THEN 1 END) AS won,
+                    COUNT(CASE WHEN l.stage = 'lost' THEN 1 END) AS lost,
+                    COALESCE(SUM(CASE WHEN l.stage = 'won' THEN l.estimated_value END), 0) AS won_value
+               FROM leads l
+              WHERE EXISTS (SELECT 1 FROM lead_assignees la
+                             WHERE la.lead_id = l.id AND la.user_id = :me)
+                AND l.updated_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+            ['me' => $userId]
+        );
+
+        // Leads with nothing logged for a fortnight. The most useful thing a
+        // sales dashboard can do is name the ones going quiet.
+        $stale = Database::all(
+            "SELECT l.id, l.lead_number, l.name, l.company, l.stage, l.estimated_value,
+                    l.updated_at
+               FROM leads l
+              WHERE EXISTS (SELECT 1 FROM lead_assignees la
+                             WHERE la.lead_id = l.id AND la.user_id = :me)
+                AND l.stage NOT IN ('won', 'lost')
+                AND l.updated_at < DATE_SUB(NOW(), INTERVAL 14 DAY)
+           ORDER BY l.updated_at
+              LIMIT 8",
+            ['me' => $userId]
+        );
+
+        $reminders = Database::all(
+            "SELECT r.*, l.name AS lead_name, l.lead_number
+               FROM reminders r
+          LEFT JOIN leads l ON l.id = r.lead_id
+              WHERE r.user_id = :me AND r.is_done = 0
+                AND r.remind_at <= DATE_ADD(NOW(), INTERVAL 1 DAY)
+           ORDER BY r.remind_at
+              LIMIT 10",
+            ['me' => $userId]
+        );
+
+        // Quotations this person raised that nobody has answered yet.
+        $awaiting = Database::all(
+            "SELECT d.id, d.doc_number, d.doc_type, d.total, d.valid_until, c.name AS client_name
+               FROM documents d
+               JOIN clients c ON c.id = d.client_id
+              WHERE d.created_by = :me
+                AND d.doc_type IN ('quotation', 'proposal')
+                AND d.status = 'sent'
+           ORDER BY d.valid_until IS NULL, d.valid_until
+              LIMIT 8",
+            ['me' => $userId]
+        );
+
+        $this->view('dashboard/sales', [
+            'title'      => 'My pipeline',
+            'stages'     => $stages,
+            'byStage'    => $byStage,
+            'openValue'  => $openValue,
+            'openCount'  => $openCount,
+            'thisMonth'  => $thisMonth,
+            'stale'      => $stale,
+            'reminders'  => $reminders,
+            'awaiting'   => $awaiting,
+        ]);
+    }
     /** Global search across clients, leads, documents and inventory. */
     public function search(Request $request): void
     {

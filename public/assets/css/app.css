@@ -3077,3 +3077,16 @@ body.has-offline-bar .content { padding-bottom: 56px; }
   border: 2px solid var(--green-600, #0F6B3E); border-radius: var(--r);
   background: var(--tint-green, #EDF8F2);
 }
+
+/* A short list of tickboxes, as used for allocating a lead to several people. */
+.check-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px 14px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
