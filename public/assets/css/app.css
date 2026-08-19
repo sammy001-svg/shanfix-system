@@ -3090,3 +3090,12 @@ body.has-offline-bar .content { padding-bottom: 56px; }
   border-radius: var(--r);
   background: var(--surface-2);
 }
+
+/* A name called out in a chat message. */
+.mention {
+  font-weight: 650;
+  color: var(--green-700);
+  background: var(--tint-green, rgba(20, 135, 78, .10));
+  padding: 0 3px;
+  border-radius: 3px;
+}

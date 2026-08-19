@@ -177,6 +177,54 @@ class MeetingController extends Controller
      * Anyone removed from the form is removed from the meeting, except the
      * host — losing the host would leave a meeting nobody owns.
      */
+    /**
+     * Tell colleagues they have been put in a meeting.
+     *
+     * Only the people newly added: re-saving a meeting to fix a typo in
+     * the agenda should not alert everybody a second time.
+     *
+     * @param array<int,int> $userIds everyone now invited
+     */
+    private function notifyInvitees(int $meetingId, array $userIds): void
+    {
+        if ($userIds === []) {
+            return;
+        }
+
+        $meeting = Database::first(
+            'SELECT title, scheduled_at, public_token FROM meetings WHERE id = :id',
+            ['id' => $meetingId]
+        );
+
+        if (!$meeting) {
+            return;
+        }
+
+        // Anyone already told about this meeting is skipped, so editing
+        // it does not alert the same people again.
+        $already = array_map('intval', array_column(Database::all(
+            "SELECT DISTINCT user_id FROM staff_notifications
+              WHERE entity_type = 'meeting' AND entity_id = :id",
+            ['id' => $meetingId]
+        ), 'user_id'));
+
+        $fresh = array_values(array_diff($userIds, $already));
+
+        if ($fresh === []) {
+            return;
+        }
+
+        \App\Services\StaffNotifier::notify($fresh, [
+            'event'       => 'meeting_invite',
+            'title'       => 'Meeting: ' . $meeting['title'],
+            'body'        => 'You have been invited. '
+                             . fdate($meeting['scheduled_at'], 'D d M Y \a\t H:i'),
+            'link'        => '/meetings/' . $meetingId,
+            'entity_type' => 'meeting',
+            'entity_id'   => $meetingId,
+        ], ['email' => true, 'sms' => true]);
+    }
+
     private function syncInvitees(Request $request, int $meetingId): void
     {
         $userIds = $request->input('user_ids', []);
@@ -220,6 +268,8 @@ class MeetingController extends Controller
         }
 
         Meetings::pruneMissing($meetingId, $keep, $guestEmails);
+
+        $this->notifyInvitees($meetingId, $keep);
     }
 
     public function show(Request $request): void

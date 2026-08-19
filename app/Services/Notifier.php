@@ -901,6 +901,20 @@ class Notifier
                     'join_link'        => Meetings::joinUrl($meeting['public_token']),
                     'link'             => Meetings::joinUrl($meeting['public_token']),
                 ])['queued'];
+
+                // A colleague is usually at a screen, so the bell is the
+                // channel most likely to be seen before the meeting starts.
+                // Guests have no account, so email and SMS are all they get.
+                if (!empty($p['user_id'])) {
+                    StaffNotifier::notify([(int) $p['user_id']], [
+                        'event'       => 'meeting_reminder',
+                        'title'       => 'Starting in ' . $offset . ' minutes: ' . $meeting['title'],
+                        'body'        => fdate($meeting['scheduled_at'], 'D d M \a\t H:i'),
+                        'link'        => '/meetings/' . $meeting['id'],
+                        'entity_type' => 'meeting',
+                        'entity_id'   => (int) $meeting['id'],
+                    ]);
+                }
             }
         }
 

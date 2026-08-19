@@ -13,10 +13,12 @@ require_once APP_PATH . '/Views/partials/icons.php';
     <div class="page-head__sub">What the system needs to tell you.</div>
   </div>
   <div class="page-head__actions">
+    <a class="btn btn--outline <?= (!$unread && !$mentions) ? 'is-active' : '' ?>"
+       href="<?= url('/alerts') ?>">All</a>
     <a class="btn btn--outline <?= $unread ? 'is-active' : '' ?>"
-       href="<?= url('/alerts' . ($unread ? '' : '?filter=unread')) ?>">
-      <?= $unread ? 'Show all' : 'Unread only' ?>
-    </a>
+       href="<?= url('/alerts?filter=unread') ?>">Unread</a>
+    <a class="btn btn--outline <?= $mentions ? 'is-active' : '' ?>"
+       href="<?= url('/alerts?filter=mentions') ?>">Mentions</a>
     <form method="post" action="<?= url('/alerts/read-all') ?>" style="display:inline">
       <?= csrf_field() ?>
       <button class="btn btn--primary" type="submit"><?= icon('check') ?> Mark all read</button>
@@ -29,7 +31,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
     <div class="card__body">
       <div class="empty">
         <div class="empty__icon"><?= icon('bell') ?></div>
-        <div class="empty__title"><?= $unread ? 'Nothing unread' : 'Nothing yet' ?></div>
+        <div class="empty__title"><?= $mentions ? 'No mentions' : ($unread ? 'Nothing unread' : 'Nothing yet') ?></div>
         <p class="empty__text">
           You will be told here when artwork is allocated to you, a client
           approves something, or work reaches your part of the process.

@@ -229,6 +229,32 @@ class ChatController extends Controller
 
         $this->markRead($conversationId);
 
+        // Anyone named in the message is told, through the bell and out to
+        // their phone. Only people already in the conversation can be named,
+        // so a mention can never point somebody at a channel they cannot open.
+        if ($body !== '') {
+            $mentioned = \App\Services\Mentions::find(
+                $body,
+                \App\Services\Mentions::membersOf($conversationId)
+            );
+
+            if ($mentioned !== []) {
+                $me    = Auth::user();
+                $where = !empty($conversation['is_group'])
+                    ? '#' . ($conversation['name'] ?? 'a channel')
+                    : 'a direct message';
+
+                \App\Services\StaffNotifier::notify($mentioned, [
+                    'event'       => 'chat_mention',
+                    'title'       => $me['name'] . ' mentioned you in ' . $where,
+                    'body'        => mb_substr($body, 0, 300),
+                    'link'        => '/chat/' . $conversationId,
+                    'entity_type' => 'chat',
+                    'entity_id'   => $conversationId,
+                ], ['email' => true, 'sms' => true]);
+            }
+        }
+
         if ($request->wantsJson()) {
             $me = Auth::user();
 
@@ -249,6 +275,47 @@ class ChatController extends Controller
         }
 
         Response::to('/chat/' . $conversationId);
+    }
+
+    /**
+     * Search everything this person can already see.
+     *
+     * Scoped through chat_participants rather than filtered afterwards, so
+     * a channel somebody left, or was never in, cannot surface here — the
+     * search must not become a way to read a private conversation.
+     */
+    public function search(Request $request): void
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        $results = [];
+
+        // Two characters would match most of the alphabet and return
+        // everything, which is no more useful than nothing.
+        if (mb_strlen($q) >= 3) {
+            $results = Database::all(
+                "SELECT m.id, m.body, m.created_at, m.conversation_id,
+                        u.name AS author, u.avatar_color,
+                        c.name AS channel_name, c.is_group
+                   FROM chat_messages m
+                   JOIN chat_conversations c ON c.id = m.conversation_id
+                   JOIN chat_participants p ON p.conversation_id = m.conversation_id
+                                           AND p.user_id = :me
+                   JOIN users u ON u.id = m.user_id
+                  WHERE m.deleted_at IS NULL
+                    AND m.body LIKE :q
+               ORDER BY m.id DESC
+                  LIMIT 60",
+                ['me' => Auth::id(), 'q' => '%' . $q . '%']
+            );
+        }
+
+        $this->view('chat/search', [
+            'title'   => 'Search chat',
+            'q'       => $q,
+            'results' => $results,
+            'tooShort' => $q !== '' && mb_strlen($q) < 3,
+        ]);
     }
 
     /** Polled by the browser for messages newer than the last one it has. */

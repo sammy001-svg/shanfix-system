@@ -19,13 +19,21 @@ class StaffNotificationController extends Controller
     public function index(Request $request): void
     {
         $userId = (int) Auth::id();
-        $unread = $request->query('filter') === 'unread';
+        $filter = (string) $request->query('filter', '');
+        $unread = $filter === 'unread';
+        $mentions = $filter === 'mentions';
 
         $where  = ['user_id = :me'];
         $params = ['me' => $userId];
 
         if ($unread) {
             $where[] = 'read_at IS NULL';
+        }
+
+        // Being named in a conversation is the one alert people go looking
+        // for afterwards, so it gets its own view.
+        if ($mentions) {
+            $where[] = "event = 'chat_mention'";
         }
 
         $clause = implode(' AND ', $where);
@@ -42,7 +50,8 @@ class StaffNotificationController extends Controller
                 $params
             ),
             'pager'  => $pager,
-            'unread' => $unread,
+            'unread'   => $unread,
+            'mentions' => $mentions,
         ]);
     }
 

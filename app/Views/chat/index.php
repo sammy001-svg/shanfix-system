@@ -25,6 +25,9 @@ $lastDay = null;
     <div class="page-head__sub">Direct messages and channels for the Shanfix team.</div>
   </div>
   <div class="page-head__actions">
+    <a class="btn btn--outline" href="<?= url('/chat/search') ?>">
+      <?= icon('search') ?> Search
+    </a>
     <button class="btn btn--outline" type="button" data-modal-open="new-channel">
       <?= icon('hash') ?> New channel
     </button>
@@ -238,7 +241,7 @@ $lastDay = null;
             <div class="msg__bubble">
               <div class="msg__author"><?= e($m['author']) ?></div>
               <?php if ($m['body']): ?>
-                <div class="msg__body"><?= e($m['body']) ?></div>
+                <div class="msg__body"><?= \App\Services\Mentions::highlight(e($m['body']), $members ?? []) ?></div>
               <?php endif; ?>
               <?php if ($m['attachment_path']): ?>
                 <a class="msg__file" href="<?= url('files/' . $m['attachment_path']) ?>"

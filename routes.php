@@ -637,6 +637,7 @@ $r->group(['auth'], function ($r) {
     $r->group(['permission:chat.use'], function ($r) {
         $r->get('/chat',                [ChatController::class, 'index']);
         $r->get('/chat/poll',           [ChatController::class, 'poll']);
+        $r->get('/chat/search',         [ChatController::class, 'search']);
         $r->get('/chat/unread-count',   [ChatController::class, 'unreadCount']);
         $r->get('/chat/with/{userId}',  [ChatController::class, 'openDirect']);
         $r->get('/chat/{id}',           [ChatController::class, 'index']);
