@@ -393,7 +393,7 @@ $lastDay = null;
     ));
   ?>
   <div class="modal-backdrop" id="add-members">
-    <div class="modal__panel">
+    <div class="modal">
       <form method="post" action="<?= url('/chat/' . $conversationId . '/members') ?>">
         <?= csrf_field() ?>
         <div class="modal__head">

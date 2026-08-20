@@ -1949,7 +1949,7 @@ fieldset:last-of-type { margin-bottom: 0; }
 
 /* Colour and background move too, otherwise flipping theme snaps harshly. */
 body,
-.card, .stat, .sidebar, .topbar, .table, .modal__panel, .badge, .btn {
+.card, .stat, .sidebar, .topbar, .table, .modal, .badge, .btn {
   transition:
     background-color var(--mid) var(--ease),
     border-color     var(--mid) var(--ease),
@@ -2048,7 +2048,6 @@ a.card:active { transform: translateY(-1px) scale(.998); }
 
 .page-head { animation: fade var(--mid) var(--ease) backwards; }
 
-.modal__panel { animation: rise var(--mid) var(--ease) backwards; }
 
 /* ---------------------------------------------------------------------
    Tables: rows respond without shifting the layout

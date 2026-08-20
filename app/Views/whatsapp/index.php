@@ -199,7 +199,7 @@ $preview = static function (array $c): string {
 
 <?php if (can('whatsapp.send')): ?>
   <div class="modal-backdrop" id="wa-start">
-    <div class="modal__panel">
+    <div class="modal">
       <form method="post" action="<?= url('/whatsapp/start') ?>">
         <?= csrf_field() ?>
         <div class="modal__head">

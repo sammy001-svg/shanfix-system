@@ -593,7 +593,7 @@ $docPath = static fn(string $type): string => match ($type) {
 
 <?php if (can('requests.manage')): ?>
   <div class="modal-backdrop" id="ask-details">
-    <div class="modal__panel">
+    <div class="modal">
       <form method="post" action="<?= url('/requests') ?>">
         <?= csrf_field() ?>
         <input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>">
