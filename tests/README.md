@@ -68,6 +68,7 @@ SHANFIX_URL=http://localhost:8080 SHANFIX_DB=shanfix_ci ./tests/run.sh
 |---|---|
 | `smoke_test.sh` | signing in, every main page, signing out |
 | `roles_test.sh` | what each role may reach, and what several roles add up to |
+| `leads_test.sh` | the pipeline, and the actions that move a lead along it |
 | `jobs_test.sh` | production: stages, files, assignment, the job sheet |
 | `services_test.sh` | the service catalogue and what it costs |
 | `renewals_test.sh` | subscriptions renewing and invoicing themselves |

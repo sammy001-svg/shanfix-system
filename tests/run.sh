@@ -21,7 +21,7 @@ fi
 if [ $# -gt 0 ]; then
   SUITES=("$@")
 else
-  SUITES=(smoke roles jobs meetings services images renewals remember
+  SUITES=(smoke roles leads jobs meetings services images renewals remember
           paylink webhook notify whatsapp chat backup brief)
 fi
 

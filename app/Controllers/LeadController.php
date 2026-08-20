@@ -505,6 +505,7 @@ class LeadController extends Controller
                 'activity_type' => 'quotation_sent',
                 'subject'       => ucfirst($type) . ' raised',
                 'notes'         => ucfirst($type) . ' drafted from this lead.',
+                'activity_date' => date('Y-m-d H:i:s'),
             ]);
 
             return $docId;
@@ -585,13 +586,21 @@ class LeadController extends Controller
 
         $lead = $this->findOrFail($request->paramInt('id'));
 
-        if ($lead['converted_client_id']) {
+        // converted_at is stamped here and nowhere else, so it is the honest
+        // test for "already done". converted_client_id is not: raising a
+        // quotation links a client too, and quoting somebody must not be what
+        // stops the deal ever being closed.
+        if ($lead['converted_at']) {
             Session::info('This lead has already been converted.');
             Response::to('/clients/' . $lead['converted_client_id']);
         }
 
+        // A client already linked by an earlier quotation is this same
+        // person, so there is nothing to warn about and nothing to create.
+        $linked = (int) ($lead['converted_client_id'] ?? 0);
+
         // Warn on an obvious duplicate rather than silently creating one.
-        if ($lead['phone'] || $lead['email']) {
+        if (!$linked && ($lead['phone'] || $lead['email'])) {
             $duplicate = Database::first(
                 'SELECT id, name FROM clients
                   WHERE (phone IS NOT NULL AND phone = :phone)
@@ -609,8 +618,12 @@ class LeadController extends Controller
             }
         }
 
-        $clientId = Database::transaction(function () use ($lead) {
-            $clientId = Database::insert('clients', [
+        $clientId = Database::transaction(function () use ($lead, $linked) {
+            // Quoting this lead already made the client record. Reuse it:
+            // a second record for the same person is how somebody's history
+            // ends up split across two profiles, with half the invoices on
+            // each and neither statement adding up.
+            $clientId = $linked ?: Database::insert('clients', [
                 'client_code'    => Numbering::next('client'),
                 'client_type'    => $lead['company'] ? 'company' : 'individual',
                 'name'           => $lead['company'] ?: $lead['name'],
