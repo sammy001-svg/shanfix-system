@@ -80,6 +80,7 @@ SHANFIX_URL=http://localhost:8080 SHANFIX_DB=shanfix_ci ./tests/run.sh
 | `remember_test.sh` | staying signed in, and the token rotating |
 | `chat_test.sh` | channel membership, and who gets told about a message |
 | `backup_test.sh` | taking a copy, and proving it restores |
+| `brief_test.sh` | asking a client what they want, and getting it back |
 
 `crawl.sh` is separate: it walks every GET route in `routes.php` as every
 role and reports anything that is not a page or a redirect. It is looking

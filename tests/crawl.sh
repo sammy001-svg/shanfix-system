@@ -35,6 +35,7 @@ id_for() {
     /expenses/*)        q "SELECT id FROM expenses ORDER BY id LIMIT 1;" ;;
     /notifications/*)   q "SELECT id FROM notifications ORDER BY id LIMIT 1;" ;;
     /alerts/*)          q "SELECT id FROM staff_notifications ORDER BY id LIMIT 1;" ;;
+    /requests/*)        q "SELECT id FROM job_requests ORDER BY id LIMIT 1;" ;;
     /chat/*)            q "SELECT id FROM chat_conversations ORDER BY id LIMIT 1;" ;;
     /artwork/*)         q "SELECT id FROM artwork_requests ORDER BY id LIMIT 1;" ;;
     /delivery-notes/*)  q "SELECT id FROM delivery_notes ORDER BY id LIMIT 1;" ;;
@@ -53,7 +54,7 @@ id_for() {
 # expanded by hand because routes.php builds those paths in a loop.
 build_pages() {
   php -r '
-    $src = file_get_contents("$ROOT/routes.php");
+    $src = file_get_contents(getenv("SHANFIX_ROOT") . "/routes.php");
     preg_match_all("/\\\$r->get\(\s*[\x27\"]([^\x27\"]+)[\x27\"]/", $src, $m);
     $out = [];
     foreach (array_unique($m[1]) as $p) {
@@ -101,6 +102,11 @@ for p in "${RAW[@]}"; do
     v=$(id_for "$p")
     [ -z "$v" ] && continue          # nothing of that kind exists to look at
     p=${p//\{id\}/$v}
+  fi
+  if [[ "$p" == *"{fileId}"* ]]; then
+    v=$(q "SELECT id FROM job_request_files ORDER BY id LIMIT 1;")
+    [ -z "$v" ] && continue          # nothing attached anywhere yet
+    p=${p//\{fileId\}/$v}
   fi
   if [[ "$p" == *"{userId}"* ]]; then
     p=${p//\{userId\}/$(q "SELECT id FROM users ORDER BY id LIMIT 1;")}
