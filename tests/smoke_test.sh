@@ -238,6 +238,21 @@ has "the shortcut ships"     "$(curl -s "$BASE/assets/js/app.js")" "initQuickOpe
 has "and its styles"         "$(curl -s "$BASE/assets/css/app.css")" "quickopen__panel"
 
 echo ""
+echo "=== On a phone ==="
+# A list here is eight to eleven columns. Left as a table on a 360px
+# screen that is scrolling sideways to read one row and back for the
+# next, which is not reading a list at all.
+has "lists stack into cards"   "$(curl -s "$BASE/assets/js/app.js")"   "initStackTables"
+has "and have styles to do it" "$(curl -s "$BASE/assets/css/app.css")" "table--stacks"
+
+# iOS zooms the whole page whenever a field under 16px takes focus, on
+# every single field, and the reader has to pinch back out each time.
+has "fields are 16px on touch"  "$(curl -s "$BASE/assets/css/app.css")" "pointer: coarse"
+
+# A fingertip covers about 9mm; under 44px things get mis-hit.
+has "buttons are big enough"    "$(curl -s "$BASE/assets/css/app.css")" "min-height: 44px"
+
+echo ""
 echo "==================================================="
 printf "  \033[32mPASSED: %d\033[0m   \033[31mFAILED: %d\033[0m\n" "$PASS" "$FAIL"
 echo "==================================================="

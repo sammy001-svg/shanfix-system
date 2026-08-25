@@ -3275,4 +3275,182 @@ body.quickopen-open { overflow: hidden; }
   .topbar__search input { padding-right: 12px; }
 }
 
+/* ---------------------------------------------------------------------
+   Touch
+   ---------------------------------------------------------------------
+   Scoped to coarse pointers rather than to a screen width, because what
+   matters is whether the person is using a finger, not how wide their
+   screen is. A desk machine keeps the tighter density it was designed
+   with; a phone on the production floor or in a delivery van gets
+   controls that can actually be hit.
+   --------------------------------------------------------------------- */
+@media (pointer: coarse) {
 
+  /* iOS zooms the whole page in whenever a field smaller than 16px takes
+     focus, and the reader then has to pinch back out to see anything. It
+     does it on every single field. 16px here is not a design choice, it
+     is the threshold that stops that happening. */
+  .input, .select, .textarea,
+  input[type="text"], input[type="email"], input[type="tel"],
+  input[type="number"], input[type="password"], input[type="search"],
+  input[type="date"], input[type="datetime-local"], select, textarea {
+    font-size: 16px;
+    padding: 10px 12px;
+  }
+
+  /* A fingertip covers about 9mm. Anything under 44px gets mis-hit, and
+     on a job card or a delivery note a mis-hit lands on something that
+     matters. */
+  .btn {
+    min-height: 44px;
+    padding: 11px 16px;
+    font-size: 14.5px;
+  }
+
+  .btn--sm {
+    min-height: 38px;
+    padding: 9px 13px;
+  }
+
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Rows in a list get tapped as often as buttons do. */
+  .table td,
+  .table th {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  /* Checkboxes and radios are the smallest thing anyone has to hit. */
+  .check-row input[type="checkbox"],
+  .check-row input[type="radio"],
+  .check input[type="checkbox"],
+  .check input[type="radio"] {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Room under the last card to scroll it clear of a browser's bottom
+     bar, which otherwise sits over the final action on the page. */
+  .content {
+    padding-bottom: 40px;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Lists on a phone
+   ---------------------------------------------------------------------
+   A list in this system is nine to eleven columns wide. Left as a table
+   on a 360px screen it means scrolling sideways to read one row and back
+   again to read the next, which is not reading a list at all.
+
+   Below the breakpoint each row becomes a small card and each value is
+   printed against its column heading. The heading text is put on the
+   cells by initStackTables(), and only where the cells line up with the
+   headings — a mislabelled value would be worse than an unlabelled one.
+
+   Above the breakpoint none of this applies and the table is a table.
+   --------------------------------------------------------------------- */
+@media (max-width: 720px) {
+
+  .table--stacks,
+  .table--stacks tbody,
+  .table--stacks tr,
+  .table--stacks td {
+    display: block;
+    width: auto;
+  }
+
+  /* The headings are repeated on every cell now, so the row of them at
+     the top is redundant. Hidden rather than removed, so it is still
+     read out in source order and still there above the breakpoint. */
+  .table--stacks thead {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .table--stacks tr {
+    margin: 0 0 10px;
+    padding: 4px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    background: var(--surface);
+  }
+
+  .table--stacks tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .table--stacks td {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 7px 13px;
+    border: 0;
+    text-align: left;
+  }
+
+  /* The heading, printed beside its value. */
+  .table--stacks td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    width: 38%;
+    color: var(--slate-500);
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+
+  /* A cell with no heading is a column of buttons or an avatar. It gets
+     the full width rather than a blank label column beside it. */
+  .table--stacks td:not([data-label]) {
+    padding-top: 9px;
+  }
+
+  /* Figures are set right in a table so the digits line up down the
+     column. Stacked there is no column to line up with. */
+  .table--stacks td.num {
+    text-align: left;
+    justify-content: flex-start;
+  }
+
+  /* The first cell is the thing the row is about, so it reads as the
+     card's title rather than as one more labelled field. */
+  .table--stacks td:first-child {
+    padding-top: 11px;
+    font-weight: 600;
+    font-size: 14.5px;
+  }
+  .table--stacks td:first-child::before {
+    display: none;
+  }
+
+  /* A cell of buttons is an action, not a value. Squeezed into the 62%
+     left over beside a label the buttons wrap and get hard to hit, so it
+     drops the label and takes the width. */
+  .table--stacks td:has(.btn),
+  .table--stacks td:has(form) {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 4px;
+    padding-bottom: 11px;
+  }
+  .table--stacks td:has(.btn)::before,
+  .table--stacks td:has(form)::before {
+    display: none;
+  }
+
+  /* Nothing to scroll sideways any more. */
+  .table-wrap:has(.table--stacks) {
+    overflow-x: visible;
+  }
+}

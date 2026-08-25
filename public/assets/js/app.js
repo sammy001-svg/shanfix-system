@@ -1436,6 +1436,7 @@
     initTheme();
     initCycleDays();
     initQuickOpen();
+    initStackTables();
   });
 
   /* ------------------------------------------------------------------
@@ -1595,6 +1596,58 @@
         e.preventDefault();
         open();
       }
+    });
+  }
+
+  /* ------------------------------------------------------------------
+     Tables that stack on a phone
+     ------------------------------------------------------------------
+     A list here is nine to eleven columns wide. On a 360px screen that
+     means scrolling sideways to read one row, and scrolling back to read
+     the next — which is how a delivery driver ends up ringing the office
+     to ask what they are delivering.
+
+     Rather than editing every table by hand, this copies each column
+     heading onto its cells. The stylesheet then turns each row into a
+     small card below the breakpoint, with the heading printed beside the
+     value. Above it nothing changes.
+
+     Only tables that are laid out plainly are touched: a colspan means
+     the cells no longer line up with the headings, and a wrong label is
+     worse than none.
+     ------------------------------------------------------------------ */
+  function initStackTables() {
+    $$('.table').forEach((table) => {
+      const head = $('thead tr', table);
+      if (!head) return;
+
+      const labels = $$('th', head).map((th) => (th.textContent || '').trim());
+      if (!labels.length) return;
+
+      const rows = $$('tbody tr', table);
+      let usable = true;
+
+      rows.forEach((tr) => {
+        const cells = $$('td', tr);
+        if (!cells.length) return;
+
+        // A row that spans columns cannot be matched to the headings.
+        if (cells.length !== labels.length) { usable = false; return; }
+        if (cells.some((td) => td.colSpan > 1)) { usable = false; }
+      });
+
+      if (!usable) return;
+
+      rows.forEach((tr) => {
+        $$('td', tr).forEach((td, i) => {
+          const label = labels[i];
+          // An empty heading is a column of buttons or an avatar; giving
+          // it a label would print a stray colon on a card.
+          if (label) td.setAttribute('data-label', label);
+        });
+      });
+
+      table.classList.add('table--stacks');
     });
   }
 
