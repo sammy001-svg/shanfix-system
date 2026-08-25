@@ -309,6 +309,10 @@ if ($me && can('jobs.view')) {
         <?= icon('search') ?>
         <input type="search" name="q" placeholder="Search clients, invoices, leads…"
                value="<?= e($_GET['q'] ?? '') ?>" aria-label="Search">
+        <?php // A shortcut nobody knows about is worth nothing, so it says so
+              // here. aria-hidden because it is a hint to the eye — the input
+              // already carries its own label. ?>
+        <kbd class="topbar__kbd" aria-hidden="true">Ctrl K</kbd>
       </form>
 
       <button class="icon-btn" type="button" data-theme-toggle

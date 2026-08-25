@@ -1435,7 +1435,168 @@
     initRoleMatrix();
     initTheme();
     initCycleDays();
+    initQuickOpen();
   });
+
+  /* ------------------------------------------------------------------
+     Quick open
+     ------------------------------------------------------------------
+     Getting to a record was: reach for the mouse, click the search box,
+     type, Enter, read a page of results, click the right one. For anyone
+     who does that forty times a day it is most of the work.
+
+     This is Ctrl-K (or "/"), type, arrow down, Enter. The rows come from
+     the same data the search page uses, through the same permission
+     checks — a JSON route is not a way around them.
+     ------------------------------------------------------------------ */
+  function initQuickOpen() {
+    let box = null, input = null, list = null;
+    let items = [], active = -1, timer = null, seq = 0;
+
+    function build() {
+      if (box) return box;
+
+      box = document.createElement('div');
+      box.className = 'quickopen';
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-label', 'Quick open');
+      box.innerHTML =
+        '<div class="quickopen__panel">' +
+          '<input class="quickopen__input" type="search" autocomplete="off" spellcheck="false"' +
+                ' placeholder="Search clients, documents, jobs, leads…" aria-label="Search everything">' +
+          '<div class="quickopen__list" role="listbox"></div>' +
+          '<div class="quickopen__hint">' +
+            '<span><kbd>↑</kbd><kbd>↓</kbd> move</span>' +
+            '<span><kbd>Enter</kbd> open</span>' +
+            '<span><kbd>Esc</kbd> close</span>' +
+          '</div>' +
+        '</div>';
+
+      document.body.appendChild(box);
+      input = $('.quickopen__input', box);
+      list  = $('.quickopen__list', box);
+
+      box.addEventListener('click', (e) => { if (e.target === box) close(); });
+      input.addEventListener('input', schedule);
+      input.addEventListener('keydown', onKey);
+
+      return box;
+    }
+
+    function open() {
+      build();
+      box.classList.add('is-open');
+      document.body.classList.add('quickopen-open');
+      input.value = '';
+      render([]);
+      input.focus();
+    }
+
+    function close() {
+      if (!box) return;
+      box.classList.remove('is-open');
+      document.body.classList.remove('quickopen-open');
+    }
+
+    function schedule() {
+      clearTimeout(timer);
+      // Long enough that a fast typist sends one request rather than six.
+      timer = setTimeout(search, 160);
+    }
+
+    function search() {
+      const q = input.value.trim();
+      if (q.length < 2) { render([]); return; }
+
+      // Replies can arrive out of order; only the newest may draw.
+      const mine = ++seq;
+
+      fetch(basePath() + '/search/quick?q=' + encodeURIComponent(q), {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      })
+        .then((r) => (r.ok ? r.json() : { results: [] }))
+        .then((data) => { if (mine === seq) render(data.results || []); })
+        .catch(() => { if (mine === seq) render([]); });
+    }
+
+    function render(rows) {
+      items = rows;
+      active = rows.length ? 0 : -1;
+
+      if (!rows.length) {
+        list.innerHTML = input.value.trim().length >= 2
+          ? '<div class="quickopen__empty">Nothing matching that.</div>'
+          : '';
+        return;
+      }
+
+      list.innerHTML = rows.map((r, i) =>
+        '<a class="quickopen__row' + (i === 0 ? ' is-active' : '') + '"' +
+        ' role="option" aria-selected="' + (i === 0) + '"' +
+        ' href="' + esc(r.url) + '" data-i="' + i + '">' +
+          '<span class="quickopen__kind">' + esc(r.kind) + '</span>' +
+          '<span class="quickopen__label">' + esc(r.label) + '</span>' +
+          (r.meta ? '<span class="quickopen__meta">' + esc(r.meta) + '</span>' : '') +
+        '</a>'
+      ).join('');
+
+      $$('.quickopen__row', list).forEach((el) => {
+        el.addEventListener('mouseenter', () => setActive(Number(el.dataset.i)));
+      });
+    }
+
+    function setActive(i) {
+      if (!items.length) return;
+      active = (i + items.length) % items.length;
+
+      $$('.quickopen__row', list).forEach((el, k) => {
+        const on = k === active;
+        el.classList.toggle('is-active', on);
+        el.setAttribute('aria-selected', on ? 'true' : 'false');
+        if (on) el.scrollIntoView({ block: 'nearest' });
+      });
+    }
+
+    function onKey(e) {
+      if (e.key === 'ArrowDown')    { e.preventDefault(); setActive(active + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+      else if (e.key === 'Escape')  { e.preventDefault(); close(); }
+      else if (e.key === 'Enter' && active >= 0 && items[active]) {
+        e.preventDefault();
+        window.location.href = items[active].url;
+      }
+    }
+
+    function esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function basePath() {
+      const m = document.querySelector('meta[name="app-base"]');
+      return m ? (m.content || '') : '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        open();
+        return;
+      }
+
+      // "/" is a shortcut only when it is not being typed into something.
+      const tag = (e.target.tagName || '').toLowerCase();
+      const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
+
+      if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        open();
+      }
+    });
+  }
 
   window.Shanfix = { toast, openModal };
 })();

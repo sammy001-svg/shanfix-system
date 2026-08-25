@@ -283,6 +283,7 @@ $r->group(['auth'], function ($r) {
     // -- Dashboard, search, profile
     $r->get('/dashboard', [DashboardController::class, 'index']);
     $r->get('/search',    [DashboardController::class, 'search']);
+    $r->get('/search/quick', [DashboardController::class, 'quickSearch']);
 
     $r->get('/profile',           [AuthController::class, 'profile']);
     $r->post('/profile',          [AuthController::class, 'updateProfile'],  ['csrf']);

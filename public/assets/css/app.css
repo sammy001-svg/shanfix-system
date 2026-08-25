@@ -361,7 +361,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 }
 .topbar__search input {
   width: 100%;
-  padding: 7px 12px 7px 32px;
+  padding: 7px 62px 7px 32px;
   font-size: 13px;
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -3154,3 +3154,125 @@ body.has-offline-bar .content { padding-bottom: 56px; }
   padding: 0 3px;
   border-radius: 3px;
 }
+
+/* ---------------------------------------------------------------------
+   Quick open (Ctrl-K, or "/")
+   --------------------------------------------------------------------- */
+.quickopen {
+  position: fixed; inset: 0;
+  z-index: 260;
+  display: none;
+  padding: 12vh 16px 16px;
+  background: rgba(8, 32, 58, .55);
+}
+.quickopen.is-open { display: block; }
+body.quickopen-open { overflow: hidden; }
+
+.quickopen__panel {
+  max-width: 560px; margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: modal-in .14s ease-out;
+}
+
+.quickopen__input {
+  width: 100%;
+  padding: 15px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  font-size: 15.5px;
+  font-family: inherit;
+}
+.quickopen__input:focus { outline: none; }
+.quickopen__input::placeholder { color: var(--slate-500); }
+
+.quickopen__list { max-height: 46vh; overflow-y: auto; }
+
+.quickopen__row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px;
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 13.5px;
+  border-left: 3px solid transparent;
+}
+.quickopen__row.is-active {
+  background: var(--surface-2);
+  border-left-color: var(--green-600);
+}
+
+/* Fixed width so the labels line up into a column and the eye can run
+   down them rather than tracking a ragged left edge. */
+.quickopen__kind {
+  flex: none; width: 72px;
+  font-size: 11px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--slate-500);
+}
+.quickopen__label {
+  flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.quickopen__meta {
+  flex: none;
+  color: var(--slate-500); font-size: 12px;
+  max-width: 34%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.quickopen__empty {
+  padding: 18px; text-align: center;
+  color: var(--slate-500); font-size: 13.5px;
+}
+
+.quickopen__hint {
+  display: flex; gap: 16px;
+  padding: 9px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--slate-500); font-size: 11.5px;
+}
+.quickopen__hint kbd {
+  display: inline-block;
+  padding: 1px 5px; margin-right: 3px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  font-size: 11px;
+}
+
+/* On a phone the keyboard takes half the screen, so the panel starts
+   higher and the list gives back the room. */
+@media (max-width: 560px) {
+  .quickopen { padding-top: 6vh; }
+  .quickopen__list { max-height: 40vh; }
+  .quickopen__hint { display: none; }
+  .quickopen__kind { width: 58px; }
+  .quickopen__meta { display: none; }
+}
+
+/* The Ctrl-K hint inside the search box. Hidden where the box is too
+   narrow to spare the room, and on touch where there is no Ctrl key. */
+.topbar__kbd {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--slate-500);
+  font-family: var(--mono); font-size: 10.5px;
+  pointer-events: none;
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .topbar__kbd { display: none; }
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .topbar__search input { padding-right: 12px; }
+}
+
+

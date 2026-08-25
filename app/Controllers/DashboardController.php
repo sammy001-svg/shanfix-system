@@ -5,6 +5,7 @@ use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\Request;
+use App\Core\Response;
 
 class DashboardController extends Controller
 {
@@ -305,6 +306,122 @@ class DashboardController extends Controller
         ]);
     }
     /** Global search across clients, leads, documents and inventory. */
+    /**
+     * Search as you type, for the quick-open box.
+     *
+     * The full search page is a page load, which is a lot of ceremony for
+     * "take me to Acme". This answers the same question as JSON so the
+     * keyboard can do the whole job: type three letters, arrow down,
+     * Enter. Same permission gates as the page — a JSON route is not a
+     * way around them.
+     *
+     * Each row carries the URL it opens, so the browser does not have to
+     * know how this system builds paths.
+     */
+    public function quickSearch(Request $request): void
+    {
+        $q   = trim((string) $request->query('q', ''));
+        $out = [];
+
+        if (mb_strlen($q) < 2) {
+            Response::json(['results' => []]);
+        }
+
+        $like = '%' . $q . '%';
+
+        if (Auth::can('clients.view')) {
+            foreach (Database::all(
+                "SELECT id, name, client_code FROM clients
+                  WHERE name LIKE :q OR client_code LIKE :q2 OR phone LIKE :q3 OR email LIKE :q4
+               ORDER BY name LIMIT 5",
+                ['q' => $like, 'q2' => $like, 'q3' => $like, 'q4' => $like]
+            ) as $r) {
+                $out[] = [
+                    'kind'  => 'Client',
+                    'label' => $r['name'],
+                    'meta'  => $r['client_code'],
+                    'url'   => url('/clients/' . $r['id']),
+                ];
+            }
+        }
+
+        if (Auth::can('documents.view')) {
+            foreach (Database::all(
+                "SELECT d.id, d.doc_type, d.doc_number, d.title, c.name AS client_name
+                   FROM documents d
+              LEFT JOIN clients c ON c.id = d.client_id
+                  WHERE d.doc_number LIKE :q OR d.title LIKE :q2 OR c.name LIKE :q3
+               ORDER BY d.issue_date DESC LIMIT 6",
+                ['q' => $like, 'q2' => $like, 'q3' => $like]
+            ) as $r) {
+                $paths = [
+                    'quotation' => '/quotations/', 'invoice' => '/invoices/',
+                    'receipt'   => '/receipts/',   'proposal' => '/proposals/',
+                    'agreement' => '/agreements/',
+                ];
+
+                $out[] = [
+                    'kind'  => ucfirst((string) $r['doc_type']),
+                    'label' => $r['doc_number'] . ($r['title'] ? ' — ' . $r['title'] : ''),
+                    'meta'  => $r['client_name'] ?? '',
+                    'url'   => url(($paths[$r['doc_type']] ?? '/quotations/') . $r['id']),
+                ];
+            }
+        }
+
+        if (Auth::can('leads.view')) {
+            foreach (Database::all(
+                "SELECT id, name, company, lead_number FROM leads
+                  WHERE name LIKE :q OR company LIKE :q2 OR lead_number LIKE :q3 OR phone LIKE :q4
+               ORDER BY updated_at DESC LIMIT 4",
+                ['q' => $like, 'q2' => $like, 'q3' => $like, 'q4' => $like]
+            ) as $r) {
+                $out[] = [
+                    'kind'  => 'Lead',
+                    'label' => $r['company'] ?: $r['name'],
+                    'meta'  => $r['lead_number'],
+                    'url'   => url('/leads/' . $r['id']),
+                ];
+            }
+        }
+
+        if (Auth::can('jobs.view')) {
+            foreach (Database::all(
+                "SELECT j.id, j.job_number, j.title, c.name AS client_name
+                   FROM jobs j
+              LEFT JOIN clients c ON c.id = j.client_id
+                  WHERE j.job_number LIKE :q OR j.title LIKE :q2 OR c.name LIKE :q3
+               ORDER BY j.id DESC LIMIT 4",
+                ['q' => $like, 'q2' => $like, 'q3' => $like]
+            ) as $r) {
+                $out[] = [
+                    'kind'  => 'Job',
+                    'label' => $r['job_number'] . ($r['title'] ? ' — ' . $r['title'] : ''),
+                    'meta'  => $r['client_name'] ?? '',
+                    'url'   => url('/jobs/' . $r['id']),
+                ];
+            }
+        }
+
+        if (Auth::can('inventory.view')) {
+            foreach (Database::all(
+                "SELECT id, name, sku FROM inventory_items
+                  WHERE name LIKE :q OR sku LIKE :q2
+               ORDER BY name LIMIT 3",
+                ['q' => $like, 'q2' => $like]
+            ) as $r) {
+                $out[] = [
+                    'kind'  => 'Item',
+                    'label' => $r['name'],
+                    'meta'  => $r['sku'] ?? '',
+                    'url'   => url('/inventory/' . $r['id']),
+                ];
+            }
+        }
+
+        Response::json(['results' => array_slice($out, 0, 18)]);
+    }
+
     public function search(Request $request): void
     {
         $q = trim((string) $request->query('q', ''));

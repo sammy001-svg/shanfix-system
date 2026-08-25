@@ -156,6 +156,17 @@ $MYSQL -e "UPDATE settings SET setting_value='720' WHERE setting_key='backup_eve
            DELETE FROM notifications WHERE event='backup_stale';
            DELETE FROM notification_locks WHERE lock_key LIKE 'backup:stale%';"
 touch -d "10 days ago" "$DIR"/*.sql.gz "$DIR"/*.zip 2>/dev/null
+
+# State the precondition rather than assuming it. Anything that took a
+# backup after the backdating above — another suite, or a cron run by hand
+# while debugging — leaves a fresh copy sitting here, and then "not stale"
+# is the correct answer and the two assertions below fail for a reason
+# that has nothing to do with the code. Better to say which it is.
+NEWEST=$(ls -t "$DIR"/*.sql.gz 2>/dev/null | head -1)
+AGE_DAYS=$([ -n "$NEWEST" ] && echo $(( ( $(date +%s) - $(stat -c %Y "$NEWEST") ) / 86400 )) || echo -1)
+eq "precondition: the newest backup is old enough to warn about" \
+   "$([ "$AGE_DAYS" -gt 3 ] && echo yes || echo "no, it is ${AGE_DAYS}d old")" "yes"
+
 for i in 1 2 3; do php "$ROOT/cron.php" > /dev/null 2>&1; done
 eq "the administrators are warned"  "$(q "SELECT COUNT(*) FROM staff_notifications WHERE event='backup_stale';")" "1"
 eq "once, not once per cron run"    "$(q "SELECT COUNT(*) FROM notifications WHERE event='backup_stale';")" "1"

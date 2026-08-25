@@ -217,6 +217,27 @@ has "the worker ignores non-GET" "$(curl -s "$BASE/sw.js")" "request.method !== 
 has "the banner reads the probe" "$(curl -s "$BASE/assets/js/offline.js")" "lastKnown.online"
 
 echo ""
+echo "=== Quick open ==="
+# The suite signed out further up; these need a session again.
+TOKEN=$(token "/login")
+post "/login" "_token=$TOKEN&email=admin@shanfix.co.ke&password=Shanfix@2026" "signed back in" > /dev/null 2>&1
+# Ctrl-K, type, arrow down, Enter. It answers from the same data as the
+# search page and must honour the same permissions — a JSON route is not
+# a way around them.
+eq "it answers"              "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$BASE/search/quick?q=acme")" "200"
+has "and returns rows"       "$(curl -s -b "$JAR" "$BASE/search/quick?q=acme")" '"kind"'
+has "each row carries a url" "$(curl -s -b "$JAR" "$BASE/search/quick?q=acme")" '"url"'
+
+# One letter is not a search; it would return most of the database.
+eq "a single letter finds nothing"    "$(curl -s -b "$JAR" "$BASE/search/quick?q=a")" '{"results":[]}'
+
+# Signed out it must give away nothing at all.
+ne "signed out is refused"    "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/search/quick?q=acme")" "200"
+
+has "the shortcut ships"     "$(curl -s "$BASE/assets/js/app.js")" "initQuickOpen"
+has "and its styles"         "$(curl -s "$BASE/assets/css/app.css")" "quickopen__panel"
+
+echo ""
 echo "==================================================="
 printf "  \033[32mPASSED: %d\033[0m   \033[31mFAILED: %d\033[0m\n" "$PASS" "$FAIL"
 echo "==================================================="
