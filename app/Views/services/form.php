@@ -24,7 +24,7 @@ $val = static function (string $key, $fallback = '') use ($service) {
   </div>
 </div>
 
-<form method="post" action="<?= e($action) ?>">
+<form method="post" action="<?= e($action) ?>" enctype="multipart/form-data">
   <?= csrf_field() ?>
 
   <div class="grid-sidebar">
@@ -131,6 +131,62 @@ $val = static function (string $key, $fallback = '') use ($service) {
               <span>Only active services appear when building a new quotation.</span>
             </span>
           </label>
+        </div>
+      </div>
+
+      <?php
+        $images    = $images ?? [];
+        $maxImages = max(1, (int) setting('service_images_max', 6));
+      ?>
+      <div class="card">
+        <div class="card__head">
+          <?= icon('image') ?>
+          <div>
+            <div class="card__title">Photos</div>
+            <div class="card__sub"><?= count($images) ?> of <?= $maxImages ?> used</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <?php // Half of what this company sells is a service. Three photos
+                // of work already done say more than any description of it. ?>
+          <?php if ($images): ?>
+            <div class="thumb-grid mb-12">
+              <?php foreach ($images as $img): ?>
+                <a class="thumb <?= (int) $img['is_primary'] === 1 ? 'thumb--primary' : '' ?>"
+                   href="<?= url('files/' . $img['file_path']) ?>"
+                   data-gallery="service-form"
+                   data-caption="<?= e($img['alt_text'] ?: $img['file_name']) ?>"
+                   title="<?= e($img['file_name']) ?>">
+                  <img src="<?= url('files/' . ($img['thumb_path'] ?: $img['file_path'])) ?>"
+                       alt="<?= e($img['alt_text'] ?: ($service['name'] ?? 'Service photo')) ?>" loading="lazy">
+                  <?php if ((int) $img['is_primary'] === 1): ?>
+                    <span class="thumb__badge">Main</span>
+                  <?php endif; ?>
+                </a>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (count($images) < $maxImages): ?>
+            <div class="field">
+              <label class="label" for="images">
+                <?= $images ? 'Add more photos' : 'Photos of this work' ?>
+              </label>
+              <input class="input" type="file" id="images" name="images[]"
+                     accept="image/jpeg,image/png,image/gif,image/webp" multiple
+                     data-image-preview="#service-image-preview">
+              <span class="field-hint">
+                JPG, PNG, GIF or WebP. Select several at once.
+                Large photos are resized automatically.
+              </span>
+            </div>
+            <div class="thumb-grid mt-12" id="service-image-preview"></div>
+          <?php else: ?>
+            <p class="text-sm text-muted mb-0">
+              Maximum of <?= $maxImages ?> photos reached. Remove one on the
+              <a href="<?= url('/services/' . $service['id']) ?>">service page</a> to add another.
+            </p>
+          <?php endif; ?>
         </div>
       </div>
 

@@ -1437,6 +1437,7 @@
     initCycleDays();
     initQuickOpen();
     initStackTables();
+    initLightbox();
   });
 
   /* ------------------------------------------------------------------
@@ -1648,6 +1649,128 @@
       });
 
       table.classList.add('table--stacks');
+    });
+  }
+
+  /* ------------------------------------------------------------------
+     Image viewer
+     ------------------------------------------------------------------
+     Clicking a product photo opened it as a bare file in a new tab: no
+     way to reach the next one without going back, and on a phone it left
+     the system entirely. This keeps you on the page and lets you move
+     through the set with arrows, a swipe, or the buttons.
+
+     Any element marked data-gallery="name" joins that group, in document
+     order. Nothing else needs to know about it.
+     ------------------------------------------------------------------ */
+  function initLightbox() {
+    let box = null, imgEl = null, capEl = null, countEl = null;
+    let group = [], at = 0, lastFocus = null;
+
+    function build() {
+      if (box) return box;
+
+      box = document.createElement('div');
+      box.className = 'lightbox';
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-label', 'Image viewer');
+      box.innerHTML =
+        '<button class="lightbox__close" type="button" aria-label="Close viewer">&times;</button>' +
+        '<button class="lightbox__nav lightbox__nav--prev" type="button" aria-label="Previous image">&#8249;</button>' +
+        '<figure class="lightbox__stage">' +
+          '<img class="lightbox__img" alt="">' +
+          '<figcaption class="lightbox__cap"></figcaption>' +
+        '</figure>' +
+        '<button class="lightbox__nav lightbox__nav--next" type="button" aria-label="Next image">&#8250;</button>' +
+        '<div class="lightbox__count" aria-live="polite"></div>';
+
+      document.body.appendChild(box);
+      imgEl   = $('.lightbox__img', box);
+      capEl   = $('.lightbox__cap', box);
+      countEl = $('.lightbox__count', box);
+
+      $('.lightbox__close', box).addEventListener('click', close);
+      $('.lightbox__nav--prev', box).addEventListener('click', () => step(-1));
+      $('.lightbox__nav--next', box).addEventListener('click', () => step(1));
+
+      // Clicking the backdrop closes; clicking the picture does not.
+      box.addEventListener('click', (e) => {
+        if (e.target === box || e.target.classList.contains('lightbox__stage')) close();
+      });
+
+      let startX = null;
+      box.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+      box.addEventListener('touchend', (e) => {
+        if (startX === null) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        if (Math.abs(dx) > 45) step(dx < 0 ? 1 : -1);
+        startX = null;
+      });
+
+      return box;
+    }
+
+    function show(i) {
+      at = (i + group.length) % group.length;
+      const a = group[at];
+
+      imgEl.src = a.getAttribute('href') || a.dataset.full || '';
+      imgEl.alt = a.dataset.caption || ($('img', a) || {}).alt || '';
+      capEl.textContent = a.dataset.caption || '';
+      capEl.style.display = a.dataset.caption ? '' : 'none';
+
+      countEl.textContent = group.length > 1 ? (at + 1) + ' of ' + group.length : '';
+      box.classList.toggle('is-single', group.length < 2);
+    }
+
+    function step(by) { if (group.length > 1) show(at + by); }
+
+    function open(a) {
+      build();
+      const name = a.dataset.gallery;
+      lastFocus = document.activeElement;
+
+      // The same picture often appears twice on a page — once large and
+      // again as its own thumbnail. Collapsed by source, so the set is
+      // the pictures there are rather than the links to them, and
+      // clicking either one lands on the same place in the set.
+      const seen = new Map();
+
+      $$('[data-gallery="' + name + '"]').forEach((el) => {
+        const src = el.getAttribute('href') || el.dataset.full || '';
+        if (!seen.has(src)) seen.set(src, el);
+      });
+
+      group = Array.from(seen.values());
+
+      const src = a.getAttribute('href') || a.dataset.full || '';
+      show(Math.max(0, group.indexOf(seen.get(src))));
+      box.classList.add('is-open');
+      document.body.classList.add('lightbox-open');
+      $('.lightbox__close', box).focus();
+    }
+
+    function close() {
+      if (!box) return;
+      box.classList.remove('is-open');
+      document.body.classList.remove('lightbox-open');
+      imgEl.src = '';
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-gallery]');
+      if (!a) return;
+      e.preventDefault();
+      open(a);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!box || !box.classList.contains('is-open')) return;
+      if (e.key === 'Escape')          { e.preventDefault(); close(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+      else if (e.key === 'ArrowLeft')  { e.preventDefault(); step(-1); }
     });
   }
 

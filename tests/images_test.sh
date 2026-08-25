@@ -134,6 +134,54 @@ curl -s -o /dev/null -b "$J" -c "$J" -X POST "$B/inventory/$ITEM/delete" --data 
 eq "image rows gone" "$($MYSQL -N -e "SELECT COUNT(*) FROM inventory_images WHERE item_id=$ITEM;")" "0"
 eq "no orphan files"  "$(($(pngs) - BASE_FILES))" "0"
 
+echo ""
+echo "=== Photos on a service ==="
+# Half of what this company sells is a service. Three photos of work
+# already done say more than any description of it.
+SID=$(q "SELECT id FROM services ORDER BY id LIMIT 1;")
+q "DELETE FROM service_images WHERE service_id=$SID;" > /dev/null
+SNAME=$(q "SELECT name FROM services WHERE id=$SID;")
+SCODE=$(q "SELECT code FROM services WHERE id=$SID;")
+
+eq "the form takes files"    "$(curl -s -b "$J" "$B/services/$SID/edit" | grep -c 'enctype="multipart/form-data"')" "1"
+eq "and takes several at once"    "$(curl -s -b "$J" "$B/services/$SID/edit" | grep -c 'multiple')" "1"
+
+curl -s -o /dev/null -b "$J" -c "$J" -X POST "$B/services/$SID"   -F "_token=$(tok "/services/$SID/edit")" -F "name=$SNAME" -F "code=$SCODE"   -F "pricing_type=fixed" -F "price=5000" -F "is_active=1"   -F "images[]=@$IMG/small.png" -F "images[]=@$IMG/big.png"
+
+eq "both photos are stored"  "$(q "SELECT COUNT(*) FROM service_images WHERE service_id=$SID;")" "2"
+eq "the first becomes main"  "$(q "SELECT COUNT(*) FROM service_images WHERE service_id=$SID AND is_primary=1;")" "1"
+
+# The same header inspection inventory gets: a renamed script must never
+# reach the filesystem, whichever record it was aimed at.
+curl -s -o /dev/null -b "$J" -c "$J" -X POST "$B/services/$SID"   -F "_token=$(tok "/services/$SID/edit")" -F "name=$SNAME" -F "code=$SCODE"   -F "pricing_type=fixed" -F "price=5000" -F "is_active=1"   -F "images[]=@$IMG/shell.png"
+eq "a disguised script is refused" "$(q "SELECT COUNT(*) FROM service_images WHERE service_id=$SID;")" "2"
+
+# The viewer needs the pictures grouped, and the page needs its controls.
+PAGE=$(curl -s -b "$J" "$B/services/$SID")
+eq "the page shows a gallery" "$(echo "$PAGE" | grep -c 'data-gallery="service"')" "3"
+
+IMGID=$(q "SELECT id FROM service_images WHERE service_id=$SID AND is_primary=0 LIMIT 1;")
+curl -s -o /dev/null -b "$J" -c "$J" -X POST "$B/services/$SID/images/$IMGID/primary" --data "_token=$(tok "/services/$SID")"
+eq "the main photo can be changed" "$(q "SELECT is_primary FROM service_images WHERE id=$IMGID;")" "1"
+
+curl -s -o /dev/null -b "$J" -c "$J" -X POST "$B/services/$SID/images/$IMGID/delete" --data "_token=$(tok "/services/$SID")"
+eq "a photo can be removed"   "$(q "SELECT COUNT(*) FROM service_images WHERE service_id=$SID;")" "1"
+# Removing the main one must not leave a service with photos and none chosen.
+eq "and main is handed over"  "$(q "SELECT COUNT(*) FROM service_images WHERE service_id=$SID AND is_primary=1;")" "1"
+
+# A photo id from another service must not be reachable through this one.
+OTHER=$(q "SELECT id FROM services WHERE id<>$SID ORDER BY id LIMIT 1;")
+MINE=$(q "SELECT id FROM service_images WHERE service_id=$SID LIMIT 1;")
+curl -s -o /dev/null -b "$J" -c "$J" -X POST "$B/services/$OTHER/images/$MINE/delete" --data "_token=$(tok "/services/$OTHER")"
+eq "photos cannot be deleted through another service"    "$(q "SELECT COUNT(*) FROM service_images WHERE id=$MINE;")" "1"
+
+echo ""
+echo "=== The image viewer ==="
+eq "it ships"        "$(curl -s "$B/assets/js/app.js" | grep -c 'initLightbox' | awk '{print ($1>0)?"yes":"no"}')" "yes"
+eq "and its styles"  "$(curl -s "$B/assets/css/app.css" | grep -c 'lightbox__stage')" "1"
+
+q "DELETE FROM service_images WHERE service_id=$SID;" > /dev/null
+
 rm -rf "$IMGB"; rm -f "$J"
 
 echo ""

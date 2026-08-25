@@ -359,6 +359,9 @@ $r->group(['auth'], function ($r) {
         // Past work shown as an example of a service.
         $r->post('/services/{id}/examples',              [ServiceController::class, 'linkJob']);
         $r->post('/services/{id}/examples/{job}/remove', [ServiceController::class, 'unlinkJob']);
+
+        $r->post('/services/{id}/images/{imageId}/delete',  [ServiceController::class, 'deleteImage']);
+        $r->post('/services/{id}/images/{imageId}/primary', [ServiceController::class, 'setPrimaryImage']);
     });
 
     // -- Clients

@@ -213,6 +213,72 @@
   </div>
 
   <aside>
+    <?php $images = $images ?? []; ?>
+    <?php if ($images): ?>
+      <div class="card">
+        <div class="card__head">
+          <?= icon('image') ?>
+          <div>
+            <div class="card__title">Photos</div>
+            <div class="card__sub"><?= count($images) ?> of this work</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <?php $main = $images[0]; ?>
+          <a class="product-hero" href="<?= url('files/' . $main['file_path']) ?>"
+             data-gallery="service" data-caption="<?= e($main['alt_text'] ?: $service['name']) ?>"
+             title="View larger">
+            <img src="<?= url('files/' . $main['file_path']) ?>"
+                 alt="<?= e($main['alt_text'] ?: $service['name']) ?>" loading="lazy">
+          </a>
+
+          <?php if (count($images) > 1): ?>
+            <div class="thumb-grid mt-12">
+              <?php foreach ($images as $img): ?>
+                <a class="thumb <?= (int) $img['is_primary'] === 1 ? 'thumb--primary' : '' ?>"
+                   href="<?= url('files/' . $img['file_path']) ?>"
+                   data-gallery="service"
+                   data-caption="<?= e($img['alt_text'] ?: $img['file_name']) ?>"
+                   title="<?= e($img['file_name']) ?>">
+                  <img src="<?= url('files/' . ($img['thumb_path'] ?: $img['file_path'])) ?>"
+                       alt="<?= e($img['alt_text'] ?: $service['name']) ?>" loading="lazy">
+                  <?php if ((int) $img['is_primary'] === 1): ?>
+                    <span class="thumb__badge">Main</span>
+                  <?php endif; ?>
+                </a>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (can('services.manage')): ?>
+            <div class="thumb-actions mt-12">
+              <?php foreach ($images as $img): ?>
+                <div class="thumb-actions__row">
+                  <span class="text-xs text-muted flex-1"><?= e(str_excerpt($img['file_name'], 26)) ?></span>
+
+                  <?php if ((int) $img['is_primary'] !== 1): ?>
+                    <form method="post"
+                          action="<?= url('/services/' . $service['id'] . '/images/' . $img['id'] . '/primary') ?>">
+                      <?= csrf_field() ?>
+                      <button class="btn btn--ghost btn--sm" type="submit">Make main</button>
+                    </form>
+                  <?php endif; ?>
+
+                  <form method="post"
+                        action="<?= url('/services/' . $service['id'] . '/images/' . $img['id'] . '/delete') ?>"
+                        data-confirm="Remove this photo from <?= e($service['name']) ?>?">
+                    <?= csrf_field() ?>
+                    <button class="btn btn--ghost btn--sm text-red" type="submit"
+                            aria-label="Remove this photo"><?= icon('trash') ?></button>
+                  </form>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endif; ?>
+
     <div class="card">
       <div class="card__head"><div class="card__title">Details</div></div>
       <div class="card__body">

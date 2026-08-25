@@ -12,7 +12,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
-use App\Services\ImageProcessor;
+use App\Services\ImageLibrary;
 
 class InventoryController extends Controller
 {
@@ -461,126 +461,24 @@ class InventoryController extends Controller
      *
      * @return array{saved:int, errors:array<int,string>}
      */
+    /**
+     * Photos for this item.
+     *
+     * The work itself lives in ImageLibrary, shared with services. It is
+     * the code that decides whether an uploaded file reaches the disk, and
+     * a second copy of it would mean any flaw had to be found twice.
+     *
+     * @return array{saved:int, errors:array<int,string>}
+     */
     private function storeImages(int $itemId, Request $request): array
     {
-        $files  = $_FILES['images'] ?? null;
-        $saved  = 0;
-        $errors = [];
-
-        if (!is_array($files) || !isset($files['name'])) {
-            return ['saved' => 0, 'errors' => []];
-        }
-
-        // Normalise PHP's awkward multi-file layout into one entry per file.
-        $names = (array) $files['name'];
-        $count = count($names);
-
-        $existing = (int) Database::scalar(
-            'SELECT COUNT(*) FROM inventory_images WHERE item_id = :id',
-            ['id' => $itemId],
-            0
-        );
-
-        $max = max(1, Settings::int('product_images_max', 6));
-
-        $maxEdge  = max(400, Settings::int('product_image_max_px', 1600));
-        $thumbPx  = max(100, Settings::int('product_thumb_px', 400));
-        $maxBytes = (int) Config::get('uploads.max_size_mb', 8) * 1024 * 1024;
-
-        $dir = STORAGE_PATH . '/uploads/products';
-
-        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
-            return ['saved' => 0, 'errors' => ['Could not create the product image folder on the server.']];
-        }
-
-        for ($i = 0; $i < $count; $i++) {
-            $error = (int) ($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
-
-            if ($error === UPLOAD_ERR_NO_FILE) {
-                continue;
-            }
-
-            $original = trim((string) ($names[$i] ?? 'image'));
-
-            if ($existing + $saved >= $max) {
-                $errors[] = 'Only ' . $max . ' photos are allowed per item — "' . str_excerpt($original, 30) . '" was skipped.';
-                continue;
-            }
-
-            if ($error !== UPLOAD_ERR_OK) {
-                $errors[] = match ($error) {
-                    UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE =>
-                        '"' . str_excerpt($original, 30) . '" is larger than the server allows.',
-                    UPLOAD_ERR_PARTIAL =>
-                        '"' . str_excerpt($original, 30) . '" only uploaded partially. Try again.',
-                    default =>
-                        '"' . str_excerpt($original, 30) . '" could not be uploaded (error ' . $error . ').',
-                };
-                continue;
-            }
-
-            $tmp = (string) ($files['tmp_name'][$i] ?? '');
-
-            if (!is_uploaded_file($tmp)) {
-                $errors[] = '"' . str_excerpt($original, 30) . '" was rejected.';
-                continue;
-            }
-
-            if ((int) ($files['size'][$i] ?? 0) > $maxBytes) {
-                $errors[] = '"' . str_excerpt($original, 30) . '" is over the '
-                          . Config::get('uploads.max_size_mb', 8) . 'MB limit.';
-                continue;
-            }
-
-            // Header inspection, not the file extension — a renamed script
-            // never reaches the filesystem.
-            $info = ImageProcessor::inspect($tmp);
-
-            if (!$info['ok']) {
-                $errors[] = '"' . str_excerpt($original, 30) . '": ' . $info['error'];
-                continue;
-            }
-
-            $base      = bin2hex(random_bytes(12));
-            $fileName  = $base . '.' . $info['ext'];
-            $thumbName = $base . '_thumb.' . $info['ext'];
-
-            $result = ImageProcessor::resize($tmp, $dir . '/' . $fileName, $maxEdge);
-
-            if (!$result['ok']) {
-                $errors[] = '"' . str_excerpt($original, 30) . '": ' . ($result['error'] ?? 'could not be saved.');
-                continue;
-            }
-
-            $hasThumb = ImageProcessor::thumbnail($tmp, $dir . '/' . $thumbName, $thumbPx);
-
-            Database::insert('inventory_images', [
-                'item_id'     => $itemId,
-                'file_path'   => 'uploads/products/' . $fileName,
-                'thumb_path'  => $hasThumb ? 'uploads/products/' . $thumbName : null,
-                'file_name'   => mb_substr($original, 0, 200),
-                'file_size'   => (int) @filesize($dir . '/' . $fileName),
-                'width'       => $result['width'] ?? null,
-                'height'      => $result['height'] ?? null,
-                // First photo on a bare item becomes the main one automatically.
-                'is_primary'  => ($existing + $saved) === 0 ? 1 : 0,
-                'sort_order'  => $existing + $saved,
-                'uploaded_by' => Auth::id(),
-            ]);
-
-            $saved++;
-        }
-
-        return ['saved' => $saved, 'errors' => $errors];
+        return ImageLibrary::store('product', $itemId);
     }
 
     /** @return array<int,array<string,mixed>> */
     private function imagesFor(int $itemId): array
     {
-        return Database::all(
-            'SELECT * FROM inventory_images WHERE item_id = :id ORDER BY is_primary DESC, sort_order, id',
-            ['id' => $itemId]
-        );
+        return ImageLibrary::all('product', $itemId);
     }
 
     // -- Internals -----------------------------------------------------

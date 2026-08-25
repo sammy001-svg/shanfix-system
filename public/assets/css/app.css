@@ -3454,3 +3454,141 @@ body.quickopen-open { overflow: hidden; }
     overflow-x: visible;
   }
 }
+
+/* ---------------------------------------------------------------------
+   Image viewer
+   ---------------------------------------------------------------------
+   Product and service photos used to open as a bare file in a new tab,
+   which meant going back to reach the next one and, on a phone, leaving
+   the system altogether. This keeps the reader on the page.
+   --------------------------------------------------------------------- */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 16px;
+  background: rgba(5, 9, 15, .92);
+}
+.lightbox.is-open {
+  display: flex;
+}
+body.lightbox-open {
+  overflow: hidden;
+}
+
+.lightbox__stage {
+  margin: 0;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.lightbox__img {
+  max-width: 100%;
+  /* Leaves room for the caption and the counter without the picture
+     ever pushing them off the screen. */
+  max-height: calc(100vh - 150px);
+  object-fit: contain;
+  border-radius: var(--r);
+  background: #12202f;
+}
+
+.lightbox__cap {
+  color: #C9D6E4;
+  font-size: 13px;
+  text-align: center;
+  max-width: 60ch;
+}
+
+.lightbox__count {
+  position: absolute;
+  bottom: 18px; left: 50%;
+  transform: translateX(-50%);
+  color: #93A6BA;
+  font-size: 12.5px;
+  letter-spacing: .03em;
+}
+
+.lightbox__close,
+.lightbox__nav {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .07);
+  color: #fff;
+  cursor: pointer;
+  line-height: 1;
+  transition: background .12s ease, border-color .12s ease;
+}
+.lightbox__close:hover,
+.lightbox__nav:hover {
+  background: rgba(255, 255, 255, .16);
+  border-color: rgba(255, 255, 255, .3);
+}
+
+.lightbox__close {
+  top: 14px; right: 14px;
+  width: 44px; height: 44px;
+  font-size: 26px;
+}
+
+.lightbox__nav {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px; height: 48px;
+  font-size: 30px;
+}
+.lightbox__nav--prev { left: 14px; }
+.lightbox__nav--next { right: 14px; }
+
+/* One picture needs no way through a set. */
+.lightbox.is-single .lightbox__nav,
+.lightbox.is-single .lightbox__count {
+  display: none;
+}
+
+/* A photo is worth looking at, so on a phone it gets the room. The
+   arrows move to the bottom corners where a thumb can reach them
+   without covering the picture. */
+@media (max-width: 620px) {
+  .lightbox {
+    padding: 52px 8px 72px;
+  }
+  .lightbox__img {
+    max-height: calc(100vh - 190px);
+  }
+  .lightbox__nav {
+    top: auto;
+    bottom: 14px;
+    transform: none;
+    width: 52px; height: 52px;
+  }
+  .lightbox__count {
+    bottom: 30px;
+  }
+}
+
+/* The thumbnails and the main picture both say they can be opened. */
+.product-hero,
+.thumb {
+  cursor: zoom-in;
+}
+
+/* The per-photo controls under a gallery: which one is the main picture,
+   and removing one. Kept out of the thumbnails themselves so a tap on a
+   thumbnail always means "show me this" and never "delete this". */
+.thumb-actions { display: flex; flex-direction: column; gap: 2px; }
+.thumb-actions__row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid var(--border);
+}
+.thumb-actions__row:first-child { border-top: 0; }

@@ -182,7 +182,8 @@ $marginPct = $sell > 0 ? ($margin / $sell) * 100 : 0;
           <?php $main = $images[0]; ?>
 
           <a class="product-hero" href="<?= url('files/' . $main['file_path']) ?>"
-             target="_blank" rel="noopener" title="Open full size">
+             data-gallery="item" data-caption="<?= e($main['alt_text'] ?: $item['name']) ?>"
+             title="View larger">
             <img src="<?= url('files/' . $main['file_path']) ?>"
                  alt="<?= e($main['alt_text'] ?: $item['name']) ?>" loading="lazy">
           </a>
@@ -191,7 +192,8 @@ $marginPct = $sell > 0 ? ($margin / $sell) * 100 : 0;
             <div class="thumb-grid mt-12">
               <?php foreach ($images as $img): ?>
                 <a class="thumb <?= (int) $img['is_primary'] === 1 ? 'thumb--primary' : '' ?>"
-                   href="<?= url('files/' . $img['file_path']) ?>" target="_blank" rel="noopener"
+                   href="<?= url('files/' . $img['file_path']) ?>"
+                   data-gallery="item" data-caption="<?= e($img['alt_text'] ?: $img['file_name']) ?>"
                    title="<?= e($img['file_name']) ?>">
                   <img src="<?= url('files/' . ($img['thumb_path'] ?: $img['file_path'])) ?>"
                        alt="<?= e($img['alt_text'] ?: $item['name']) ?>" loading="lazy">

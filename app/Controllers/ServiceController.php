@@ -10,6 +10,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
+use App\Services\ImageLibrary;
 
 class ServiceController extends Controller
 {
@@ -99,6 +100,7 @@ class ServiceController extends Controller
 
         $this->view('services/form', [
             'title'        => 'New Service',
+            'images'       => [],
             'service'      => null,
             'categories'   => $this->categories(),
             'pricingTypes' => self::PRICING_TYPES,
@@ -112,14 +114,25 @@ class ServiceController extends Controller
         $data = $this->validated($request, null);
         $id   = Database::insert('services', $data);
 
+        $photos = ImageLibrary::store('service', $id);
+
+        foreach ($photos['errors'] as $problem) {
+            Session::error($problem);
+        }
+
         ActivityLog::record('service_created', 'service', $id, 'Added service ' . $data['name']);
-        Session::success('"' . $data['name'] . '" has been added to your service catalogue.');
+
+        Session::success('"' . $data['name'] . '" has been added to your service catalogue.'
+            . ($photos['saved'] > 0 ? ' ' . $photos['saved'] . ' photo(s) attached.' : ''));
+
         Response::to('/services/' . $id);
     }
 
     public function show(Request $request): void
     {
         $service = $this->findOrFail($request->paramInt('id'));
+
+        $images = ImageLibrary::all('service', (int) $service['id']);
 
         $sold = Database::all(
             "SELECT d.id, d.doc_number, d.doc_type, d.issue_date, d.status,
@@ -155,6 +168,7 @@ class ServiceController extends Controller
         $this->view('services/show', [
             'title'        => $service['name'],
             'service'      => $service,
+            'images'       => $images,
             'sold'         => $sold,
             'revenue'      => $revenue,
             'openLeads'    => $openLeads,
@@ -230,6 +244,45 @@ class ServiceController extends Controller
     }
 
     /** Add a finished job to this service's examples. */
+    /** Remove one photo from a service. */
+    public function deleteImage(Request $request): void
+    {
+        $this->authorize('services.manage');
+
+        $service = $this->findOrFail($request->paramInt('id'));
+
+        // Scoped to this service, so an id from another one is simply not
+        // found rather than deleted.
+        if (!ImageLibrary::delete('service', (int) $service['id'], $request->paramInt('imageId'))) {
+            throw new HttpException(404, 'That photo is not part of this service.');
+        }
+
+        ActivityLog::record(
+            'service_image_deleted',
+            'service',
+            (int) $service['id'],
+            'Removed a photo from ' . $service['name']
+        );
+
+        Session::success('Photo removed.');
+        Response::to('/services/' . $service['id']);
+    }
+
+    /** Choose the photo that stands for the service. */
+    public function setPrimaryImage(Request $request): void
+    {
+        $this->authorize('services.manage');
+
+        $service = $this->findOrFail($request->paramInt('id'));
+
+        if (!ImageLibrary::makePrimary('service', (int) $service['id'], $request->paramInt('imageId'))) {
+            throw new HttpException(404, 'That photo is not part of this service.');
+        }
+
+        Session::success('Main photo updated.');
+        Response::to('/services/' . $service['id']);
+    }
+
     public function linkJob(Request $request): void
     {
         $this->authorize('services.manage');
@@ -289,6 +342,7 @@ class ServiceController extends Controller
 
         $this->view('services/form', [
             'title'        => 'Edit ' . $service['name'],
+            'images'       => ImageLibrary::all('service', (int) $service['id']),
             'service'      => $service,
             'categories'   => $this->categories(),
             'pricingTypes' => self::PRICING_TYPES,
@@ -304,8 +358,17 @@ class ServiceController extends Controller
 
         Database::update('services', $data, ['id' => $service['id']]);
 
+        $photos = ImageLibrary::store('service', (int) $service['id']);
+
+        foreach ($photos['errors'] as $problem) {
+            Session::error($problem);
+        }
+
         ActivityLog::record('service_updated', 'service', (int) $service['id'], 'Updated service ' . $data['name']);
-        Session::success('Service updated.');
+
+        Session::success('Service updated.'
+            . ($photos['saved'] > 0 ? ' ' . $photos['saved'] . ' photo(s) added.' : ''));
+
         Response::to('/services/' . $service['id']);
     }
 
