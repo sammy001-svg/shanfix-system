@@ -19,6 +19,13 @@
 (function () {
   'use strict';
 
+  // How long to wait for the connectivity probe before giving up on it,
+  // and how long its answer stays good for. Four seconds is long enough
+  // for a slow mobile connection and short enough that a genuinely dead
+  // network is reported quickly.
+  var PROBE_TIMEOUT = 4000;
+  var PROBE_CACHE   = 5000;
+
   var DB_NAME  = 'shanfix-offline';
   var STORE    = 'queue';
   var MAX_TRIES = 8;
@@ -120,9 +127,69 @@
     return strip;
   }
 
+  /**
+   * Whether the server is actually reachable.
+   *
+   * navigator.onLine answers a different question — whether the device has
+   * a network interface at all — and on Windows it is routinely wrong. A
+   * VPN client or a VirtualBox/VMware adapter leaves it stuck reporting
+   * offline on a machine whose internet is working perfectly well, and
+   * believing it put a false "no internet" banner in front of people all
+   * day on a connection that was never down.
+   *
+   * So a claim of "offline" now has to be proven. HEAD, because the
+   * service worker only intercepts GET, and a probe answered out of a
+   * cache would report the network as up when it is not.
+   */
+  var lastKnown = { online: true, at: 0 };
+
+  function reachable() {
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, PROBE_TIMEOUT) : null;
+
+    return fetch(path('/up'), {
+      method: 'HEAD',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal: controller ? controller.signal : undefined
+    }).then(function () {
+      // Any reply at all proves the network carried it. Even a 404 or a
+      // 500 came from somewhere, which is the only fact being asked for.
+      if (timer) clearTimeout(timer);
+      return true;
+    }).catch(function () {
+      if (timer) clearTimeout(timer);
+      return false;
+    });
+  }
+
+  /**
+   * The current state, checked no more often than it is worth checking.
+   *
+   * A browser saying it IS online is believed without a probe: that
+   * direction is rarely wrong, and probing on every render would put a
+   * request behind every page. Saying it is offline is only a suspicion,
+   * and gets verified.
+   */
+  function connectionState() {
+    if (navigator.onLine) {
+      lastKnown = { online: true, at: Date.now() };
+      return Promise.resolve(true);
+    }
+
+    if (Date.now() - lastKnown.at < PROBE_CACHE) {
+      return Promise.resolve(lastKnown.online);
+    }
+
+    return reachable().then(function (ok) {
+      lastKnown = { online: ok, at: Date.now() };
+      return ok;
+    });
+  }
+
   function render(pending) {
     var bar = ensureStrip();
-    var offline = !navigator.onLine;
+    var offline = !lastKnown.online;
 
     if (!offline && pending === 0) {
       bar.classList.remove('is-visible', 'is-offline', 'is-syncing');
@@ -147,7 +214,9 @@
   }
 
   function refreshStatus() {
-    return all().then(function (items) {
+    return connectionState().then(function () {
+      return all();
+    }).then(function (items) {
       render(items.length);
       return items.length;
     }).catch(function () { render(0); return 0; });
@@ -175,22 +244,6 @@
       fields.push([key, String(value)]);
     });
     return fields;
-  }
-
-  function queueSubmission(form, label) {
-    var item = {
-      url:       form.getAttribute('action') || window.location.pathname,
-      fields:    serialise(form),
-      idem:      newKey(),
-      label:     label,
-      createdAt: Date.now(),
-      attempts:  0
-    };
-
-    return enqueue(item).then(function () {
-      toast('Saved on this device. It will sync when you are back online.', 'queued');
-      return refreshStatus();
-    });
   }
 
   function bodyFor(item) {
@@ -233,12 +286,10 @@
     var buttons = form.querySelectorAll('button[type="submit"], button:not([type])');
     buttons.forEach(function (b) { b.disabled = true; });
 
-    if (!navigator.onLine) {
-      queueSubmission(form, label).then(function () {
-        buttons.forEach(function (b) { b.disabled = false; });
-      });
-      return;
-    }
+    // No shortcut on navigator.onLine here. It fires wrongly often enough
+    // that this used to hold somebody's work on their device while their
+    // connection was fine. The attempt below is the honest test: if the
+    // network really is down, send() rejects and the catch queues it.
 
     var item = {
       url:      form.getAttribute('action') || window.location.pathname,
@@ -274,7 +325,9 @@
   var delivered = 0;
 
   function flush() {
-    if (flushing || !navigator.onLine) return Promise.resolve();
+    // lastKnown, not navigator.onLine: a stuck flag would leave everything
+    // queued on the device for ever, which is how saved work goes missing.
+    if (flushing || !lastKnown.online) return Promise.resolve();
     flushing = true;
     delivered = 0;
 
@@ -421,8 +474,18 @@
   // -- Start --------------------------------------------------------------
 
   document.addEventListener('submit', intercept, false);
-  window.addEventListener('online',  function () { render(0); flush(); });
-  window.addEventListener('offline', function () { refreshStatus(); });
+  window.addEventListener('online', function () {
+    lastKnown = { online: true, at: Date.now() };
+    refreshStatus();
+    flush();
+  });
+
+  // Not taken at face value: this is the event that was wrongly firing on
+  // working connections and putting the banner up.
+  window.addEventListener('offline', function () {
+    lastKnown.at = 0;             // force a real check
+    refreshStatus();
+  });
 
   document.addEventListener('DOMContentLoaded', function () {
     registerWorker();
@@ -435,8 +498,20 @@
   // Retry quietly while the tab is open, for a connection that comes back
   // without the browser firing an "online" event.
   setInterval(function () {
-    if (navigator.onLine) {
+    if (lastKnown.online) {
       all().then(function (items) { if (items.length) flush(); }).catch(function () {});
     }
   }, 60000);
+
+  // While the bar is showing, keep asking. A connection that comes back
+  // does not always fire an "online" event, and a banner that will not go
+  // away on a working connection is worse than no banner at all.
+  setInterval(function () {
+    if (lastKnown.online) return;
+
+    lastKnown.at = 0;
+    refreshStatus().then(function (pending) {
+      if (lastKnown.online && pending > 0) flush();
+    });
+  }, 10000);
 })();

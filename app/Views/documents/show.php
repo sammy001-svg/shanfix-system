@@ -100,7 +100,7 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
     <?php endif; ?>
 
     <div class="dropdown">
-      <button class="btn btn--outline" type="button" data-dropdown><?= icon('more') ?></button>
+      <button class="btn btn--outline" type="button" data-dropdown aria-label="More actions for this document"><?= icon('more') ?></button>
       <div class="dropdown__menu">
         <?php if (can('documents.manage') && $type !== 'receipt' && $doc['status'] !== 'paid'): ?>
           <a class="dropdown__item" href="<?= url($meta['path'] . '/' . $doc['id'] . '/edit') ?>">
@@ -442,7 +442,7 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
           <form method="post" action="<?= url($meta['path'] . '/' . $doc['id'] . '/status') ?>">
             <?= csrf_field() ?>
             <div class="field mb-12">
-              <select class="select" name="status">
+              <select class="select" name="status" aria-label="Status">
                 <?php foreach ($statuses as $s): ?>
                   <?php if ($isInvoice && in_array($s, ['paid', 'partial'], true)) continue; ?>
                   <option value="<?= e($s) ?>" <?= $doc['status'] === $s ? 'selected' : '' ?>>

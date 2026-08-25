@@ -48,7 +48,7 @@ $val = static fn(string $key, $fallback = '') => Session::old($key, $fallback);
             <div class="field">
               <label class="label" for="document_id">Apply to invoice</label>
               <?php if ($document): ?>
-                <input class="input" value="<?= e($document['doc_number']) ?> — <?= e(money($document['balance'])) ?> due" readonly>
+                <input class="input" value="<?= e($document['doc_number']) ?> — <?= e(money($document['balance'])) ?> due" aria-label="Invoice being paid" readonly>
                 <input type="hidden" name="document_id" value="<?= (int) $document['id'] ?>">
               <?php else: ?>
                 <select class="select" id="document_id" name="document_id">

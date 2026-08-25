@@ -235,7 +235,7 @@ $canSend  = $latest !== null && can('artwork.design')
       <div class="card">
         <div class="card__head"><div><div class="card__title">Client link</div></div></div>
         <div class="card__body">
-          <input class="input" style="font-size:12.5px" value="<?= e($shareLink) ?>"
+          <input class="input" style="font-size:12.5px" value="<?= e($shareLink) ?>" aria-label="Link to share with the client"
                  readonly onfocus="this.select()">
           <span class="field-hint">
             Anyone holding this link can approve the artwork — send it only to the client.
@@ -256,7 +256,7 @@ $canSend  = $latest !== null && can('artwork.design')
           <form method="post" action="<?= url('/artwork/' . $artwork['id'] . '/assign') ?>">
             <?= csrf_field() ?>
             <div class="field">
-              <select class="input" name="assigned_to">
+              <select class="input" name="assigned_to" aria-label="Assign to">
                 <option value="">Choose a designer…</option>
                 <?php foreach ($designers as $d): ?>
                   <option value="<?= (int) $d['id'] ?>"

@@ -27,7 +27,7 @@ use App\Core\Settings;
 class PwaController extends Controller
 {
     /** Bump to retire every client's cached shell after a deploy. */
-    private const CACHE_VERSION = 'v1';
+    private const CACHE_VERSION = 'v2';
 
     private const ICON_SIZES = [192, 512];
 
@@ -92,6 +92,30 @@ class PwaController extends Controller
      * Served with Service-Worker-Allowed so a worker delivered from a
      * sub-path may still control the whole site.
      */
+    /**
+     * "Is the server actually reachable?"
+     *
+     * navigator.onLine answers a different question — whether the device
+     * has a network interface — and on Windows it is routinely wrong, with
+     * VPN clients and virtual adapters leaving it stuck reporting offline
+     * on a machine whose internet is working perfectly well. Believing it
+     * put a false "no internet" banner in front of people all day.
+     *
+     * So the browser asks here instead. HEAD rather than GET because the
+     * service worker intercepts GET, and a probe answered out of a cache
+     * would report the network as up when it is not.
+     *
+     * Deliberately does nothing: no session, no database, no body. The
+     * only information carried is that a reply arrived at all.
+     */
+    public function up(Request $request): void
+    {
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Content-Length: 0');
+        http_response_code(204);
+        exit;
+    }
+
     public function serviceWorker(Request $request): void
     {
         $base    = rtrim(base_path(), '/');

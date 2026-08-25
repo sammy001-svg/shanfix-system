@@ -107,7 +107,7 @@
                 <form method="post" action="<?= url('/users/' . $u['id'] . '/delete') ?>" style="display:inline"
                       data-confirm="Delete <?= e($u['name']) ?>? Accounts with history are deactivated instead.">
                   <?= csrf_field() ?>
-                  <button class="btn btn--danger-soft btn--sm" type="submit"><?= icon('trash') ?></button>
+                  <button class="btn btn--danger-soft btn--sm" type="submit" aria-label="Delete this user"><?= icon('trash') ?></button>
                 </form>
               <?php endif; ?>
             </td>

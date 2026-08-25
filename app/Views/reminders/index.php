@@ -115,7 +115,7 @@
                 <form method="post" action="<?= url('/reminders/' . $r['id'] . '/delete') ?>" style="display:inline"
                       data-confirm="Delete this reminder?">
                   <?= csrf_field() ?>
-                  <button class="btn btn--danger-soft btn--sm" type="submit"><?= icon('trash') ?></button>
+                  <button class="btn btn--danger-soft btn--sm" type="submit" aria-label="Delete this reminder"><?= icon('trash') ?></button>
                 </form>
               </td>
             </tr>

@@ -22,6 +22,18 @@ class Router
     }
 
     /**
+     * A HEAD route.
+     *
+     * Used by the connectivity probe. It has to be HEAD rather than GET
+     * because the service worker only intercepts GET, and a probe answered
+     * from a cache would report the network as up when it is not.
+     */
+    public function head(string $path, array|callable $handler, array $middleware = []): void
+    {
+        $this->add('HEAD', $path, $handler, $middleware);
+    }
+
+    /**
      * Apply shared middleware to a batch of routes.
      */
     public function group(array $middleware, callable $fn): void

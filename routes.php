@@ -79,6 +79,11 @@ $r->post('/webhooks/whatsapp', [WhatsAppWebhookController::class, 'receive']);
 // would not survive.
 // ---------------------------------------------------------------------
 $r->get('/manifest.webmanifest', [PwaController::class, 'manifest']);
+// The connectivity probe. No auth, no session, no body — the only thing
+// it tells the browser is that a reply arrived, which is the one fact
+// navigator.onLine gets wrong.
+$r->head('/up', [PwaController::class, 'up']);
+
 $r->get('/sw.js',                [PwaController::class, 'serviceWorker']);
 $r->get('/icon-{size}.png',      [PwaController::class, 'icon']);
 $r->get('/offline',              [PwaController::class, 'offline']);

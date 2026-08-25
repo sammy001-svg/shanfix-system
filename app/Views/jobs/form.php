@@ -134,7 +134,7 @@ $rows = $items ?: [];
                 <tr>
                   <td class="items-table__drag" data-f="index"><?= $i + 1 ?></td>
                   <td>
-                    <textarea class="textarea" data-f="description" name="items[<?= $i ?>][description]"
+                    <textarea class="textarea" data-f="description" aria-label="Description" name="items[<?= $i ?>][description]"
                               rows="2" style="min-height:38px" required><?= e($item['description']) ?></textarea>
                   </td>
                   <td>
@@ -144,7 +144,7 @@ $rows = $items ?: [];
                   </td>
                   <td class="num">
                     <input class="input num" type="number" step="0.01" min="0.01"
-                           data-f="quantity" name="items[<?= $i ?>][quantity]"
+                           data-f="quantity" aria-label="Quantity" name="items[<?= $i ?>][quantity]"
                            value="<?= e(rtrim(rtrim(number_format((float) $item['quantity'], 2, '.', ''), '0'), '.')) ?>" required>
                   </td>
                   <td>
@@ -247,7 +247,7 @@ $rows = $items ?: [];
   <tr>
     <td class="items-table__drag" data-f="index">1</td>
     <td>
-      <textarea class="textarea" data-f="description" name="items[][description]"
+      <textarea class="textarea" data-f="description" aria-label="Description" name="items[][description]"
                 rows="2" style="min-height:38px" placeholder="What has to be made?" required></textarea>
     </td>
     <td>
@@ -256,7 +256,7 @@ $rows = $items ?: [];
     </td>
     <td class="num">
       <input class="input num" type="number" step="0.01" min="0.01"
-             data-f="quantity" name="items[][quantity]" value="1" required>
+             data-f="quantity" aria-label="Quantity" name="items[][quantity]" value="1" required>
     </td>
     <td>
       <input class="input" data-f="unit" name="items[][unit]" maxlength="30" placeholder="pcs">

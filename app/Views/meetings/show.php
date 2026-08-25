@@ -146,7 +146,7 @@ $over = in_array($meeting['status'], ['ended', 'cancelled'], true);
           </div>
         </div>
         <div class="card__body">
-          <input class="input" type="text" readonly data-select-on-focus
+          <input class="input" type="text" readonly data-select-on-focus aria-label="Meeting link"
                  value="<?= e($joinUrl) ?>">
           <div class="text-xs text-muted mt-8">
             Click to select, then copy. It is included in the reminders automatically.

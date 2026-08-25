@@ -132,7 +132,7 @@ foreach ($byCategory as $c) {
                       <form method="post" action="<?= url('/expenses/' . $ex['id'] . '/delete') ?>" style="display:inline"
                             data-confirm="Delete expense <?= e($ex['expense_number']) ?>?">
                         <?= csrf_field() ?>
-                        <button class="btn btn--danger-soft btn--sm" type="submit"><?= icon('trash') ?></button>
+                        <button class="btn btn--danger-soft btn--sm" type="submit" aria-label="Delete this expense"><?= icon('trash') ?></button>
                       </form>
                     <?php endif; ?>
                   </td>

@@ -92,6 +92,10 @@ if ($me && can('jobs.view')) {
 <link rel="apple-touch-icon" href="<?= url('icon-192.png') ?>">
 </head>
 <body>
+<?php // The first tab stop on every page. Without it, anyone working by
+      // keyboard tabs through the whole sidebar before reaching the page
+      // they actually opened — on every single navigation. ?>
+<a class="skip-link" href="#main">Skip to content</a>
 
 <div class="layout">
 
@@ -345,7 +349,7 @@ if ($me && can('jobs.view')) {
       </div>
     </header>
 
-    <main class="content">
+    <main class="content" id="main" tabindex="-1">
       <?php foreach (($flashes ?? []) as $flash): ?>
         <div class="alert alert--<?= e($flash['type']) ?>">
           <?= icon(match ($flash['type']) {

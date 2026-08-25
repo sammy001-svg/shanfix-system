@@ -170,7 +170,7 @@ $preview = static function (array $c): string {
             <?= csrf_field() ?>
             <textarea class="textarea" name="body" rows="1" required
                       placeholder="Write a message…" data-wa-input></textarea>
-            <button class="btn btn--primary" type="submit"><?= icon('send') ?></button>
+            <button class="btn btn--primary" type="submit" aria-label="Send this message"><?= icon('send') ?></button>
           </form>
           <div class="wa__window">
             <?php

@@ -146,7 +146,7 @@ $rows[] = ['item_type'=>'inventory','ref_id'=>null,'description'=>'','quantity'=
           <?php foreach ($rows as $i => $row): ?>
             <tr>
               <td>
-                <select class="input" name="items[<?= $i ?>][ref_id]" data-po-item>
+                <select class="input" name="items[<?= $i ?>][ref_id]" aria-label="Catalogue item" data-po-item>
                   <option value="">— not stock —</option>
                   <?php foreach ($stockItems as $it): ?>
                     <option value="<?= (int) $it['id'] ?>"
@@ -160,15 +160,15 @@ $rows[] = ['item_type'=>'inventory','ref_id'=>null,'description'=>'','quantity'=
                 </select>
               </td>
               <td>
-                <input class="input" name="items[<?= $i ?>][description]"
+                <input class="input" name="items[<?= $i ?>][description]" aria-label="Description"
                        value="<?= e($row['description'] ?? '') ?>" placeholder="What it is">
               </td>
               <td>
                 <input class="input" type="number" step="0.01" min="0"
-                       name="items[<?= $i ?>][quantity]" value="<?= e($row['quantity'] ?? '') ?>">
+                       name="items[<?= $i ?>][quantity]" aria-label="Quantity" value="<?= e($row['quantity'] ?? '') ?>">
               </td>
               <td>
-                <input class="input" name="items[<?= $i ?>][unit]"
+                <input class="input" name="items[<?= $i ?>][unit]" aria-label="Unit"
                        value="<?= e($row['unit'] ?? '') ?>" placeholder="ea">
               </td>
               <td>

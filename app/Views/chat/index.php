@@ -180,7 +180,7 @@ $lastDay = null;
 
         <?php if ($conversation['type'] === 'channel'): ?>
           <div class="dropdown">
-            <button class="icon-btn" type="button" data-dropdown><?= icon('more') ?></button>
+            <button class="icon-btn" type="button" data-dropdown aria-label="Channel options"><?= icon('more') ?></button>
             <div class="dropdown__menu">
               <?php foreach ($members as $m): ?>
                 <span class="dropdown__item" style="cursor:default">

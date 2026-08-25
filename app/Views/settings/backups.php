@@ -120,7 +120,7 @@ $totalSize = array_sum(array_column($backups, 'bytes'));
                             data-confirm="Delete the backup from <?= e(date('j M Y H:i', $b['at'])) ?>?"
                             style="display:inline">
                         <?= csrf_field() ?>
-                        <button class="btn btn--sm btn--danger" type="submit"><?= icon('trash') ?></button>
+                        <button class="btn btn--sm btn--danger" type="submit" aria-label="Delete this backup"><?= icon('trash') ?></button>
                       </form>
                     <?php endif; ?>
                   </td>

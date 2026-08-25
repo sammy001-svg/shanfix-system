@@ -253,6 +253,7 @@ $watching = (int) \App\Core\Session::get('public_stk_id', 0);
     </section>
   <?php endforeach; ?>
 
+  <div class="doc-table-wrap">
   <table class="doc-table">
     <thead>
       <tr>
@@ -280,6 +281,7 @@ $watching = (int) \App\Core\Session::get('public_stk_id', 0);
       <?php endforeach; ?>
     </tbody>
   </table>
+  </div>
 
   <div class="doc-totals">
     <div class="doc-totals__inner">
@@ -322,6 +324,7 @@ $watching = (int) \App\Core\Session::get('public_stk_id', 0);
   <?php if ($payments && ($isReceipt || $paid > 0)): ?>
     <section class="doc-section">
       <div class="doc-section__label">Payments received</div>
+      <div class="doc-table-wrap">
       <table class="doc-table" style="margin-top:6px">
         <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th class="num">Amount</th></tr></thead>
         <tbody>
@@ -335,6 +338,7 @@ $watching = (int) \App\Core\Session::get('public_stk_id', 0);
           <?php endforeach; ?>
         </tbody>
       </table>
+      </div>
     </section>
   <?php endif; ?>
 

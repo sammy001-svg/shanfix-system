@@ -76,7 +76,7 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
     <?php endif; ?>
 
     <div class="dropdown">
-      <button class="btn btn--outline" type="button" data-dropdown><?= icon('more') ?></button>
+      <button class="btn btn--outline" type="button" data-dropdown aria-label="More actions for this job"><?= icon('more') ?></button>
       <div class="dropdown__menu">
         <?php if (can('jobs.manage')): ?>
           <a class="dropdown__item" href="<?= url('/jobs/' . $job['id'] . '/edit') ?>"><?= icon('edit') ?> Edit job card</a>
@@ -269,7 +269,7 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
                       <div class="mt-12" style="border-top:1px solid var(--border);padding-top:12px">
                         <div class="text-xs uppercase fw-700 text-muted mb-4">Client approval link</div>
                         <div class="flex gap-8 items-center flex-wrap">
-                          <input class="input flex-1" style="min-width:220px;font-size:12.5px"
+                          <input class="input flex-1" style="min-width:220px;font-size:12.5px" aria-label="Link to share with the client"
                                  value="<?= e($proofLink) ?>" readonly
                                  onfocus="this.select()">
                           <a class="btn btn--outline btn--sm" href="<?= e($proofLink) ?>"
@@ -462,7 +462,7 @@ $pendingProof = array_values(array_filter($byType['proof'], static fn($f) => $f[
             <form method="post" action="<?= url('/jobs/' . $job['id'] . '/assign') ?>">
               <?= csrf_field() ?>
               <div class="field mb-12">
-                <select class="select" name="assigned_to">
+                <select class="select" name="assigned_to" aria-label="Assign to">
                   <option value="">— Unassigned —</option>
                   <?php foreach ($users as $u): ?>
                     <option value="<?= (int) $u['id'] ?>" <?= (int) $job['assigned_to'] === (int) $u['id'] ? 'selected' : '' ?>>

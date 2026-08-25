@@ -198,6 +198,25 @@ post "/logout" "_token=$TOKEN" "POST /logout"
 check "/dashboard" 302 "GET /dashboard after logout -> redirect"
 
 echo ""
+echo "=== The connectivity probe ==="
+# The browser asks this before claiming there is no internet. It used to
+# trust navigator.onLine, which on Windows is routinely stuck reporting
+# offline on a machine whose connection is fine — so the system told
+# people they had no internet all day, and quietly held their saved work
+# on the device instead of submitting it.
+eq "the probe answers"           "$(curl -s -o /dev/null -w '%{http_code}' -I "$BASE/up")" "204"
+eq "it sends no body"            "$(curl -s -o /dev/null -w '%{size_download}' -I "$BASE/up")" "0"
+has "and is never cached"        "$(curl -sI "$BASE/up")" "no-store"
+
+# HEAD on purpose: the service worker only intercepts GET, and a probe
+# answered out of a cache would report the network as up when it is not.
+ne "GET is not the probe"        "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/up")" "204"
+has "the worker ignores non-GET" "$(curl -s "$BASE/sw.js")" "request.method !== 'GET'"
+
+# The banner must read the verified state, not the browser's guess.
+has "the banner reads the probe" "$(curl -s "$BASE/assets/js/offline.js")" "lastKnown.online"
+
+echo ""
 echo "==================================================="
 printf "  \033[32mPASSED: %d\033[0m   \033[31mFAILED: %d\033[0m\n" "$PASS" "$FAIL"
 echo "==================================================="

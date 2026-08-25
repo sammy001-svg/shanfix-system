@@ -1037,7 +1037,7 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
                         <form method="post" action="<?= url('/settings/categories/' . $c['id'] . '/delete') ?>"
                               data-confirm="Delete &quot;<?= e($c['name']) ?>&quot;?<?= $used ? ' ' . $used . ' record(s) will become uncategorised.' : '' ?>">
                           <?= csrf_field() ?>
-                          <button class="btn btn--danger-soft btn--sm" type="submit"><?= icon('trash') ?></button>
+                          <button class="btn btn--danger-soft btn--sm" type="submit" aria-label="Delete this category"><?= icon('trash') ?></button>
                         </form>
                       </td>
                     </tr>

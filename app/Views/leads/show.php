@@ -78,7 +78,7 @@ $activityIcon = static fn(string $type): string => match ($type) {
     <?php endif; ?>
 
     <div class="dropdown">
-      <button class="btn btn--outline" type="button" data-dropdown><?= icon('more') ?></button>
+      <button class="btn btn--outline" type="button" data-dropdown aria-label="More actions for this lead"><?= icon('more') ?></button>
       <div class="dropdown__menu">
         <?php if (can('leads.manage')): ?>
           <a class="dropdown__item" href="<?= url('/leads/' . $lead['id'] . '/edit') ?>"><?= icon('edit') ?> Edit lead</a>
@@ -282,7 +282,7 @@ $activityIcon = static fn(string $type): string => match ($type) {
         <div class="card__title">Follow-ups</div>
         <?php if (can('leads.manage') && !$isClosed): ?>
           <div class="card__actions">
-            <button class="btn btn--ghost btn--sm" type="button" data-modal-open="reminder-modal">
+            <button class="btn btn--ghost btn--sm" type="button" data-modal-open="reminder-modal" aria-label="Add a follow-up reminder">
               <?= icon('plus') ?>
             </button>
           </div>

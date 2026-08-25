@@ -31,7 +31,7 @@
       <form method="post" action="<?= url('/delivery-notes/' . $note['id'] . '/delete') ?>" style="display:inline"
             data-confirm="Delete <?= e($note['dn_number']) ?>?">
         <?= csrf_field() ?>
-        <button class="btn btn--danger-soft" type="submit"><?= icon('trash') ?></button>
+        <button class="btn btn--danger-soft" type="submit" aria-label="Delete this delivery note"><?= icon('trash') ?></button>
       </form>
     <?php endif; ?>
   </div>

@@ -205,7 +205,7 @@ $rows = $existingItems ?: [];
                 <tr>
                   <td class="items-table__drag" data-f="index"><?= $i + 1 ?></td>
                   <td>
-                    <select class="select" data-f="item_type" name="items[<?= $i ?>][item_type]">
+                    <select class="select" data-f="item_type" aria-label="Item type" name="items[<?= $i ?>][item_type]">
                       <option value="custom"    <?= $item['item_type'] === 'custom'    ? 'selected' : '' ?>>Custom</option>
                       <option value="inventory" <?= $item['item_type'] === 'inventory' ? 'selected' : '' ?>>Inventory</option>
                       <option value="service"   <?= $item['item_type'] === 'service'   ? 'selected' : '' ?>>Service</option>
@@ -214,18 +214,18 @@ $rows = $existingItems ?: [];
                             data-f="ref_id" name="items[<?= $i ?>][ref_id]"></select>
                   </td>
                   <td>
-                    <textarea class="textarea" data-f="description" name="items[<?= $i ?>][description]"
+                    <textarea class="textarea" data-f="description" aria-label="Description" name="items[<?= $i ?>][description]"
                               rows="2" style="min-height:38px" required><?= e($item['description']) ?></textarea>
                     <input type="hidden" data-f="unit" name="items[<?= $i ?>][unit]" value="<?= e($item['unit']) ?>">
                   </td>
                   <td class="num">
                     <input class="input num" type="number" step="0.01" min="0.01"
-                           data-f="quantity" name="items[<?= $i ?>][quantity]"
+                           data-f="quantity" aria-label="Quantity" name="items[<?= $i ?>][quantity]"
                            value="<?= e(rtrim(rtrim(number_format((float) $item['quantity'], 2, '.', ''), '0'), '.')) ?>" required>
                   </td>
                   <td class="num">
                     <input class="input num" type="number" step="0.01" min="0"
-                           data-f="unit_price" name="items[<?= $i ?>][unit_price]"
+                           data-f="unit_price" aria-label="Unit price" name="items[<?= $i ?>][unit_price]"
                            value="<?= e(number_format((float) $item['unit_price'], 2, '.', '')) ?>" required>
                   </td>
                   <td class="num fw-600 nums" data-f="line_total">0.00</td>
@@ -325,7 +325,7 @@ $rows = $existingItems ?: [];
         <div class="card">
           <div class="card__head"><div class="card__title">Status</div></div>
           <div class="card__body">
-            <select class="select" name="status">
+            <select class="select" name="status" aria-label="Status">
               <option value="draft" <?= $val('status', 'draft') === 'draft' ? 'selected' : '' ?>>Draft</option>
               <option value="sent"  <?= $val('status', 'draft') === 'sent'  ? 'selected' : '' ?>>Sent to client</option>
               <?php if ($type === 'invoice'): ?>
@@ -412,25 +412,25 @@ $rows = $existingItems ?: [];
   <tr>
     <td class="items-table__drag" data-f="index">1</td>
     <td>
-      <select class="select" data-f="item_type" name="items[][item_type]">
+      <select class="select" data-f="item_type" aria-label="Item type" name="items[][item_type]">
         <option value="custom">Custom</option>
         <option value="inventory">Inventory</option>
         <option value="service">Service</option>
       </select>
-      <select class="select mt-4 hidden" data-f="ref_id" name="items[][ref_id]"></select>
+      <select class="select mt-4 hidden" data-f="ref_id" aria-label="Catalogue item" name="items[][ref_id]"></select>
     </td>
     <td>
-      <textarea class="textarea" data-f="description" name="items[][description]"
+      <textarea class="textarea" data-f="description" aria-label="Description" name="items[][description]"
                 rows="2" style="min-height:38px" placeholder="Describe the item or service…" required></textarea>
       <input type="hidden" data-f="unit" name="items[][unit]" value="">
     </td>
     <td class="num">
       <input class="input num" type="number" step="0.01" min="0.01"
-             data-f="quantity" name="items[][quantity]" value="1" required>
+             data-f="quantity" aria-label="Quantity" name="items[][quantity]" value="1" required>
     </td>
     <td class="num">
       <input class="input num" type="number" step="0.01" min="0"
-             data-f="unit_price" name="items[][unit_price]" value="0.00" required>
+             data-f="unit_price" aria-label="Unit price" name="items[][unit_price]" value="0.00" required>
     </td>
     <td class="num fw-600 nums" data-f="line_total">0.00</td>
     <td>

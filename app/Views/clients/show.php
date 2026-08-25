@@ -49,7 +49,7 @@ $docPath = static fn(string $type): string => match ($type) {
     <?php endif; ?>
 
     <div class="dropdown">
-      <button class="btn btn--outline" type="button" data-dropdown><?= icon('more') ?></button>
+      <button class="btn btn--outline" type="button" data-dropdown aria-label="More actions for this client"><?= icon('more') ?></button>
       <div class="dropdown__menu">
         <?php if (can('clients.manage')): ?>
           <a class="dropdown__item" href="<?= url('/clients/' . $client['id'] . '/edit') ?>">

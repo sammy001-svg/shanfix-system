@@ -168,6 +168,7 @@ $changes  = $artwork['status'] === 'changes_requested';
   <?php if ($history): ?>
     <div style="margin-top:22px">
       <div class="text-xs uppercase fw-700 text-muted mb-8">Earlier versions</div>
+      <div class="doc-table-wrap">
       <table class="doc-table">
         <tbody>
           <?php foreach ($history as $h): ?>
@@ -180,6 +181,7 @@ $changes  = $artwork['status'] === 'changes_requested';
           <?php endforeach; ?>
         </tbody>
       </table>
+      </div>
     </div>
   <?php endif; ?>
 

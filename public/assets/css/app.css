@@ -213,6 +213,27 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
   border-radius: var(--r-sm);
 }
 
+/* Off screen until it is tabbed to, then the first thing on the page.
+   It exists so somebody working by keyboard does not tab through the
+   whole sidebar before reaching the page they opened. */
+.skip-link {
+  position: absolute;
+  left: 8px; top: -60px;
+  z-index: 300;
+  padding: 10px 16px;
+  background: var(--green-600);
+  color: #fff;
+  font-size: 14px; font-weight: 600;
+  border-radius: var(--r);
+  text-decoration: none;
+  transition: top .12s ease;
+}
+.skip-link:focus { top: 8px; }
+
+/* The target takes focus programmatically, so it must not draw a ring
+   of its own around the entire page. */
+#main:focus { outline: none; }
+
 /* ---------------------------------------------------------------------
    App shell
    --------------------------------------------------------------------- */
@@ -579,6 +600,16 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
    Tables
    --------------------------------------------------------------------- */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* The line-item tables a client sees on a quotation, invoice or artwork
+   approval. They are opened on phones as often as on a desk, and a table
+   of item, quantity, price and total does not fit a 360px screen — so it
+   scrolls inside its own box rather than forcing the whole page sideways.
+   Screen only: on paper there is nothing to scroll and the full width is
+   available. */
+@media screen {
+  .doc-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
 
 .table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
