@@ -184,6 +184,12 @@ $r->group(['client_auth'], function ($r) {
     });
 
     $r->get('/portal/statement', [PortalController::class, 'statement']);
+
+    $r->get('/portal/services',  [PortalController::class, 'services']);
+    $r->get('/portal/catalogue', [PortalController::class, 'catalogue']);
+    $r->get('/portal/requests',  [PortalController::class, 'priceRequests']);
+
+    $r->post('/portal/catalogue/ask', [PortalController::class, 'requestPrice'], ['csrf']);
 });
 
 // A client's own statement of account, on the same token model.

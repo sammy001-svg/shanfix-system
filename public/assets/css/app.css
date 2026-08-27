@@ -4014,3 +4014,134 @@ body.lightbox-open {
   .portal-doc__meta { text-align: left; }
   .portal-totals { max-width: none; margin-left: 0; }
 }
+
+/* ---------------------------------------------------------------------
+   Portal: recurring services, catalogue, price requests
+   --------------------------------------------------------------------- */
+
+/* One recurring service: what it is on the left, when it is due on the
+   right, because "when" is the thing being scanned down the column. */
+.portal-sub {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.portal-sub__main { flex: 1; min-width: 200px; }
+.portal-sub__name { font-weight: 650; font-size: 15.5px; }
+.portal-sub__due  { text-align: right; flex: none; }
+
+.portal-sub__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  text-decoration: none;
+}
+.portal-sub__link:hover { text-decoration: underline; }
+.portal-sub__link svg { width: 14px; height: 14px; }
+
+/* The catalogue. A row per thing, the whole row a label so a tap
+   anywhere on it ticks the box — on a phone the box alone is a hard
+   target. */
+.portal-cat__heading {
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--slate-500);
+  margin-bottom: 8px;
+}
+
+.portal-cat {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.portal-cat__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+.portal-cat__item:first-child { border-top: 0; }
+.portal-cat__item:hover { background: var(--surface-2); }
+
+.portal-cat__item input[type="checkbox"] {
+  margin-top: 3px;
+  width: 17px; height: 17px;
+  flex: none;
+}
+
+.portal-cat__body { flex: 1; display: block; min-width: 0; }
+.portal-cat__name { display: block; font-weight: 600; font-size: 14.5px; }
+.portal-cat__desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--slate-600);
+  line-height: 1.5;
+}
+.portal-cat__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--slate-500);
+}
+.portal-cat__meta svg { width: 13px; height: 13px; }
+
+.portal-cat__price {
+  flex: none;
+  font-weight: 700;
+  font-size: 14.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.portal-cat__unit { font-weight: 400; font-size: 12px; color: var(--slate-500); }
+
+/* The ask. Pinned to the bottom of the screen because the things being
+   ticked are above the fold and the button would otherwise be below it. */
+.portal-ask {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+}
+.portal-ask .field { min-width: 190px; }
+
+.portal-reply {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--green-600);
+  background: var(--surface-2);
+  border-radius: 0 var(--r) var(--r) 0;
+}
+
+@media (max-width: 620px) {
+  .portal-sub__due { text-align: left; }
+
+  /* Price under the name rather than squeezed beside it. */
+  .portal-cat__item { flex-wrap: wrap; }
+  .portal-cat__price { width: 100%; text-align: left; padding-left: 30px; }
+
+  .portal-ask { flex-direction: column; align-items: stretch; }
+  .portal-ask .btn { width: 100%; }
+}

@@ -235,8 +235,99 @@ ne "nor settings"                         "$(pcode /settings)" "200"
 signin_admin
 ne "a staff session is not a portal one"  "$(code /portal)" "200"
 
+
 echo ""
-echo "=== 10. Tidy up ==="
+echo "=== 9. Renewals, the catalogue, and asking about a price ==="
+RCID=$(q "SELECT client_id FROM subscriptions WHERE client_id IS NOT NULL LIMIT 1;")
+[ -z "$RCID" ] && RCID=$DCID
+REMAIL="portalcat@example.co.ke"
+RHASH=$($PHP -r 'echo password_hash("portal2026", PASSWORD_DEFAULT);')
+
+$MYSQL -e "DELETE FROM client_users WHERE email='$REMAIL';
+           DELETE FROM price_requests WHERE client_id=$RCID;
+           DELETE FROM staff_notifications WHERE event='price_request';
+           UPDATE settings SET setting_value='1' WHERE setting_key IN ('portal_show_prices','portal_show_inventory');
+           INSERT INTO client_users (client_id,name,email,password_hash,status,email_verified_at)
+           VALUES ($RCID,'Portal Catalogue','$REMAIL','$RHASH','active',NOW());"
+
+rm -f "$PJ"
+ppost /portal/login --data-urlencode "_token=$(ptok /portal/login)" \
+  --data-urlencode "email=$REMAIL" --data-urlencode "password=portal2026" > /dev/null
+
+eq "their renewals open"  "$(pcode /portal/services)"  "200"
+eq "the catalogue opens"  "$(pcode /portal/catalogue)" "200"
+eq "their requests open"  "$(pcode /portal/requests)"  "200"
+
+# Everything active, and nothing that is not.
+eq "every active service is offered" \
+   "$(pget /portal/catalogue | grep -c 'value="service:')" \
+   "$(q "SELECT COUNT(*) FROM services WHERE is_active=1;")"
+eq "and every active product" \
+   "$(pget /portal/catalogue | grep -c 'value="inventory:')" \
+   "$(q "SELECT COUNT(*) FROM inventory_items WHERE is_active=1;")"
+
+echo ""
+echo "=== 10. Ticking things and asking ==="
+SVC1=$(q "SELECT id FROM services WHERE is_active=1 ORDER BY id LIMIT 1;")
+SVC2=$(q "SELECT id FROM services WHERE is_active=1 ORDER BY id LIMIT 1 OFFSET 1;")
+INV1=$(q "SELECT id FROM inventory_items WHERE is_active=1 ORDER BY id LIMIT 1;")
+REALPRICE=$(q "SELECT price FROM services WHERE id=$SVC1;")
+
+ppost /portal/catalogue/ask \
+  --data-urlencode "_token=$(ptok /portal/catalogue)" \
+  --data-urlencode "items[]=service:$SVC1" --data-urlencode "items[]=service:$SVC2" \
+  --data-urlencode "items[]=inventory:$INV1" \
+  --data-urlencode "kind=discount" \
+  --data-urlencode "note=All three for the Westlands branch." > /dev/null
+
+eq "the request is recorded"    "$(q "SELECT COUNT(*) FROM price_requests WHERE client_id=$RCID;")" "1"
+eq "with all three items"       "$(q "SELECT COUNT(*) FROM price_request_items;")" "3"
+eq "and what they were asking"  "$(q "SELECT kind FROM price_requests WHERE client_id=$RCID;")" "discount"
+eq "sales are told"             "$(q "SELECT IF(COUNT(*)>0,'yes','no') FROM staff_notifications WHERE event='price_request';")" "yes"
+has "it shows on their page"    "$(pget /portal/requests)" "Westlands branch"
+
+echo ""
+echo "=== 11. The price we answer about is the price we hold ==="
+# A price posted from a browser is a number somebody could have typed.
+$MYSQL -e "DELETE FROM price_requests WHERE client_id=$RCID;"
+ppost /portal/catalogue/ask \
+  --data-urlencode "_token=$(ptok /portal/catalogue)" \
+  --data-urlencode "items[]=service:$SVC1" \
+  --data-urlencode "price_snapshot=1" --data-urlencode "name_snapshot=Free" \
+  --data-urlencode "kind=quotation" > /dev/null
+
+eq "a forged price is ignored" "$(q "SELECT price_snapshot FROM price_request_items ORDER BY id DESC LIMIT 1;")" "$REALPRICE"
+ne "and a forged name"         "$(q "SELECT name_snapshot FROM price_request_items ORDER BY id DESC LIMIT 1;")" "Free"
+
+# Nothing valid ticked means nothing recorded, rather than an empty ask.
+$MYSQL -e "DELETE FROM price_requests WHERE client_id=$RCID;"
+ppost /portal/catalogue/ask --data "_token=$(ptok /portal/catalogue)&items[]=service:999999&kind=quotation" > /dev/null
+eq "a made-up item makes no request" "$(q "SELECT COUNT(*) FROM price_requests WHERE client_id=$RCID;")" "0"
+
+$MYSQL -e "UPDATE services SET is_active=0 WHERE id=$SVC1;"
+ppost /portal/catalogue/ask --data "_token=$(ptok /portal/catalogue)&items[]=service:$SVC1&kind=quotation" > /dev/null
+eq "nor a withdrawn one"             "$(q "SELECT COUNT(*) FROM price_requests WHERE client_id=$RCID;")" "0"
+$MYSQL -e "UPDATE services SET is_active=1 WHERE id=$SVC1;"
+
+# A browser can post items[0][x]=1 as easily as items[]=service:1.
+ppost /portal/catalogue/ask --data "_token=$(ptok /portal/catalogue)&items[0][x]=1&kind=quotation" > /dev/null
+eq "a malformed tick is simply not a tick" "$(q "SELECT COUNT(*) FROM price_requests WHERE client_id=$RCID;")" "0"
+
+echo ""
+echo "=== 12. Prices can be turned off ==="
+$MYSQL -e "UPDATE settings SET setting_value='0' WHERE setting_key='portal_show_prices';"
+eq "with prices off, none are shown" "$(pget /portal/catalogue | grep -c 'portal-cat__price')" "0"
+eq "but the catalogue still lists what we do" \
+   "$(pget /portal/catalogue | grep -c 'value="service:')" \
+   "$(q "SELECT COUNT(*) FROM services WHERE is_active=1;")"
+$MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key='portal_show_prices';"
+
+$MYSQL -e "DELETE FROM price_requests WHERE client_id=$RCID;
+           DELETE FROM client_users WHERE email='$REMAIL';
+           DELETE FROM staff_notifications WHERE event='price_request';"
+
+echo ""
+echo "=== 13. Tidy up ==="
 $MYSQL -e "DELETE FROM client_users WHERE email IN ('$NEW','portalreq@example.co.ke','$CEMAIL');
            DELETE FROM clients WHERE email='$NEW';
            DELETE FROM client_otps;

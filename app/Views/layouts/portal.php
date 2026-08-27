@@ -67,6 +67,12 @@ $brand      = \App\Core\Settings::company();
          href="<?= url('/portal/invoices') ?>">Invoices</a>
       <a class="portal-nav__link <?= $on('/portal/statement') ? 'is-active' : '' ?>"
          href="<?= url('/portal/statement') ?>">Statement</a>
+      <a class="portal-nav__link <?= $on('/portal/services') ? 'is-active' : '' ?>"
+         href="<?= url('/portal/services') ?>">Renewals</a>
+      <a class="portal-nav__link <?= $on('/portal/catalogue') ? 'is-active' : '' ?>"
+         href="<?= url('/portal/catalogue') ?>">What we do</a>
+      <a class="portal-nav__link <?= $on('/portal/requests') ? 'is-active' : '' ?>"
+         href="<?= url('/portal/requests') ?>">My requests</a>
     </nav>
 
     <div class="portal-top__right">
