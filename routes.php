@@ -303,11 +303,11 @@ $r->group(['auth'], function ($r) {
         $r->post('/inventory',             [InventoryController::class, 'store']);
         $r->post('/inventory/{id}',        [InventoryController::class, 'update']);
         $r->post('/inventory/{id}/stock',  [InventoryController::class, 'adjustStock']);
-        $r->post('/inventory/{id}/delete', [InventoryController::class, 'destroy']);
+        $r->post('/inventory/{id}/delete', [InventoryController::class, 'destroy'], ['permission:records.delete']);
 
         // Product photos
         $r->post('/inventory/{id}/images',                  [InventoryController::class, 'uploadImages']);
-        $r->post('/inventory/images/{imageId}/delete',      [InventoryController::class, 'deleteImage']);
+        $r->post('/inventory/images/{imageId}/delete',      [InventoryController::class, 'deleteImage'], ['permission:records.delete']);
         $r->post('/inventory/images/{imageId}/primary',     [InventoryController::class, 'setPrimaryImage']);
     });
 
@@ -340,9 +340,9 @@ $r->group(['auth'], function ($r) {
              ['permission:purchases.receive', 'csrf']);
 
     $r->post('/suppliers/{id}/delete',        [SupplierController::class, 'destroy'],
-             ['permission:purchases.delete', 'csrf']);
+             ['permission:records.delete', 'permission:purchases.delete', 'csrf']);
     $r->post('/purchase-orders/{id}/delete',  [PurchaseOrderController::class, 'destroy'],
-             ['permission:purchases.delete', 'csrf']);
+             ['permission:records.delete', 'permission:purchases.delete', 'csrf']);
 
     // -- Services
     $r->group(['permission:services.view'], function ($r) {
@@ -355,13 +355,13 @@ $r->group(['auth'], function ($r) {
     $r->group(['permission:services.manage', 'csrf'], function ($r) {
         $r->post('/services',             [ServiceController::class, 'store']);
         $r->post('/services/{id}',        [ServiceController::class, 'update']);
-        $r->post('/services/{id}/delete', [ServiceController::class, 'destroy']);
+        $r->post('/services/{id}/delete', [ServiceController::class, 'destroy'], ['permission:records.delete']);
 
         // Past work shown as an example of a service.
         $r->post('/services/{id}/examples',              [ServiceController::class, 'linkJob']);
         $r->post('/services/{id}/examples/{job}/remove', [ServiceController::class, 'unlinkJob']);
 
-        $r->post('/services/{id}/images/{imageId}/delete',  [ServiceController::class, 'deleteImage']);
+        $r->post('/services/{id}/images/{imageId}/delete',  [ServiceController::class, 'deleteImage'], ['permission:records.delete']);
         $r->post('/services/{id}/images/{imageId}/primary', [ServiceController::class, 'setPrimaryImage']);
     });
 
@@ -383,7 +383,7 @@ $r->group(['auth'], function ($r) {
     $r->post('/clients/{id}/statement/send', [ClientController::class, 'sendStatement'],
              ['permission:documents.manage', 'csrf']);
 
-    $r->post('/clients/{id}/delete', [ClientController::class, 'destroy'], ['permission:clients.delete', 'csrf']);
+    $r->post('/clients/{id}/delete', [ClientController::class, 'destroy'], ['permission:records.delete', 'permission:clients.delete', 'csrf']);
 
     // -- Proposals, quotations, invoices, receipts and agreements
     // The doc type is bound by the route, so it can never come from user input.
@@ -431,9 +431,19 @@ $r->group(['auth'], function ($r) {
             (new DocumentController())->duplicate($req, $type);
         }, ['permission:documents.manage', 'csrf']);
 
+        // Approving is an administrator's job; the check is in the
+        // controller so the message explains why rather than just refusing.
+        $r->post("/{$path}/{id}/approve", function (Request $req) use ($type) {
+            (new DocumentController())->approve($req, $type);
+        }, ['permission:documents.view', 'csrf']);
+
+        $r->post("/{$path}/{id}/send-back", function (Request $req) use ($type) {
+            (new DocumentController())->sendBack($req, $type);
+        }, ['permission:documents.view', 'csrf']);
+
         $r->post("/{$path}/{id}/delete", function (Request $req) use ($type) {
             (new DocumentController())->destroy($req, $type);
-        }, ['permission:documents.delete', 'csrf']);
+        }, ['permission:records.delete', 'permission:documents.delete', 'csrf']);
     }
 
     $r->post('/quotations/{id}/convert', [DocumentController::class, 'convertToInvoice'],
@@ -474,7 +484,7 @@ $r->group(['auth'], function ($r) {
     $r->post('/artwork/{id}/send',   [ArtworkController::class, 'sendProof'],
              ['permission:artwork.design', 'csrf']);
     $r->post('/artwork/{id}/delete', [ArtworkController::class, 'destroy'],
-             ['permission:artwork.delete', 'csrf']);
+             ['permission:records.delete', 'permission:artwork.delete', 'csrf']);
 
     // -- The bell: what the system needs to tell whoever is signed in.
     // Any signed-in user has alerts, so this needs no permission of its own.
@@ -500,11 +510,11 @@ $r->group(['auth'], function ($r) {
 
         $r->post('/jobs/{id}/files',           [JobFileController::class, 'upload']);
         $r->post('/jobs/files/{fileId}/decide',[JobFileController::class, 'decide']);
-        $r->post('/jobs/files/{fileId}/delete',[JobFileController::class, 'destroy']);
+        $r->post('/jobs/files/{fileId}/delete',[JobFileController::class, 'destroy'], ['permission:records.delete']);
     });
 
     $r->post('/jobs/{id}/assign', [JobController::class, 'assign'],  ['permission:jobs.assign', 'csrf']);
-    $r->post('/jobs/{id}/delete', [JobController::class, 'destroy'], ['permission:jobs.delete', 'csrf']);
+    $r->post('/jobs/{id}/delete', [JobController::class, 'destroy'], ['permission:records.delete', 'permission:jobs.delete', 'csrf']);
 
     // Raise a job card straight from an invoice or quotation
     $r->post('/documents/{id}/job', [JobController::class, 'createFromDocument'],
@@ -520,7 +530,7 @@ $r->group(['auth'], function ($r) {
     $r->group(['permission:delivery.manage', 'csrf'], function ($r) {
         $r->post('/jobs/{id}/delivery-note',      [DeliveryNoteController::class, 'createFromJob']);
         $r->post('/delivery-notes/{id}',          [DeliveryNoteController::class, 'update']);
-        $r->post('/delivery-notes/{id}/delete',   [DeliveryNoteController::class, 'destroy']);
+        $r->post('/delivery-notes/{id}/delete',   [DeliveryNoteController::class, 'destroy'], ['permission:records.delete']);
     });
 
     // -- Leads
@@ -544,7 +554,7 @@ $r->group(['auth'], function ($r) {
              ['permission:documents.manage', 'csrf']);
 
     $r->post('/leads/{id}/convert', [LeadController::class, 'convert'], ['permission:clients.manage', 'csrf']);
-    $r->post('/leads/{id}/delete',  [LeadController::class, 'destroy'], ['permission:leads.delete', 'csrf']);
+    $r->post('/leads/{id}/delete',  [LeadController::class, 'destroy'], ['permission:records.delete', 'permission:leads.delete', 'csrf']);
 
     // -- Reminders (available to every signed-in user)
     $r->get('/reminders',  [ReminderController::class, 'index']);
@@ -552,7 +562,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/reminders',             [ReminderController::class, 'store']);
         $r->post('/reminders/{id}/done',   [ReminderController::class, 'complete']);
         $r->post('/reminders/{id}/reopen', [ReminderController::class, 'reopen']);
-        $r->post('/reminders/{id}/delete', [ReminderController::class, 'destroy']);
+        $r->post('/reminders/{id}/delete', [ReminderController::class, 'destroy'], ['permission:records.delete']);
     });
 
     // -- Payments
@@ -573,7 +583,7 @@ $r->group(['auth'], function ($r) {
     $r->group(['permission:expenses.manage', 'csrf'], function ($r) {
         $r->post('/expenses',             [ExpenseController::class, 'store']);
         $r->post('/expenses/{id}',        [ExpenseController::class, 'update']);
-        $r->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy']);
+        $r->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy'], ['permission:records.delete']);
     });
 
     // -- WhatsApp (shared company inbox)
@@ -611,7 +621,7 @@ $r->group(['auth'], function ($r) {
     });
 
     $r->post('/meetings/{id}/delete', [MeetingController::class, 'destroy'],
-             ['permission:meetings.delete', 'csrf']);
+             ['permission:records.delete', 'permission:meetings.delete', 'csrf']);
 
     // -- Recurring services (websites, hosting, retainers)
     $r->get('/subscriptions',             [SubscriptionController::class, 'index'],  ['permission:subscriptions.view']);
@@ -623,7 +633,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/subscriptions',              [SubscriptionController::class, 'store']);
         $r->post('/subscriptions/{id}',         [SubscriptionController::class, 'update']);
         $r->post('/subscriptions/{id}/invoice', [SubscriptionController::class, 'invoiceNow']);
-        $r->post('/subscriptions/{id}/delete',  [SubscriptionController::class, 'destroy']);
+        $r->post('/subscriptions/{id}/delete',  [SubscriptionController::class, 'destroy'], ['permission:records.delete']);
     });
 
     // -- Messages (email & SMS)
@@ -659,7 +669,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/settings/backups',                 [BackupController::class, 'create']);
         $r->post('/settings/backups/schedule',        [BackupController::class, 'save']);
         $r->post('/settings/backups/{name}/verify',   [BackupController::class, 'verify']);
-        $r->post('/settings/backups/{name}/delete',   [BackupController::class, 'delete']);
+        $r->post('/settings/backups/{name}/delete',   [BackupController::class, 'delete'], ['permission:records.delete']);
     });
 
     // Downloading is a GET so the browser can save it directly; it changes
@@ -693,7 +703,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/letters/{id}',           [LetterController::class, 'update']);
         $r->post('/letters/{id}/status',    [LetterController::class, 'status']);
         $r->post('/letters/{id}/duplicate', [LetterController::class, 'duplicate']);
-        $r->post('/letters/{id}/delete',    [LetterController::class, 'destroy']);
+        $r->post('/letters/{id}/delete',    [LetterController::class, 'destroy'], ['permission:records.delete']);
     });
 
     // -- Reports
@@ -735,7 +745,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/users',             [UserController::class, 'store']);
         $r->post('/users/{id}',        [UserController::class, 'update']);
         $r->post('/users/{id}/toggle', [UserController::class, 'toggleActive']);
-        $r->post('/users/{id}/delete', [UserController::class, 'destroy']);
+        $r->post('/users/{id}/delete', [UserController::class, 'destroy'], ['permission:records.delete']);
     });
 
     $r->get('/settings', [SettingsController::class, 'index'], ['permission:settings.manage']);
@@ -747,7 +757,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/settings/payments/test',      [SettingsController::class, 'testKopokopo']);
         $r->post('/settings/payments/webhook',   [SettingsController::class, 'subscribeWebhook']);
         $r->post('/settings/categories',         [SettingsController::class, 'storeCategory']);
-        $r->post('/settings/categories/{id}/delete', [SettingsController::class, 'destroyCategory']);
+        $r->post('/settings/categories/{id}/delete', [SettingsController::class, 'destroyCategory'], ['permission:records.delete']);
     });
 
     $r->get('/audit', [DashboardController::class, 'audit'], ['permission:audit.view']);

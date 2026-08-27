@@ -44,6 +44,14 @@ class PublicDocumentController extends Controller
     {
         $doc = $this->findByToken((string) $request->param('token'));
 
+        // A document held for approval must not be readable on its link
+        // either — otherwise blocking the send button achieves nothing the
+        // moment somebody pastes the link into WhatsApp. The client is not
+        // told there is an internal hold; only that it is not ready.
+        if (\App\Services\DocumentApproval::isPending($doc)) {
+            throw new HttpException(404, 'This document is not ready yet. Please contact us.');
+        }
+
         $items = Database::all(
             'SELECT description, quantity, unit, unit_price, line_total
                FROM document_items WHERE document_id = :id ORDER BY sort_order, id',

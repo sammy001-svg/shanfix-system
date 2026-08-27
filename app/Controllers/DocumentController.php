@@ -15,6 +15,7 @@ use App\Core\Validator;
 use App\Core\Logger;
 use App\Services\DocumentCalculator;
 use App\Services\Notifier;
+use App\Services\DocumentApproval;
 use App\Services\StockLedger;
 
 /**
@@ -185,7 +186,20 @@ class DocumentController extends Controller
             $this->flashStockWarnings(StockLedger::postQuietly($id));
         }
 
-        Session::success(self::TYPES[$type]['label'] . ' created successfully.');
+        // A price leaving the company is a commitment, so unless an
+        // administrator raised it themselves it waits to be approved.
+        DocumentApproval::afterSave($id, $type);
+
+        if (DocumentApproval::governs($type) && !DocumentApproval::canApprove()) {
+            Session::success(
+                self::TYPES[$type]['label'] . ' created and sent for approval. '
+                . 'An administrator has been texted; it cannot be printed or '
+                . 'sent to the client until they approve it.'
+            );
+        } else {
+            Session::success(self::TYPES[$type]['label'] . ' created successfully.');
+        }
+
         Response::to(self::TYPES[$type]['path'] . '/' . $id);
     }
 
@@ -277,7 +291,19 @@ class DocumentController extends Controller
             }
         }
 
-        Session::success($doc['doc_number'] . ' updated.');
+        // Changing a price is the same commitment as setting one, so an
+        // edit by anybody but an administrator sends it back for approval.
+        DocumentApproval::afterSave((int) $doc['id'], $type, true);
+
+        if (DocumentApproval::governs($type) && !DocumentApproval::canApprove()) {
+            Session::success(
+                $doc['doc_number'] . ' updated and sent for approval. '
+                . 'It cannot be printed or sent until an administrator approves the change.'
+            );
+        } else {
+            Session::success($doc['doc_number'] . ' updated.');
+        }
+
         Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
     }
 
@@ -368,7 +394,50 @@ class DocumentController extends Controller
             'smsOn'       => $smsOn,
             'messagingOn' => $emailOn || $smsOn,
             'publicLink'  => $publicLink,
+            'approvalPending' => DocumentApproval::isPending($doc),
+            'approvalGoverns' => DocumentApproval::governs($type),
+            'canApprove'      => DocumentApproval::canApprove(),
         ]);
+    }
+
+    /** An administrator clears a document to go out. */
+    public function approve(Request $request, string $type): void
+    {
+        $this->assertType($type);
+
+        if (!DocumentApproval::canApprove()) {
+            throw new HttpException(403, 'Only an administrator can approve a document.');
+        }
+
+        $doc = $this->findOrFail($request->paramInt('id'), $type);
+
+        DocumentApproval::approve((int) $doc['id']);
+
+        Session::success($doc['doc_number'] . ' approved. It can be printed and sent now.');
+        Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
+    }
+
+    /** An administrator sends it back with something to change. */
+    public function sendBack(Request $request, string $type): void
+    {
+        $this->assertType($type);
+
+        if (!DocumentApproval::canApprove()) {
+            throw new HttpException(403, 'Only an administrator can hold a document back.');
+        }
+
+        $doc  = $this->findOrFail($request->paramInt('id'), $type);
+        $note = trim((string) $request->input('approval_note', ''));
+
+        if ($note === '') {
+            Session::error('Say what needs changing — sending it back with no reason only costs another round trip.');
+            Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
+        }
+
+        DocumentApproval::sendBack((int) $doc['id'], $note);
+
+        Session::success('Sent back to ' . ($doc['created_by_name'] ?? 'whoever raised it') . ' with your note.');
+        Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
     }
 
     /** Printable A4 view, also used for "Save as PDF" via the browser. */
@@ -377,6 +446,15 @@ class DocumentController extends Controller
         $this->assertType($type);
 
         $doc = $this->findOrFail($request->paramInt('id'), $type);
+
+        // This view is the download. Blocking it here is what stops an
+        // unapproved price reaching a client on paper or as a PDF, so an
+        // administrator is not exempted — they approve it first, which
+        // takes one click on the page they were just sent back to.
+        if (DocumentApproval::isPending($doc)) {
+            Session::error(DocumentApproval::heldMessage($doc));
+            Response::to(self::TYPES[$type]['path'] . '/' . $doc['id']);
+        }
 
         $items = Database::all(
             'SELECT * FROM document_items WHERE document_id = :id ORDER BY sort_order, id',

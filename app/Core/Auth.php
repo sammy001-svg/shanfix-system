@@ -57,6 +57,15 @@ class Auth
         'clients.manage'    => ['admin', 'manager', 'sales', 'reception'],
         'clients.delete'    => ['admin'],
 
+        // Deleting anything at all. Held alongside whatever permission
+        // already governs the record, so both must pass: a manager may
+        // still edit an invoice and no longer delete one.
+        //
+        // Retracting your own chat message is not covered — that is
+        // unsending something you just typed, it soft-deletes, and the
+        // thread keeps the record either way.
+        'records.delete'    => ['admin'],
+
         // Asking a client what they want, and reading what they said.
         // Reception raise these at the counter, so they are included.
         'requests.view'     => ['admin', 'manager', 'sales', 'production', 'reception', 'designer', 'staff'],

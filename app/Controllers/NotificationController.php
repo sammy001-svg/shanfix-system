@@ -107,6 +107,12 @@ class NotificationController extends Controller
             throw new HttpException(404, 'That document does not exist.');
         }
 
+        // Sending is the other way an unapproved price reaches a client.
+        if (\App\Services\DocumentApproval::isPending($doc)) {
+            Session::error(\App\Services\DocumentApproval::heldMessage($doc));
+            Response::back('/' . \App\Services\DocumentApproval::pathFor((string) $doc['doc_type']) . '/' . $id);
+        }
+
         if ($doc['status'] === 'draft') {
             Session::error('This document is still a draft. Mark it as sent first, so the client sees a finalised copy.');
             Response::back('/invoices/' . $id);

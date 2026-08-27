@@ -178,6 +178,51 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
   </div>
 <?php endif; ?>
 
+<?php if (!empty($approvalPending)): ?>
+  <?php // The person who raised it needs to know why the print button does
+        // nothing; the administrator needs a way to clear it without
+        // hunting for one. Both read this same banner. ?>
+  <div class="alert alert--warning">
+    <?= icon('alert-triangle') ?>
+    <div class="alert__body">
+      <strong>Waiting for approval.</strong>
+      This <?= e($doc['doc_type']) ?> cannot be printed, downloaded or sent to
+      the client until an administrator approves it, and its client link will
+      not open.
+
+      <?php if (!empty($doc['approval_note'])): ?>
+        <div class="mt-8">
+          <strong>Asked to change:</strong> <?= e($doc['approval_note']) ?>
+        </div>
+      <?php endif; ?>
+
+      <?php if (!empty($canApprove)): ?>
+        <div class="flex items-center gap-8 mt-12" style="flex-wrap:wrap">
+          <form method="post" action="<?= url($meta['path'] . '/' . $doc['id'] . '/approve') ?>">
+            <?= csrf_field() ?>
+            <button class="btn btn--primary btn--sm" type="submit">
+              <?= icon('check') ?> Approve it
+            </button>
+          </form>
+
+          <form method="post" action="<?= url($meta['path'] . '/' . $doc['id'] . '/send-back') ?>"
+                class="flex items-center gap-8" style="flex-wrap:wrap">
+            <?= csrf_field() ?>
+            <input class="input" type="text" name="approval_note" maxlength="255"
+                   style="min-width:230px" placeholder="What needs changing?"
+                   aria-label="What needs changing">
+            <button class="btn btn--ghost btn--sm" type="submit">Send back</button>
+          </form>
+        </div>
+      <?php else: ?>
+        <div class="text-sm mt-8">
+          The administrators have been texted. You will be told as soon as it is approved.
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+<?php endif; ?>
+
 <div class="grid-sidebar">
   <div>
     <?php if (!empty($sections)): ?>
