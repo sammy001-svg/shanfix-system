@@ -90,6 +90,44 @@ $backTo    = $isInvoice ? '/portal/invoices' : '/portal/quotations';
     </dl>
   </div>
 
+  <?php if (!empty($payable)): ?>
+    <div class="portal-card portal-pay">
+      <div class="portal-pay__head">
+        <?= icon('smartphone') ?>
+        <div>
+          <div class="fw-600">Pay by M-Pesa</div>
+          <div class="text-sm text-muted">
+            We send a prompt to your phone. Enter your PIN and it is done.
+          </div>
+        </div>
+        <div class="portal-pay__amount"><?= e(money($doc['balance'], false)) ?></div>
+      </div>
+
+      <form method="post" action="<?= url('/portal/invoices/' . $doc['id'] . '/pay') ?>"
+            class="portal-pay__form">
+        <?= csrf_field() ?>
+        <div class="field mb-0 flex-1">
+          <label class="label" for="phone">Your M-Pesa number</label>
+          <input class="input" type="tel" id="phone" name="phone" required
+                 value="<?= e($me['phone'] ?? '') ?>" placeholder="07XX XXX XXX"
+                 inputmode="tel" autocomplete="tel">
+        </div>
+        <button class="btn btn--primary btn--lg" type="submit">
+          Send me the prompt
+        </button>
+      </form>
+
+      <?php // The amount is taken from the invoice, never from this form —
+            // there is no field for it, and the server would ignore one. ?>
+      <p class="text-xs text-muted mb-0">
+        You will be asked for <?= e(money($doc['balance'], false)) ?>, the full
+        outstanding amount on this invoice.
+      </p>
+
+      <div class="portal-pay__watch" data-pay-status="<?= url('/portal/invoices/' . $doc['id'] . '/pay/status') ?>"></div>
+    </div>
+  <?php endif; ?>
+
   <?php if ($payments): ?>
     <div class="portal-card">
       <div class="fw-600 mb-8">What you have paid</div>

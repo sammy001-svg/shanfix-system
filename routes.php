@@ -190,6 +190,12 @@ $r->group(['client_auth'], function ($r) {
     $r->get('/portal/requests',  [PortalController::class, 'priceRequests']);
 
     $r->post('/portal/catalogue/ask', [PortalController::class, 'requestPrice'], ['csrf']);
+
+    $r->get('/portal/uploads',  [PortalController::class, 'uploads']);
+    $r->post('/portal/uploads', [PortalController::class, 'upload'], ['csrf']);
+
+    $r->post('/portal/invoices/{id}/pay', [PortalController::class, 'pay'], ['csrf']);
+    $r->get('/portal/invoices/{id}/pay/status', [PortalController::class, 'payStatus']);
 });
 
 // A client's own statement of account, on the same token model.

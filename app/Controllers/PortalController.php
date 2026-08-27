@@ -143,6 +143,7 @@ class PortalController extends Controller
                ORDER BY created_at",
                 ['id' => $doc['id']]
             ),
+            'payable'  => \App\Services\StkPayment::payable($doc),
             'company'  => Settings::company(),
         ], 'portal');
     }
@@ -417,5 +418,203 @@ class PortalController extends Controller
         } while ($taken);
 
         return $ref;
+    }
+
+    // -- Paying ---------------------------------------------------------------
+
+    /** Send an M-Pesa prompt for one of their invoices. */
+    public function pay(Request $request): void
+    {
+        $clientId = $this->mustHaveClient();
+
+        $doc = Database::first(
+            "SELECT * FROM documents
+              WHERE id = :id AND client_id = :c AND doc_type = 'invoice'
+                AND status <> 'draft' AND approval_status <> 'pending'",
+            ['id' => $request->paramInt('id'), 'c' => $clientId]
+        );
+
+        if (!$doc) {
+            throw new HttpException(404, 'That invoice is not on your account.');
+        }
+
+        // The amount, the rate limit and the one-prompt-at-a-time rule all
+        // live in StkPayment, shared with the public share link. Two copies
+        // of that reasoning would be two places to get it wrong.
+        $result = \App\Services\StkPayment::request(
+            $doc,
+            (string) $request->input('phone', ''),
+            'client portal'
+        );
+
+        if (!empty($result['stk_id'])) {
+            // Held in the session so the page that follows knows which
+            // request to watch, without an id in a URL anyone could change.
+            Session::put('portal_stk_id', (int) $result['stk_id']);
+        }
+
+        if (!$result['ok']) {
+            Session::error($result['error'] ?? 'The payment could not be started.');
+        } elseif (!empty($result['pending'])) {
+            Session::warning($result['error']);
+        } else {
+            Session::success('Check your phone and enter your M-Pesa PIN to complete the payment.');
+        }
+
+        Response::to('/portal/invoices/' . $doc['id']);
+    }
+
+    /** Polled by their browser while a prompt is outstanding. */
+    public function payStatus(Request $request): void
+    {
+        $clientId = $this->mustHaveClient();
+
+        $doc = Database::first(
+            "SELECT id, balance, status FROM documents
+              WHERE id = :id AND client_id = :c AND doc_type = 'invoice'",
+            ['id' => $request->paramInt('id'), 'c' => $clientId]
+        );
+
+        if (!$doc) {
+            Response::json(['ok' => false], 404);
+        }
+
+        $row = \App\Services\StkPayment::status(
+            (int) Session::get('portal_stk_id', 0),
+            (int) $doc['id']
+        );
+
+        if (!$row) {
+            Response::json(['ok' => true, 'state' => 'none']);
+        }
+
+        Response::json([
+            'ok'      => true,
+            'state'   => $row['status'],
+            'receipt' => $row['mpesa_receipt'] ?? null,
+            'message' => $row['result_desc'] ?? null,
+            'balance' => money($doc['balance']),
+            'settled' => (float) $doc['balance'] <= 0.009,
+        ]);
+    }
+
+    // -- Sending us files -----------------------------------------------------
+
+    public function uploads(Request $request): void
+    {
+        $clientId = $this->mustHaveClient();
+
+        $this->view('portal/uploads', [
+            'title'   => 'Send us your artwork',
+            'me'      => ClientAuth::user(),
+            'rows'    => Database::all(
+                'SELECT * FROM portal_uploads WHERE client_id = :c ORDER BY created_at DESC LIMIT 60',
+                ['c' => $clientId]
+            ),
+            'enabled' => Settings::bool('portal_uploads_enabled', true),
+            'maxMb'   => (int) \App\Core\Config::get('uploads.max_size_mb', 8),
+            'company' => Settings::company(),
+        ], 'portal');
+    }
+
+    /** Take whatever they sent. */
+    public function upload(Request $request): void
+    {
+        $clientId = $this->mustHaveClient();
+
+        if (!Settings::bool('portal_uploads_enabled', true)) {
+            Session::error('Sending files is switched off at the moment. Please email them to us.');
+            Response::to('/portal/uploads');
+        }
+
+        // Print-ready artwork is large and the disk is not. Without a cap an
+        // upload form is a way to fill it.
+        $perHour = max(1, Settings::int('portal_uploads_per_hour', 20));
+
+        $recent = (int) Database::scalar(
+            'SELECT COUNT(*) FROM portal_uploads
+              WHERE client_id = :c AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+            ['c' => $clientId],
+            0
+        );
+
+        if ($recent >= $perHour) {
+            Session::error('That is a lot of files in one go. Please try again in an hour, or email the rest to us.');
+            Response::to('/portal/uploads');
+        }
+
+        $files = $_FILES['files'] ?? null;
+
+        if (!is_array($files) || !isset($files['name']) || !is_array($files['name'])) {
+            Session::error('Choose a file to send.');
+            Response::to('/portal/uploads');
+        }
+
+        $note  = mb_substr(trim((string) $request->input('note')), 0, 500) ?: null;
+        $me    = ClientAuth::user();
+        $saved = 0;
+        $count = min(count($files['name']), max(1, $perHour - $recent));
+
+        for ($i = 0; $i < $count; $i++) {
+            if (($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+
+            $one = [
+                'name'     => $files['name'][$i]     ?? '',
+                'type'     => $files['type'][$i]     ?? '',
+                'tmp_name' => $files['tmp_name'][$i] ?? '',
+                'error'    => $files['error'][$i]    ?? UPLOAD_ERR_OK,
+                'size'     => $files['size'][$i]     ?? 0,
+            ];
+
+            // A bad file is reported and skipped rather than losing the
+            // whole batch — somebody sending six files should not lose five
+            // of them because the sixth was the wrong format.
+            try {
+                $stored = $this->storeUpload($one, 'portal/' . $clientId);
+            } catch (\Throwable $e) {
+                Session::error($one['name'] . ' was not sent: ' . $e->getMessage());
+                continue;
+            }
+
+            if ($stored === null) {
+                continue;
+            }
+
+            Database::insert('portal_uploads', [
+                'client_id'      => $clientId,
+                'client_user_id' => $me['id'] ?? null,
+                'original_name'  => mb_substr((string) $one['name'], 0, 255),
+                'stored_name'    => $stored,
+                'mime'           => mb_substr((string) $one['type'], 0, 120),
+                'bytes'          => (int) $one['size'],
+                'note'           => $note,
+            ]);
+
+            $saved++;
+        }
+
+        if ($saved === 0) {
+            Session::error('Nothing was sent. Check the file type and try again.');
+            Response::to('/portal/uploads');
+        }
+
+        // Production are the people waiting on artwork.
+        StaffNotifier::notify(
+            StaffNotifier::withRole(['admin', 'manager', 'production', 'designer']),
+            [
+                'event'       => 'portal_upload',
+                'title'       => ($me['client_name'] ?? 'A client') . ' has sent ' . $saved . ' file(s)',
+                'body'        => $note ?: 'Artwork or documents sent through the portal.',
+                'link'        => '/portal-uploads',
+                'entity_type' => 'client',
+                'entity_id'   => $clientId,
+            ],
+            ['email' => true, 'sms' => false]
+        );
+
+        Session::success($saved . ' file(s) sent. Our team will pick them up from here.');
+        Response::to('/portal/uploads');
     }
 }

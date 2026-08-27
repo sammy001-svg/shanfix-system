@@ -1438,6 +1438,7 @@
     initQuickOpen();
     initStackTables();
     initLightbox();
+    initPortalPay();
   });
 
   /* ------------------------------------------------------------------
@@ -1772,6 +1773,62 @@
       else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
       else if (e.key === 'ArrowLeft')  { e.preventDefault(); step(-1); }
     });
+  }
+
+  /* ------------------------------------------------------------------
+     Watching an M-Pesa prompt, in the client portal
+     ------------------------------------------------------------------
+     Somebody has a prompt on their handset and is looking at this page
+     wondering whether it worked. Without this they refresh, and a refresh
+     re-posts the form and sends a second prompt.
+
+     Stops on its own: once it is settled there is nothing more to say,
+     and after three minutes an unanswered prompt has expired anyway.
+     ------------------------------------------------------------------ */
+  function initPortalPay() {
+    const box = $('[data-pay-status]');
+    if (!box) return;
+
+    const url = box.dataset.payStatus;
+    let tries = 0;
+
+    function say(text, tone) {
+      box.textContent = text;
+      box.style.color = tone === 'good' ? 'var(--green-600)'
+                      : tone === 'bad'  ? 'var(--red-600)' : '';
+    }
+
+    function tick() {
+      // 36 checks at five seconds is three minutes, which is longer than
+      // any prompt stays live.
+      if (tries++ > 36) return;
+
+      fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data || !data.ok) return;
+
+          if (data.state === 'none') { setTimeout(tick, 5000); return; }
+
+          if (data.state === 'pending') {
+            say('Waiting for you to enter your M-Pesa PIN…');
+            setTimeout(tick, 5000);
+            return;
+          }
+
+          if (data.state === 'success') {
+            say('Payment received' + (data.receipt ? ' — ' + data.receipt : '')
+                + '. Reloading your invoice…', 'good');
+            setTimeout(() => window.location.reload(), 1800);
+            return;
+          }
+
+          say(data.message || 'That payment did not go through. You can try again.', 'bad');
+        })
+        .catch(() => { setTimeout(tick, 8000); });
+    }
+
+    tick();
   }
 
   window.Shanfix = { toast, openModal };

@@ -9,7 +9,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
-use App\Services\KopoKopo;
+use App\Services\StkPayment;
 use App\Services\Notifier;
 
 /**
@@ -38,7 +38,6 @@ class PublicDocumentController extends Controller
      * is generous for a client fumbling their PIN and useless for a
      * nuisance.
      */
-    private const MAX_ATTEMPTS_PER_HOUR = 6;
 
     public function show(Request $request): void
     {
@@ -155,12 +154,10 @@ class PublicDocumentController extends Controller
      * pay() before acting — the view only decides what to draw, and a POST
      * can arrive without it.
      */
+    /** Kept as a thin name for the view; the rule lives in StkPayment. */
     public static function payable(array $doc): bool
     {
-        return $doc['doc_type'] === 'invoice'
-            && (float) $doc['balance'] > 0.009
-            && !in_array($doc['status'], ['cancelled', 'draft', 'paid'], true)
-            && Settings::bool('kopokopo_enabled');
+        return StkPayment::payable($doc);
     }
 
     /**
@@ -180,110 +177,26 @@ class PublicDocumentController extends Controller
     {
         $doc = $this->findByToken((string) $request->param('token'));
 
-        if (!self::payable($doc)) {
-            Session::error('This invoice cannot be paid online. Please contact us.');
-            Response::to('/view/' . $doc['public_token']);
+        // The amount, the rate limit and the one-prompt-at-a-time rule live
+        // in StkPayment, shared with the client portal. Two copies of that
+        // reasoning would be two places to get it wrong, and this is the
+        // code that decides how much somebody is asked to pay.
+        $result = StkPayment::request($doc, (string) $request->input('phone', ''), 'share link');
+
+        if (!empty($result['stk_id'])) {
+            // Held in the session so the page that follows knows which
+            // request to watch, without an id in a URL anyone could change.
+            Session::put('public_stk_id', (int) $result['stk_id']);
         }
-
-        $phone = normalize_phone((string) $request->input('phone', ''));
-
-        if ($phone === null) {
-            Session::error('Please enter a valid M-Pesa number, for example 0712345678.');
-            Response::to('/view/' . $doc['public_token']);
-        }
-
-        // Always the full balance, read from the invoice. The form asks only
-        // for a phone number, so any amount arriving in this POST was put
-        // there by hand — there is no legitimate request it could come from.
-        // Part payment from the client side would need a visible field and a
-        // deliberate decision to allow it; until then, accepting a number
-        // here would only be a way to fire prompts for arbitrary sums.
-        $amount = (float) $doc['balance'];
-
-        $recent = (int) Database::scalar(
-            'SELECT COUNT(*) FROM stk_requests
-              WHERE document_id = :id AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
-            ['id' => $doc['id']],
-            0
-        );
-
-        if ($recent >= self::MAX_ATTEMPTS_PER_HOUR) {
-            Session::error('Too many payment attempts on this invoice. Please try again later, or contact us to pay another way.');
-            Response::to('/view/' . $doc['public_token']);
-        }
-
-        // One prompt at a time — a second while the first is still on the
-        // client's handset only confuses them.
-        $pending = Database::first(
-            "SELECT id FROM stk_requests
-              WHERE document_id = :id AND status = 'pending'
-                AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE)
-              LIMIT 1",
-            ['id' => $doc['id']]
-        );
-
-        if ($pending) {
-            Session::put('public_stk_id', (int) $pending['id']);
-            Session::warning('A payment request is already on your phone. Enter your M-Pesa PIN to complete it.');
-            Response::to('/view/' . $doc['public_token']);
-        }
-
-        $client = Database::first('SELECT * FROM clients WHERE id = :id', ['id' => $doc['client_id']]);
-
-        $names     = preg_split('/\s+/', trim((string) ($client['name'] ?? 'Client')));
-        $firstName = $names[0] ?? 'Client';
-        $lastName  = count($names) > 1 ? end($names) : '-';
-
-        // Recorded before the call goes out, so a callback that arrives
-        // before the HTTP response still finds a row to attach itself to.
-        $stkId = Database::insert('stk_requests', [
-            'document_id'  => (int) $doc['id'],
-            'client_id'    => (int) $doc['client_id'],
-            'phone'        => $phone,
-            'amount'       => $amount,
-            'status'       => 'pending',
-            'initiated_by' => null,   // the client did this, not a member of staff
-        ]);
-
-        $result = (new KopoKopo())->stkPush(
-            phone:       $phone,
-            amount:      $amount,
-            callbackUrl: Notifier::absoluteUrl('/webhooks/kopokopo'),
-            reference:   (string) $doc['doc_number'],
-            firstName:   $firstName,
-            lastName:    $lastName,
-            email:       $client['email'] ?: null,
-            metadata:    [
-                'client_id'   => (string) $doc['client_id'],
-                'document_id' => (string) $doc['id'],
-                'stk_id'      => (string) $stkId,
-                'source'      => 'share_link',
-            ]
-        );
-
-        Database::update('stk_requests', [
-            'kopokopo_id'      => $result['id'] ?? null,
-            'location_url'     => $result['location'] ?? null,
-            'request_payload'  => json_encode($result['request'] ?? [], JSON_UNESCAPED_SLASHES),
-            'response_payload' => mb_substr((string) ($result['response'] ?? ''), 0, 4000),
-            'status'           => $result['ok'] ? 'pending' : 'failed',
-            'result_desc'      => $result['ok'] ? null : mb_substr((string) ($result['error'] ?? ''), 0, 255),
-        ], ['id' => $stkId]);
 
         if (!$result['ok']) {
-            ActivityLog::record('stk_failed', 'stk_request', $stkId,
-                'Client-initiated STK Push failed for ' . $doc['doc_number']);
-            Session::error('We could not reach M-Pesa just now. Please try again in a moment.');
-            Response::to('/view/' . $doc['public_token']);
+            Session::error($result['error'] ?? 'The payment could not be started.');
+        } elseif (!empty($result['pending'])) {
+            Session::warning($result['error']);
+        } else {
+            Session::success('Check your phone and enter your M-Pesa PIN to complete the payment.');
         }
 
-        ActivityLog::record('stk_sent', 'stk_request', $stkId,
-            'Client paid ' . $doc['doc_number'] . ' from the share link — prompt sent to ' . $phone);
-
-        // Held in the session so the page that follows knows which request
-        // to watch, without putting the id in a URL anyone could change.
-        Session::put('public_stk_id', $stkId);
-        Session::success('Check your phone and enter your M-Pesa PIN to complete the payment.');
         Response::to('/view/' . $doc['public_token']);
     }
 

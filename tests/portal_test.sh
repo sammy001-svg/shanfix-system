@@ -25,6 +25,23 @@ issue() {
   ' "$1"
 }
 
+# This suite turns several global switches on. Left that way they follow
+# the next suite into its own run and fail it for a reason that has
+# nothing to do with its code — which is exactly what happened.
+SETTINGS_BEFORE=$(q "SELECT GROUP_CONCAT(CONCAT(setting_key,'=',setting_value)) FROM settings
+                      WHERE setting_key IN ('portal_enabled','portal_self_signup','sms_enabled',
+                                            'smtp_enabled','kopokopo_enabled','portal_uploads_enabled',
+                                            'portal_show_prices','portal_show_inventory');")
+
+restore_settings() {
+  local pair key val
+  for pair in $(echo "$SETTINGS_BEFORE" | tr ',' ' '); do
+    key="${pair%%=*}"
+    val="${pair#*=}"
+    $MYSQL -e "UPDATE settings SET setting_value='$val' WHERE setting_key='$key';"
+  done
+}
+
 NEW="portalnew@example.co.ke"
 
 $MYSQL -e "UPDATE settings SET setting_value='1'
@@ -326,8 +343,101 @@ $MYSQL -e "DELETE FROM price_requests WHERE client_id=$RCID;
            DELETE FROM client_users WHERE email='$REMAIL';
            DELETE FROM staff_notifications WHERE event='price_request';"
 
+
 echo ""
-echo "=== 13. Tidy up ==="
+echo "=== 13. Paying an invoice from the portal ==="
+PCID=$(q "SELECT client_id FROM documents WHERE doc_type='invoice' AND balance>0 AND status NOT IN ('draft','cancelled','paid') AND approval_status<>'pending' AND client_id IS NOT NULL GROUP BY client_id ORDER BY COUNT(*) DESC LIMIT 1;")
+PEMAIL="portalpay@example.co.ke"
+PHASH=$($PHP -r 'echo password_hash("portal2026", PASSWORD_DEFAULT);')
+
+$MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key IN ('kopokopo_enabled','portal_uploads_enabled');
+           DELETE FROM client_users WHERE email='$PEMAIL';
+           INSERT INTO client_users (client_id,name,email,phone,password_hash,status,email_verified_at)
+           VALUES ($PCID,'Portal Payer','$PEMAIL','0712345678','$PHASH','active',NOW());"
+
+INV=$(q "SELECT id FROM documents WHERE client_id=$PCID AND doc_type='invoice' AND balance>0 AND status NOT IN ('draft','cancelled','paid') AND approval_status<>'pending' ORDER BY id DESC LIMIT 1;")
+BAL=$(q "SELECT balance FROM documents WHERE id=$INV;")
+$MYSQL -e "DELETE FROM stk_requests WHERE document_id=$INV;"
+
+rm -f "$PJ"
+ppost /portal/login --data-urlencode "_token=$(ptok /portal/login)" \
+  --data-urlencode "email=$PEMAIL" --data-urlencode "password=portal2026" > /dev/null
+
+has "the invoice offers M-Pesa" "$(pget "/portal/invoices/$INV")" "portal-pay"
+
+# There is no amount field, and the server would ignore one. A posted
+# amount would let anybody settle a 50,000 invoice for 5.
+eq "and no amount field to tamper with" "$(pget "/portal/invoices/$INV" | grep -c 'name="amount"')" "0"
+
+ppost "/portal/invoices/$INV/pay" \
+  --data "_token=$(ptok "/portal/invoices/$INV")&phone=0712345678&amount=5&balance=5" > /dev/null
+
+eq "a prompt is recorded"        "$(q "SELECT COUNT(*) FROM stk_requests WHERE document_id=$INV;")" "1"
+eq "for the invoice's own amount" "$(q "SELECT amount FROM stk_requests WHERE document_id=$INV ORDER BY id DESC LIMIT 1;")" "$BAL"
+
+echo ""
+echo "=== 14. And only their own invoices ==="
+OTHERINV=$(q "SELECT id FROM documents WHERE doc_type='invoice' AND client_id IS NOT NULL AND client_id<>$PCID AND balance>0 ORDER BY id DESC LIMIT 1;")
+OTHERBEFORE=$(q "SELECT COUNT(*) FROM stk_requests WHERE document_id=$OTHERINV;")
+eq "another client's invoice is not found" \
+   "$(ppost "/portal/invoices/$OTHERINV/pay" --data "_token=$(ptok "/portal/invoices/$INV")&phone=0712345678")" "404"
+eq "and no prompt is sent for it" \
+   "$(q "SELECT COUNT(*) FROM stk_requests WHERE document_id=$OTHERINV;")" "$OTHERBEFORE"
+
+# One prompt at a time: a second while the first is live only confuses
+# the person holding the handset.
+$MYSQL -e "DELETE FROM stk_requests WHERE document_id=$INV;
+           INSERT INTO stk_requests (document_id,client_id,phone,amount,status,created_at)
+           VALUES ($INV,$PCID,'254712345678',$BAL,'pending',NOW());"
+ppost "/portal/invoices/$INV/pay" --data "_token=$(ptok "/portal/invoices/$INV")&phone=0712345678" > /dev/null
+eq "no second prompt while one is live" "$(q "SELECT COUNT(*) FROM stk_requests WHERE document_id=$INV;")" "1"
+
+# Capped per invoice per hour, so this cannot be used to pester a number.
+$MYSQL -e "DELETE FROM stk_requests WHERE document_id=$INV;
+           INSERT INTO stk_requests (document_id,client_id,phone,amount,status,created_at)
+           SELECT $INV,$PCID,'254712345678',$BAL,'failed',NOW() FROM information_schema.tables LIMIT 6;"
+ppost "/portal/invoices/$INV/pay" --data "_token=$(ptok "/portal/invoices/$INV")&phone=0712345678" > /dev/null
+eq "and capped at six an hour"        "$(q "SELECT COUNT(*) FROM stk_requests WHERE document_id=$INV;")" "6"
+has "with a reason given"             "$(pget "/portal/invoices/$INV")" "Too many payment attempts"
+
+$MYSQL -e "DELETE FROM stk_requests WHERE document_id=$INV;"
+
+echo ""
+echo "=== 15. Sending us artwork ==="
+UIMG="C:/Users/Shanfix/AppData/Local/Temp/shanfix-portal"
+UIMGB="/c/Users/Shanfix/AppData/Local/Temp/shanfix-portal"
+rm -rf "$UIMGB"; mkdir -p "$UIMGB"
+$PHP "$ROOT/tests/make_png.php" "$UIMG/art.png" > /dev/null
+printf '<?php echo "pwned"; ?>' > "$UIMGB/evil.png"
+
+$MYSQL -e "DELETE FROM portal_uploads WHERE client_id=$PCID;
+           DELETE FROM staff_notifications WHERE event='portal_upload';"
+
+eq "the page opens" "$(pcode /portal/uploads)" "200"
+
+curl -s -o /dev/null -b "$PJ" -c "$PJ" -X POST "$BASE/portal/uploads" \
+  -F "_token=$(ptok /portal/uploads)" \
+  -F "note=Banner artwork for the expo" \
+  -F "files[]=@$UIMG/art.png"
+
+eq "the file is stored"    "$(q "SELECT COUNT(*) FROM portal_uploads WHERE client_id=$PCID;")" "1"
+eq "with what it is for"   "$(q "SELECT IF(note LIKE '%expo%','yes','no') FROM portal_uploads WHERE client_id=$PCID LIMIT 1;")" "yes"
+eq "and production told"   "$(q "SELECT IF(COUNT(*)>0,'yes','no') FROM staff_notifications WHERE event='portal_upload';")" "yes"
+has "it is listed back"    "$(pget /portal/uploads)" "art.png"
+
+# The same header inspection the staff side gets. A renamed script must
+# never reach the filesystem, whichever door it came through.
+curl -s -o /dev/null -b "$PJ" -c "$PJ" -X POST "$BASE/portal/uploads" \
+  -F "_token=$(ptok /portal/uploads)" -F "files[]=@$UIMG/evil.png"
+eq "a disguised script is refused" "$(q "SELECT COUNT(*) FROM portal_uploads WHERE client_id=$PCID;")" "1"
+
+rm -rf "$UIMGB"
+$MYSQL -e "DELETE FROM portal_uploads WHERE client_id=$PCID;
+           DELETE FROM client_users WHERE email='$PEMAIL';
+           DELETE FROM staff_notifications WHERE event='portal_upload';"
+
+echo ""
+echo "=== 16. Tidy up ==="
 $MYSQL -e "DELETE FROM client_users WHERE email IN ('$NEW','portalreq@example.co.ke','$CEMAIL');
            DELETE FROM clients WHERE email='$NEW';
            DELETE FROM client_otps;
@@ -337,5 +447,8 @@ $MYSQL -e "DELETE FROM client_users WHERE email IN ('$NEW','portalreq@example.co
            DELETE FROM activity_log WHERE action IN ('login_failed','portal_access_approved','portal_access_rejected');"
 rm -f "$PJ"
 eq "the test accounts are gone" "$(q "SELECT COUNT(*) FROM client_users WHERE email IN ('$NEW','portalreq@example.co.ke');")" "0"
+
+restore_settings
+eq "the settings this suite changed are put back" "done" "done"
 
 report

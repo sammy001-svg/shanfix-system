@@ -73,6 +73,8 @@ $brand      = \App\Core\Settings::company();
          href="<?= url('/portal/catalogue') ?>">What we do</a>
       <a class="portal-nav__link <?= $on('/portal/requests') ? 'is-active' : '' ?>"
          href="<?= url('/portal/requests') ?>">My requests</a>
+      <a class="portal-nav__link <?= $on('/portal/uploads') ? 'is-active' : '' ?>"
+         href="<?= url('/portal/uploads') ?>">Send artwork</a>
     </nav>
 
     <div class="portal-top__right">
