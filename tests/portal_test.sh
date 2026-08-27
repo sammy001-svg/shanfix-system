@@ -176,7 +176,53 @@ eq "waiting on their code"                "$(q "SELECT status FROM client_users 
 eq "and the code was texted to them"    "$(( $(q "SELECT COUNT(*) FROM notifications WHERE event='client_otp' AND channel='sms';") - SMS_BEFORE ))" "1"
 
 echo ""
-echo "=== 7. The two systems do not touch ==="
+echo "=== 7. What a client can see of their own account ==="
+# A client with real documents behind them.
+DCID=$(q "SELECT client_id FROM documents WHERE doc_type='invoice' AND status<>'draft' AND client_id IS NOT NULL GROUP BY client_id ORDER BY COUNT(*) DESC LIMIT 1;")
+DEMAIL="portaldocs@example.co.ke"
+DHASH=$($PHP -r 'echo password_hash("portal2026", PASSWORD_DEFAULT);')
+
+$MYSQL -e "DELETE FROM client_users WHERE email='$DEMAIL';
+           INSERT INTO client_users (client_id,name,email,password_hash,status,email_verified_at)
+           VALUES ($DCID,'Portal Docs','$DEMAIL','$DHASH','active',NOW());"
+
+rm -f "$PJ"
+ppost /portal/login --data-urlencode "_token=$(ptok /portal/login)"   --data-urlencode "email=$DEMAIL" --data-urlencode "password=portal2026" > /dev/null
+
+eq "their quotations open" "$(pcode /portal/quotations)" "200"
+eq "their invoices open"   "$(pcode /portal/invoices)"   "200"
+eq "their statement opens" "$(pcode /portal/statement)"  "200"
+
+# Every invoice they should see, and no more.
+VISIBLE=$(q "SELECT COUNT(*) FROM documents WHERE client_id=$DCID AND doc_type='invoice' AND status<>'draft' AND approval_status<>'pending';")
+eq "the list shows exactly their invoices"    "$(pget /portal/invoices | grep -c 'portal/invoices/')" "$VISIBLE"
+
+# The statement has to reconcile, or it is worse than not showing one.
+DB_BALANCE=$(q "SELECT FORMAT(COALESCE(SUM(balance),0),2) FROM documents WHERE client_id=$DCID AND doc_type='invoice' AND status NOT IN ('draft','cancelled','paid') AND approval_status<>'pending';")
+has "the statement balance matches the books" "$(pget /portal/statement)" "$DB_BALANCE"
+
+echo ""
+echo "=== 8. And nothing of anybody else's ==="
+THEIRS=$(q "SELECT id FROM documents WHERE doc_type='invoice' AND status<>'draft' AND client_id IS NOT NULL AND client_id<>$DCID ORDER BY id DESC LIMIT 1;")
+eq "another client's invoice is not found" "$(pcode "/portal/invoices/$THEIRS")" "404"
+
+# The approval rule reaches the portal too: a price still waiting on an
+# administrator must not reach the client by this route either.
+MINE=$(q "SELECT id FROM documents WHERE client_id=$DCID AND doc_type='invoice' AND status<>'draft' ORDER BY id DESC LIMIT 1;")
+$MYSQL -e "UPDATE documents SET approval_status='pending' WHERE id=$MINE;"
+eq "an invoice awaiting approval is hidden" "$(pcode "/portal/invoices/$MINE")" "404"
+$MYSQL -e "UPDATE documents SET approval_status='approved' WHERE id=$MINE;"
+eq "and visible once approved"              "$(pcode "/portal/invoices/$MINE")" "200"
+
+# A draft is still ours, not theirs.
+$MYSQL -e "UPDATE documents SET status='draft' WHERE id=$MINE;"
+eq "a draft is not shown"                   "$(pcode "/portal/invoices/$MINE")" "404"
+$MYSQL -e "UPDATE documents SET status='sent' WHERE id=$MINE;"
+
+$MYSQL -e "DELETE FROM client_users WHERE email='$DEMAIL';"
+
+echo ""
+echo "=== 9. The two systems do not touch ==="
 # A portal session must never satisfy the staff guard, and the reverse.
 rm -f "$PJ"
 ppost /portal/login --data-urlencode "_token=$(ptok /portal/login)" --data-urlencode "email=$NEW" --data-urlencode "password=hunter2pass" > /dev/null
@@ -190,7 +236,7 @@ signin_admin
 ne "a staff session is not a portal one"  "$(code /portal)" "200"
 
 echo ""
-echo "=== 8. Tidy up ==="
+echo "=== 10. Tidy up ==="
 $MYSQL -e "DELETE FROM client_users WHERE email IN ('$NEW','portalreq@example.co.ke','$CEMAIL');
            DELETE FROM clients WHERE email='$NEW';
            DELETE FROM client_otps;

@@ -166,6 +166,26 @@ $r->post('/portal/request-access', [PortalAuthController::class, 'requestAccess'
 
 $r->get('/portal',                 [PortalController::class, 'home'], ['client_auth']);
 
+$r->group(['client_auth'], function ($r) {
+    // The doc type is bound by the route, so it can never come from
+    // what a client typed.
+    $r->get('/portal/quotations', function (Request $req) {
+        (new PortalController())->documents($req, 'quotation');
+    });
+    $r->get('/portal/quotations/{id}', function (Request $req) {
+        (new PortalController())->document($req, 'quotation');
+    });
+
+    $r->get('/portal/invoices', function (Request $req) {
+        (new PortalController())->documents($req, 'invoice');
+    });
+    $r->get('/portal/invoices/{id}', function (Request $req) {
+        (new PortalController())->document($req, 'invoice');
+    });
+
+    $r->get('/portal/statement', [PortalController::class, 'statement']);
+});
+
 // A client's own statement of account, on the same token model.
 $r->get('/statement/{token}', [PublicStatementController::class, 'show']);
 $r->get('/s/{token}',         [PublicStatementController::class, 'show']);

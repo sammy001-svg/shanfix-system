@@ -52,9 +52,21 @@ $brand      = \App\Core\Settings::company();
   </a>
 
   <?php if ($portalUser): ?>
+    <?php
+      // is_active_nav('/portal') matches every page in the portal, so the
+      // overview would stay lit on all of them. Matched on the path itself.
+      $here = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+      $on   = static fn(string $p): bool => str_ends_with($here, $p);
+    ?>
     <nav class="portal-nav">
-      <a class="portal-nav__link <?= is_active_nav('/portal') && !is_active_nav('/portal/invoices') ? 'is-active' : '' ?>"
+      <a class="portal-nav__link <?= $on('/portal') ? 'is-active' : '' ?>"
          href="<?= url('/portal') ?>">Overview</a>
+      <a class="portal-nav__link <?= str_contains($here, '/portal/quotations') ? 'is-active' : '' ?>"
+         href="<?= url('/portal/quotations') ?>">Quotations</a>
+      <a class="portal-nav__link <?= str_contains($here, '/portal/invoices') ? 'is-active' : '' ?>"
+         href="<?= url('/portal/invoices') ?>">Invoices</a>
+      <a class="portal-nav__link <?= $on('/portal/statement') ? 'is-active' : '' ?>"
+         href="<?= url('/portal/statement') ?>">Statement</a>
     </nav>
 
     <div class="portal-top__right">

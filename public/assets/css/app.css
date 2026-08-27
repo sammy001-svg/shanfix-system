@@ -3968,3 +3968,49 @@ body.lightbox-open {
   .portal-card { padding: 20px; }
   .portal-h1 { font-size: 20px; }
 }
+
+/* A document, as the client reads it. */
+.portal-doc__head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+}
+.portal-doc__meta { font-size: 13px; color: var(--slate-600); line-height: 1.7; text-align: right; }
+
+/* The totals block. Set right against the table above it so the figures
+   line up down the page the way they do on the printed copy. */
+.portal-totals {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 24px;
+  margin: 18px 0 0 auto;
+  max-width: 330px;
+  font-size: 13.5px;
+}
+.portal-totals dt { color: var(--slate-600); }
+.portal-totals dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.portal-totals__grand {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.portal-ageing {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+.portal-ageing__cell {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+}
+.portal-ageing__figure { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.portal-ageing__label { margin-top: 2px; font-size: 11.5px; color: var(--slate-500); }
+
+@media (max-width: 620px) {
+  .portal-doc__meta { text-align: left; }
+  .portal-totals { max-width: none; margin-left: 0; }
+}
