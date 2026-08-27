@@ -23,6 +23,7 @@ use App\Controllers\ExpenseController;
 use App\Controllers\InventoryController;
 use App\Controllers\JobController;
 use App\Controllers\JobRequestController;
+use App\Controllers\LetterController;
 use App\Controllers\JobFileController;
 use App\Controllers\LeadController;
 use App\Controllers\MeetingController;
@@ -679,6 +680,21 @@ $r->group(['auth'], function ($r) {
     });
 
     $r->get('/requests/{id}/fill', [JobRequestController::class, 'fill'], ['permission:requests.manage']);
+
+    // -- Company letters
+    $r->get('/letters',            [LetterController::class, 'index'],  ['permission:letters.view']);
+    $r->get('/letters/create',     [LetterController::class, 'create'], ['permission:letters.manage']);
+    $r->get('/letters/{id}',       [LetterController::class, 'show'],   ['permission:letters.view']);
+    $r->get('/letters/{id}/edit',  [LetterController::class, 'edit'],   ['permission:letters.manage']);
+    $r->get('/letters/{id}/print', [LetterController::class, 'print'],  ['permission:letters.view']);
+
+    $r->group(['permission:letters.manage', 'csrf'], function ($r) {
+        $r->post('/letters',                [LetterController::class, 'store']);
+        $r->post('/letters/{id}',           [LetterController::class, 'update']);
+        $r->post('/letters/{id}/status',    [LetterController::class, 'status']);
+        $r->post('/letters/{id}/duplicate', [LetterController::class, 'duplicate']);
+        $r->post('/letters/{id}/delete',    [LetterController::class, 'destroy']);
+    });
 
     // -- Reports
     $r->get('/reports',           [ReportController::class, 'index'],           ['permission:reports.view']);

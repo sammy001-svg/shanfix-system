@@ -73,6 +73,7 @@ class SettingsController extends Controller
         Settings::setMany([
             'company_name'    => $request->input('company_name'),
             'company_tagline' => $request->input('company_tagline'),
+            'company_vision'  => $request->input('company_vision'),
             'company_email'   => $request->input('company_email'),
             'company_phone'   => $request->input('company_phone'),
             'company_address' => $request->input('company_address'),

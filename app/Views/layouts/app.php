@@ -140,6 +140,12 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php if (can('letters.view')): ?>
+        <a class="nav-link <?= is_active_nav('/letters') ? 'is-active' : '' ?>" href="<?= url('/letters') ?>">
+          <?= icon('mail', 'nav-link__icon') ?> Letters
+        </a>
+      <?php endif; ?>
+
       <?php if (can('documents.view')): ?>
         <a class="nav-link <?= is_active_nav('/proposals') ? 'is-active' : '' ?>" href="<?= url('/proposals') ?>">
           <?= icon('briefcase', 'nav-link__icon') ?> Proposals

@@ -62,6 +62,11 @@ class Auth
         'requests.view'     => ['admin', 'manager', 'sales', 'production', 'reception', 'designer', 'staff'],
         'requests.manage'   => ['admin', 'manager', 'sales', 'reception'],
 
+        // Company letters. Anyone client-facing may read what was sent;
+        // writing one puts the company's name on it, so that is narrower.
+        'letters.view'      => ['admin', 'manager', 'sales', 'finance', 'reception'],
+        'letters.manage'    => ['admin', 'manager', 'sales'],
+
         'leads.view'        => ['admin', 'manager', 'sales', 'reception', 'staff'],
         // Everyone else sees only the leads allocated to them. Reception
         // is included because they log walk-ins before anyone owns them.

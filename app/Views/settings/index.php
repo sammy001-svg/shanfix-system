@@ -61,6 +61,16 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
           </div>
 
           <div class="field">
+            <label class="label" for="company_vision">Vision</label>
+            <textarea class="textarea" id="company_vision" name="company_vision" rows="2" maxlength="300"
+                      placeholder="e.g. To be the partner Kenyan businesses turn to for printing, branding and software that works."><?= e(setting('company_vision', '')) ?></textarea>
+            <span class="field-hint">
+              Printed small at the foot of every letter. Leave it empty and a
+              letter simply ends after the signature.
+            </span>
+          </div>
+
+          <div class="field">
             <label class="label" for="company_email">Email</label>
             <input class="input" type="email" id="company_email" name="company_email"
                    value="<?= e($settings['email']) ?>" maxlength="160">

@@ -3592,3 +3592,169 @@ body.lightbox-open {
   border-top: 1px solid var(--border);
 }
 .thumb-actions__row:first-child { border-top: 0; }
+
+/* ---------------------------------------------------------------------
+   Letters
+   ---------------------------------------------------------------------
+   A sheet of A4 with the company letterhead at the top and the company's
+   vision at the foot. Sized in points rather than pixels: this is read
+   on paper more often than on screen, and points are what a printer
+   works in.
+   --------------------------------------------------------------------- */
+.letter {
+  max-width: 780px;
+  padding: 34px 46px 40px;
+  font-size: 11.5pt;
+  line-height: 1.6;
+  color: #16202B;
+}
+
+.letter__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.letter__logo {
+  max-height: 62px;
+  max-width: 230px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.letter__company {
+  font-size: 15pt;
+  font-weight: 700;
+  color: var(--navy-800);
+  letter-spacing: -.01em;
+}
+
+.letter__tagline {
+  font-size: 9.5pt;
+  color: var(--green-700);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Set right so the block sits against the edge of the page the way a
+   printed letterhead does. */
+.letter__contact {
+  text-align: right;
+  font-size: 9.5pt;
+  line-height: 1.55;
+  color: #46586B;
+  white-space: nowrap;
+}
+
+.letter__rule {
+  height: 2px;
+  background: var(--green-600);
+  margin: 14px 0 22px;
+}
+
+.letter__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10pt;
+  color: #46586B;
+  margin-bottom: 26px;
+}
+
+.letter__to {
+  font-size: 11pt;
+  line-height: 1.5;
+  margin-bottom: 22px;
+}
+
+.letter__salutation {
+  margin: 0 0 14px;
+}
+
+/* The one line that tells the reader what the letter is about, so it is
+   the one line that is not in the running text. */
+.letter__subject {
+  margin: 0 0 16px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.letter__body p {
+  margin: 0 0 12px;
+  text-align: justify;
+}
+
+.letter__sign {
+  margin-top: 26px;
+}
+
+.letter__closing {
+  margin: 0;
+}
+
+/* Room to sign between the closing and the name. */
+.letter__space {
+  height: 56px;
+}
+
+.letter__signatory {
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* The vision, small, under a rule, at the foot of the page. */
+.letter__foot {
+  margin-top: 40px;
+  padding-top: 12px;
+  border-top: 1px solid #D9E1EA;
+  font-size: 8.5pt;
+  font-style: italic;
+  text-align: center;
+  color: #6B7C8E;
+}
+
+@media print {
+  .letter {
+    max-width: none;
+    padding: 0;
+    font-size: 11pt;
+  }
+
+  /* Keep the signature block off a page of its own: a name and title
+     stranded on page two looks like a different letter. */
+  .letter__sign {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* The vision sits at the foot of the last page rather than repeating,
+     which is what a printed letterhead does. */
+  .letter__foot {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+@media (max-width: 620px) {
+  .letter {
+    padding: 20px 18px 26px;
+    font-size: 11pt;
+  }
+
+  .letter__head {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* On a phone the contact block reads better under the name than
+     squeezed into a column beside it. */
+  .letter__contact {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .letter__body p {
+    text-align: left;
+  }
+}
