@@ -168,6 +168,16 @@ class App
                 Auth::touchSeen();
                 break;
 
+            case 'client_auth':
+                // The portal guard. Deliberately its own case rather than a
+                // flag on 'auth': a staff session must never satisfy it and a
+                // client session must never satisfy 'auth'.
+                if (!\App\Core\ClientAuth::check()) {
+                    Session::put('portal_intended_url', $request->uri);
+                    Response::to('/portal/login');
+                }
+                break;
+
             case 'guest':
                 if (Auth::check()) {
                     Response::to('/dashboard');

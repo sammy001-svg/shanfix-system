@@ -46,6 +46,9 @@ class Notifier
         // Artwork
         'artwork_ready'       => 'Artwork ready for client approval',
         'artwork_approved'    => 'Artwork approved — thank you',
+
+        // Client portal
+        'client_otp'          => 'Verification code for the client portal',
     ];
 
     /**

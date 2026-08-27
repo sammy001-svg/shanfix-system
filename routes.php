@@ -33,6 +33,9 @@ use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
 use App\Controllers\PublicArtworkController;
 use App\Controllers\PublicJobRequestController;
+use App\Controllers\PortalAuthController;
+use App\Controllers\PortalController;
+use App\Controllers\PortalRequestController;
 use App\Controllers\PublicProofController;
 use App\Controllers\PublicStatementController;
 use App\Controllers\PurchaseOrderController;
@@ -142,6 +145,26 @@ $r->post('/brief/{token}', [PublicJobRequestController::class, 'submit'], ['csrf
 
 // Short form for SMS.
 $r->get('/b/{token}', [PublicJobRequestController::class, 'show']);
+
+// ---------------------------------------------------------------------
+// The client portal
+// ---------------------------------------------------------------------
+// A second application with its own guard. 'client_auth' is not 'auth':
+// a staff session cannot satisfy one and a client session cannot satisfy
+// the other, which is the whole point of the two being separate.
+$r->get('/portal/login',           [PortalAuthController::class, 'showLogin']);
+$r->post('/portal/login',          [PortalAuthController::class, 'login'], ['csrf']);
+$r->post('/portal/logout',         [PortalAuthController::class, 'logout'], ['csrf']);
+
+$r->get('/portal/start',           [PortalAuthController::class, 'showStart']);
+$r->post('/portal/start',          [PortalAuthController::class, 'requestCode'], ['csrf']);
+$r->get('/portal/verify',          [PortalAuthController::class, 'showVerify']);
+$r->post('/portal/verify',         [PortalAuthController::class, 'verify'], ['csrf']);
+
+$r->get('/portal/request-access',  [PortalAuthController::class, 'showRequestAccess']);
+$r->post('/portal/request-access', [PortalAuthController::class, 'requestAccess'], ['csrf']);
+
+$r->get('/portal',                 [PortalController::class, 'home'], ['client_auth']);
 
 // A client's own statement of account, on the same token model.
 $r->get('/statement/{token}', [PublicStatementController::class, 'show']);
@@ -704,6 +727,14 @@ $r->group(['auth'], function ($r) {
         $r->post('/letters/{id}/status',    [LetterController::class, 'status']);
         $r->post('/letters/{id}/duplicate', [LetterController::class, 'duplicate']);
         $r->post('/letters/{id}/delete',    [LetterController::class, 'destroy'], ['permission:records.delete']);
+    });
+
+    // -- Portal access requests, decided by an administrator
+    $r->get('/portal-requests', [PortalRequestController::class, 'index'], ['permission:clients.manage']);
+
+    $r->group(['permission:clients.manage', 'csrf'], function ($r) {
+        $r->post('/portal-requests/{id}/approve', [PortalRequestController::class, 'approve']);
+        $r->post('/portal-requests/{id}/reject',  [PortalRequestController::class, 'reject']);
     });
 
     // -- Reports
