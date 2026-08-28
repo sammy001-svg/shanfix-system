@@ -151,6 +151,77 @@ check('Public URL set', $appUrl !== '' && str_starts_with($appUrl, 'http'),
                 ? 'app.url should be a full URL starting with https://'
                 : ''));
 
+
+// ---------------------------------------------------------------------
+// What is actually deployed here
+// ---------------------------------------------------------------------
+// The question this section answers is "did my last push reach this
+// server, and has the database caught up with it?" — because a
+// deployment that quietly did nothing looks exactly like a deployment
+// that worked until somebody goes looking for the new page.
+
+// How recent the code on this server is. A push that never arrived
+// leaves this at whatever date the last one that did arrive was.
+$newest     = 0;
+$newestName = '';
+
+foreach (['app/Controllers', 'app/Services', 'app/Core'] as $dir) {
+    $path = $base . '/' . $dir;
+
+    if (!is_dir($path)) {
+        continue;
+    }
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS)) as $f) {
+        if ($f->isFile() && $f->getMTime() > $newest) {
+            $newest     = $f->getMTime();
+            $newestName = $f->getFilename();
+        }
+    }
+}
+
+$ageDays = $newest > 0 ? (int) floor((time() - $newest) / 86400) : -1;
+
+check(
+    'Code on this server',
+    $newest > 0,
+    $newest > 0
+        ? 'Newest file is ' . htmlspecialchars($newestName, ENT_QUOTES, 'UTF-8') . ', ' . date('j M Y H:i', $newest)
+          . ' (' . ($ageDays === 0 ? 'today' : $ageDays . ' day(s) ago') . ')'
+        : 'Could not read the application folders.',
+    true
+);
+
+// Migrations are the other half. New code against an old database is the
+// second way a deployment looks like it did nothing — the page is there
+// and it fails, or the feature is there and its table is not.
+if ($dbOk && isset($pdo)) {
+    $onDisk = is_dir($base . '/database/migrations')
+        ? array_values(array_filter(scandir($base . '/database/migrations'), static fn($f) => str_ends_with($f, '.sql')))
+        : [];
+
+    $applied = [];
+
+    try {
+        $applied = $pdo->query('SELECT filename FROM migrations')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    } catch (Throwable $ex) {
+        // No migrations table at all means none have ever been applied.
+    }
+
+    $pending = array_values(array_diff($onDisk, $applied));
+
+    check(
+        'Database is up to date with the code',
+        $pending === [],
+        $pending === []
+            ? count($applied) . ' migration(s) applied, none pending.'
+            : count($pending) . ' migration(s) still to apply — open /upgrade.php and sign in as an '
+              . 'administrator. Until then the newer features will be missing or will error. '
+              . 'Waiting: ' . htmlspecialchars(implode(', ', array_slice($pending, 0, 6)), ENT_QUOTES, 'UTF-8')
+              . (count($pending) > 6 ? ' and ' . (count($pending) - 6) . ' more' : '')
+    );
+}
+
 // ---------------------------------------------------------------------
 // Rewrite engine
 // ---------------------------------------------------------------------
