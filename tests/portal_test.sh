@@ -436,8 +436,34 @@ $MYSQL -e "DELETE FROM portal_uploads WHERE client_id=$PCID;
            DELETE FROM client_users WHERE email='$PEMAIL';
            DELETE FROM staff_notifications WHERE event='portal_upload';"
 
+
 echo ""
-echo "=== 16. Tidy up ==="
+echo "=== 16. The two doors point at each other ==="
+# The portal is no use if nobody can find it. A customer arriving at the
+# staff sign-in has no account that will work there and no way to know
+# it, so the way to their own has to be on the page.
+STAFF=$(curl -s "$BASE/login")
+has "the staff page offers the portal"   "$STAFF" 'href="/portal/login"'
+has "and a way to set access up"         "$STAFF" 'href="/portal/start"'
+
+# And the reverse, for somebody who works here and followed the wrong link.
+PORTAL=$(curl -s "$BASE/portal/login")
+has "the portal points staff back"       "$PORTAL" 'href="/login"'
+has "it offers setting access up"        "$PORTAL" "Set up my access"
+has "and asking us, with no email"       "$PORTAL" "Ask us to set it up"
+
+# Every one of those has to actually go somewhere.
+for path in /login /portal/login /portal/start /portal/request-access; do
+  eq "$path resolves" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE$path")" "200"
+done
+
+# With the portal switched off, the staff page must not advertise it.
+$MYSQL -e "UPDATE settings SET setting_value='0' WHERE setting_key='portal_enabled';"
+eq "and it is not offered when the portal is off"    "$(curl -s "$BASE/login" | grep -c 'Are you a customer')" "0"
+$MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key='portal_enabled';"
+
+echo ""
+echo "=== 17. Tidy up ==="
 $MYSQL -e "DELETE FROM client_users WHERE email IN ('$NEW','portalreq@example.co.ke','$CEMAIL');
            DELETE FROM clients WHERE email='$NEW';
            DELETE FROM client_otps;

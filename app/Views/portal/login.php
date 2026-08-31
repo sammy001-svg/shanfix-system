@@ -46,4 +46,12 @@
       <a href="<?= url('/portal/request-access') ?>">Ask us to set it up</a>.
     </p>
   </div>
+
+  <?php // Somebody who works here and followed the wrong link would
+        // otherwise be stuck, since their staff account will not sign in
+        // on this side. ?>
+  <p class="text-xs text-muted text-center mt-16">
+    Work at <?= e($company['name']) ?>?
+    <a href="<?= url('/login') ?>">Staff sign in is here</a>.
+  </p>
 </div>

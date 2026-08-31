@@ -146,6 +146,27 @@ $logoSrc    = inline_image($logoFile) ?? url('/brand/logo');
       <p class="login__help">
         Trouble signing in? Contact your system administrator.
       </p>
+
+      <?php // This is the staff door. A customer arriving here has no
+            // account that will work in it and no way to know that, so the
+            // way to their own is said plainly rather than left to be
+            // guessed at or asked about on the phone. ?>
+      <?php if (setting('portal_enabled', '1') === '1'): ?>
+        <div class="login__switch">
+          <div class="login__switch-line"><span>Are you a customer?</span></div>
+
+          <a class="btn btn--outline btn--block" href="<?= url('/portal/login') ?>">
+            <?= icon('users') ?> Go to the customer portal
+          </a>
+
+          <p class="login__switch-help">
+            See your quotations, invoices and statements, pay by M-Pesa and send
+            us artwork.
+            <a href="<?= url('/portal/start') ?>">Set up your access</a>
+            if this is your first time.
+          </p>
+        </div>
+      <?php endif; ?>
     </div>
 
     <footer class="login__foot">
