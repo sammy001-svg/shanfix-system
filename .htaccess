@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------
+# Serving the application from the folder above public/
+# ---------------------------------------------------------------------
+# The application expects the document root to point at public/. Where
+# that cannot be changed — and on plenty of shared hosting it cannot —
+# the site answers at /public and not at /, which is what this fixes:
+# every request is handed into public/, and the .htaccess already there
+# does the rest of the routing.
+#
+# Pointing the document root at public/ is still the better arrangement,
+# because it puts app/, config/ and storage/ physically outside the folder
+# Apache serves, where no misconfiguration can reach them. This file is
+# the next best thing, and the deny rules below are the reason it is safe
+# enough to use.
+#
+# NOTE: this file belongs to the repository layout only. The flat package
+# built by build-cpanel.php has index.php at the top and no public/ at
+# all, and writes its own .htaccess — do not copy this one into it.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Anything already inside public/ is left exactly as it is — the
+    # .htaccess in there handles real files and the front controller.
+    RewriteRule ^public/ - [L]
+
+    # Everything else is handed to it. Relative, with no reference to the
+    # document root, so this works whether the application sits at the
+    # root of a domain or in a folder beneath one.
+    RewriteRule ^(.*)$ public/$1 [QSA,L]
+</IfModule>
+
+# ---------------------------------------------------------------------
+# The folders that must never be served
+# ---------------------------------------------------------------------
+# Each of these already carries its own .htaccess saying the same thing.
+# It is repeated here deliberately: with the document root above public/,
+# these folders sit inside the tree Apache serves, and one missing file
+# would put the database password on the open web. Two independent rules
+# now have to fail before that can happen.
+#
+# Verified against Apache 2.4 in exactly that layout: with the per-folder
+# files deleted these rules still refused every one of them, and with
+# these removed as well, database/seed.sql served in full.
+RedirectMatch 404 ^(.*)/(app|config|database|storage|tests|deploy)(/|$)
+
+# The working files of the project itself are nobody's business either.
+RedirectMatch 404 ^(.*)/\.(git|github|env)(/|$)
+RedirectMatch 404 ^(.*)/(composer\.(json|lock)|package(-lock)?\.json|\.cpanel\.yml)$
+
+# migrate.php and cron.php refuse to run over the web on their own, but
+# there is no reason for them to be reachable at all.
+RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel)\.php$
+
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+
+Options -Indexes
