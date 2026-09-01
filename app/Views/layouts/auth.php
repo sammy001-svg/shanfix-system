@@ -105,12 +105,21 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
 
       <?php // What is behind the door, for the person deciding whether they
             // are at the right one. Only shown where there is room for it,
-            // and only on the customer side: staff know what this is. ?>
+            // and only on the customer side: staff know what this is.
+            //
+            // Each line is checked against the setting that turns it on.
+            // Promising a customer they can pay here, when payments are
+            // switched off, is a broken promise made before they have even
+            // signed in. ?>
       <?php if ($isGuest): ?>
         <ul class="login__points">
           <li><?= icon('file-text') ?><span>Your quotations, invoices and statement</span></li>
-          <li><?= icon('credit-card') ?><span>Pay an invoice by M-Pesa</span></li>
-          <li><?= icon('paperclip') ?><span>Send us artwork for printing</span></li>
+          <?php if (\App\Core\Settings::bool('kopokopo_enabled')): ?>
+            <li><?= icon('credit-card') ?><span>Pay an invoice by M-Pesa</span></li>
+          <?php endif; ?>
+          <?php if (\App\Core\Settings::bool('portal_uploads_enabled', true)): ?>
+            <li><?= icon('paperclip') ?><span>Send us artwork for printing</span></li>
+          <?php endif; ?>
           <li><?= icon('repeat') ?><span>See what renews, and when</span></li>
         </ul>
       <?php endif; ?>

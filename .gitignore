@@ -34,3 +34,8 @@ Thumbs.db
 # Cookie jars and captured output the suites leave behind.
 /tests/*.txt
 /tests/*.eml
+
+# Scratch pages used to measure or seed the browser while testing. They
+# are served from public/, so one left behind is one more thing on the
+# open web that nobody meant to publish.
+public/_*.html

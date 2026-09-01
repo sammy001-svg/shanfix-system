@@ -449,8 +449,26 @@ has "and a way to set access up"         "$STAFF" 'href="/portal/start"'
 # And the reverse, for somebody who works here and followed the wrong link.
 PORTAL=$(curl -s "$BASE/portal/login")
 has "the portal points staff back"       "$PORTAL" 'href="/login"'
-has "it offers setting access up"        "$PORTAL" "Set up my access"
+# Asserted on the link, not the wording. The button used to say "Set up
+# my access"; it now says setting up and resetting are the same thing,
+# which is true and worth saying, and the test should not have to be
+# rewritten every time the copy improves.
+has "it offers setting access up"        "$PORTAL" 'href="/portal/start"'
+has "and says that resets live there too" "$PORTAL" "forgotten your password"
 has "and asking us, with no email"       "$PORTAL" "Ask us to set it up"
+
+# Both doors are dressed by the same shell, so a client who has been sent a
+# link sees the company they expect rather than a bare form. The badge is
+# the only thing that differs, and it has to differ — two accounts that
+# look alike and do not work in each other's page is the whole confusion.
+has "the staff door is labelled"    "$STAFF"  "login__kind--staff"
+has "the customer door is labelled" "$PORTAL" "login__kind--client"
+ne "and they are not the same label"    "$(echo "$STAFF" | grep -c 'login__kind--client')" "1"
+
+# Signed out, there is nothing to navigate to. The portal's own top bar
+# used to render on these pages with an empty nav, which reads as a broken
+# page rather than a sign-in one.
+eq "no app chrome before signing in" "$(echo "$PORTAL" | grep -c 'portal-nav')" "0"
 
 # Every one of those has to actually go somewhere.
 for path in /login /portal/login /portal/start /portal/request-access; do

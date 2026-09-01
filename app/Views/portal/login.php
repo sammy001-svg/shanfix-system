@@ -9,7 +9,11 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 <h1 class="login__title">Sign in</h1>
 <p class="login__intro">
-  Your quotations, invoices and statements — and you can pay by M-Pesa here.
+  <?php // Same rule as the list beside it: only say we take payment here
+        // if we actually do. ?>
+  Your quotations, invoices and statements<?php
+    if (\App\Core\Settings::bool('kopokopo_enabled')):
+  ?> — and you can pay by M-Pesa here<?php endif; ?>.
 </p>
 
 <form method="post" action="<?= url('/portal/login') ?>">

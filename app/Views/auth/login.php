@@ -84,8 +84,9 @@ $portalOn     = \App\Core\Settings::bool('portal_enabled', true);
     </a>
 
     <p class="login__switch-help">
-      See your quotations, invoices and statements, pay by M-Pesa and send
-      us artwork.
+      See your quotations, invoices and statements<?php
+        if (\App\Core\Settings::bool('kopokopo_enabled')): ?>, pay by M-Pesa<?php endif; ?><?php
+        if (\App\Core\Settings::bool('portal_uploads_enabled', true)): ?> and send us artwork<?php endif; ?>.
       <a href="<?= url('/portal/start') ?>">Set up your access</a>
       if this is your first time.
     </p>

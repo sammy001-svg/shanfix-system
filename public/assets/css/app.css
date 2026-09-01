@@ -1124,12 +1124,6 @@ fieldset:last-of-type { margin-bottom: 0; }
   min-height: 100vh;
   min-height: 100dvh;          /* mobile browser chrome */
   display: grid;
-  /* An implicit auto track is sized to its content, and the card's content
-     — whole sentences that have not wrapped yet — is far wider than a
-     phone. The track then overflowed the screen and took the card with it,
-     cutting the sign-in button in half on a 390px display. minmax(0, 1fr)
-     pins the track to the screen and lets the text wrap inside it. */
-  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 24px 16px;
   background: var(--navy-900);
@@ -1232,15 +1226,6 @@ fieldset:last-of-type { margin-bottom: 0; }
   .login__logo   { margin-left: 0; }
 }
 
-.login__brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 20px;
-  margin-bottom: 22px;
-  border-bottom: 1px solid var(--border);
-}
-
 .login__mark {
   width: 44px; height: 44px;
   flex: 0 0 44px;
@@ -1253,14 +1238,8 @@ fieldset:last-of-type { margin-bottom: 0; }
   letter-spacing: -.02em;
 }
 
-/* A wordmark stands alone and centred. Capped on both axes so a very wide
-   or very tall logo cannot burst the card. */
-.login__brand--logo {
-  display: block;
-  text-align: center;
-}
-.login__brand--logo .login__tagline { margin-top: 8px; }
-
+/* Capped on both axes so a very wide or very tall logo cannot push the
+   column out of shape. */
 .login__logo {
   max-height: 68px;
   max-width: 100%;
