@@ -51,7 +51,8 @@ class PortalAuthController extends Controller
             'title'      => 'Client sign in',
             'company'    => Settings::company(),
             'selfSignup' => Settings::bool('portal_self_signup', true),
-        ], 'portal');
+            'authKind'   => 'client',
+        ], 'auth');
     }
 
     public function login(Request $request): void
@@ -90,7 +91,8 @@ class PortalAuthController extends Controller
             'title'      => 'Get access to your account',
             'company'    => Settings::company(),
             'selfSignup' => Settings::bool('portal_self_signup', true),
-        ], 'portal');
+            'authKind'   => 'client',
+        ], 'auth');
     }
 
     /**
@@ -156,11 +158,12 @@ class PortalAuthController extends Controller
         }
 
         $this->view('portal/verify', [
-            'title'   => 'Enter your code',
-            'company' => Settings::company(),
-            'email'   => $email,
-            'minutes' => ClientOtp::minutes(),
-        ], 'portal');
+            'title'    => 'Enter your code',
+            'company'  => Settings::company(),
+            'email'    => $email,
+            'minutes'  => ClientOtp::minutes(),
+            'authKind' => 'client',
+        ], 'auth');
     }
 
     /** Step two: the code, and the password they want. */
@@ -265,9 +268,10 @@ class PortalAuthController extends Controller
         $this->assertEnabled();
 
         $this->view('portal/request-access', [
-            'title'   => 'Ask us for access',
-            'company' => Settings::company(),
-        ], 'portal');
+            'title'    => 'Ask us for access',
+            'company'  => Settings::company(),
+            'authKind' => 'client',
+        ], 'auth');
     }
 
     /**

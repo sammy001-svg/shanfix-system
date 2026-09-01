@@ -15,7 +15,7 @@ class AuthController extends Controller
 {
     public function showLogin(Request $request): void
     {
-        $this->view('auth/login', ['title' => 'Sign in'], 'blank');
+        $this->view('auth/login', ['title' => 'Sign in'], 'auth');
     }
 
     public function login(Request $request): void

@@ -20,6 +20,18 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Certificate renewal. AutoSSL and Let's Encrypt both prove ownership
+    # by fetching a file from here, and handing that into public/ — where
+    # it is not — makes the check fail and the certificate quietly expire.
+    RewriteRule ^\.well-known/ - [L]
+
+    # The maintenance pages live beside this file rather than inside
+    # public/, so the catch-all below would look for them in the wrong
+    # place and the router would answer 404. upgrade.php is how pending
+    # database changes get applied after a deployment; hiding it is how a
+    # deployment ends up looking like it did nothing.
+    RewriteRule ^(upgrade|check)\.php$ - [L]
+
     # Anything already inside public/ is left exactly as it is — the
     # .htaccess in there handles real files and the front controller.
     RewriteRule ^public/ - [L]
@@ -51,6 +63,34 @@ RedirectMatch 404 ^(.*)/(composer\.(json|lock)|package(-lock)?\.json|\.cpanel\.y
 # migrate.php and cron.php refuse to run over the web on their own, but
 # there is no reason for them to be reachable at all.
 RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel)\.php$
+
+# ---------------------------------------------------------------------
+# The PHP files that sit beside this one
+# ---------------------------------------------------------------------
+# <Files> matches the file Apache finally settles on, so it holds whatever
+# the rewrites above did or did not do — which is why the two that must
+# never run over the web are named here rather than left to a rewrite.
+#
+# routes.php is a fragment, not a page: run on its own it fails partway
+# through and the error names paths on the server.
+<Files "routes.php">
+    Require all denied
+</Files>
+
+<Files "dev-server.php">
+    Require all denied
+</Files>
+
+# check.php reports the document root, the PHP build and the folder
+# permissions. That is exactly what you want when a deployment has gone
+# wrong, and exactly what an attacker wants the rest of the time, so it
+# is shut by default.
+#
+# TO USE IT: comment out the three lines below, load
+# https://your-domain/check.php, then put them back.
+<Files "check.php">
+    Require all denied
+</Files>
 
 <IfModule mod_headers.c>
     Header always set X-Frame-Options "SAMEORIGIN"

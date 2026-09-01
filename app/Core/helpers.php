@@ -22,9 +22,10 @@ if (!function_exists('base_path')) {
      * Sub-directory the app is served from, '' when at the domain root.
      * Lets the system work at both example.com/ and example.com/erp/.
      *
-     * Normally detected from SCRIPT_NAME. Set app.base_path in config.php to
-     * override — needed when a rewrite maps the domain root onto public/, so
-     * SCRIPT_NAME says "/public/index.php" while visitors are on "/".
+     * Detected from SCRIPT_NAME, then checked against the request, because a
+     * rewrite can map the domain root onto public/ and leave SCRIPT_NAME
+     * saying "/public/index.php" while the visitor is on "/". Set
+     * app.base_path in config.php to override the detection entirely.
      */
     function base_path(): string
     {
@@ -58,6 +59,26 @@ if (!function_exists('base_path')) {
         $dir = str_replace('\\', '/', dirname($script));
 
         $base = ($dir === '/' || $dir === '.' || $dir === '') ? '' : rtrim($dir, '/');
+
+        // A rewrite can map the domain root onto a sub-folder: the visitor
+        // asks for /dashboard and public/index.php answers it. SCRIPT_NAME
+        // then names a folder the visitor's own URL never mentions, and
+        // every link we build would gain a /public they did not ask for —
+        // which is how the front page ends up bouncing to /public/dashboard.
+        //
+        // The request itself settles it. A genuine sub-folder install is
+        // one the visitor is demonstrably inside; if their path does not
+        // begin with the folder, they are not in it, whatever SCRIPT_NAME
+        // says. Someone who does browse to /public/... directly still gets
+        // /public back, so links stay consistent within that visit.
+        if ($base !== '') {
+            $uri = '/' . ltrim(explode('?', (string) ($_SERVER['REQUEST_URI'] ?? '/'))[0], '/');
+
+            if (strcasecmp($uri, $base) !== 0
+                && strncasecmp($uri, $base . '/', strlen($base) + 1) !== 0) {
+                $base = '';
+            }
+        }
 
         return $base;
     }

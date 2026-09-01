@@ -1155,11 +1155,75 @@ fieldset:last-of-type { margin-bottom: 0; }
   gap: 18px;
 }
 
+/* Wide enough for two columns: the brand and what is behind the door on
+   the left, the form on the right, the footer across the bottom. Below
+   this the same three blocks simply stack, which is the phone layout. */
+@media (min-width: 940px) {
+  .login__panel {
+    max-width: 920px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 424px;
+    grid-template-areas:
+      "aside card"
+      "foot  foot";
+    align-items: center;
+    column-gap: 64px;
+    row-gap: 28px;
+  }
+  .login__aside { grid-area: aside; }
+  .login__card  { grid-area: card; }
+  .login__foot  { grid-area: foot; }
+}
+
 .login__card {
   background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 34px 32px 30px;
+  padding: 32px 32px 28px;
+  /* On a dark theme the card and the navy behind it are close enough that
+     a shadow alone does not separate them. The border is what makes it
+     read as a card; the shadow is only depth. */
   box-shadow: 0 18px 50px rgba(4, 16, 30, .38);
+}
+
+/* The brand, outside the card, sitting on the dark ground. */
+.login__aside {
+  text-align: center;
+  color: #fff;
+}
+
+.login__lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.login__points {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: none;               /* only where there is room for it */
+}
+.login__points li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 0;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, .82);
+}
+.login__points svg {
+  width: 16px; height: 16px;
+  flex: 0 0 16px;
+  color: var(--green-400);   /* on the navy ground, not on a tint */
+}
+/* Two columns: the brand stops being a centred header and becomes the
+   left-hand column, so the lockup, the tagline and the list all start on
+   the same line. */
+@media (min-width: 940px) {
+  .login__points { display: block; }
+  .login__aside  { text-align: left; }
+  .login__logo   { margin-left: 0; }
 }
 
 .login__brand {
@@ -1192,7 +1256,7 @@ fieldset:last-of-type { margin-bottom: 0; }
 .login__brand--logo .login__tagline { margin-top: 8px; }
 
 .login__logo {
-  max-height: 56px;
+  max-height: 68px;
   max-width: 100%;
   width: auto;
   height: auto;
@@ -1200,8 +1264,14 @@ fieldset:last-of-type { margin-bottom: 0; }
   display: block;
   object-fit: contain;
 }
-.login__company { font-weight: 700; font-size: 16px; color: var(--ink); line-height: 1.25; }
-.login__tagline { font-size: 12px; color: var(--on-green); font-weight: 600; margin-top: 1px; }
+.login__company { font-weight: 700; font-size: 21px; color: #fff; line-height: 1.2; letter-spacing: -.01em; }
+.login__tagline {
+  font-size: 13px;
+  color: var(--green-400);   /* on the navy ground, not on a tint */
+  font-weight: 600;
+  margin: 10px 0 0;
+  line-height: 1.4;
+}
 
 .login__title { font-size: 24px; margin-bottom: 4px; }
 .login__intro { color: var(--slate-600); font-size: 13.5px; margin-bottom: 22px; }
@@ -4201,3 +4271,46 @@ body.lightbox-open {
   color: var(--slate-500);
   text-align: center;
 }
+
+/* Which of the two doors this is. Staff and customers sign in to the same
+   company but not with each other's accounts, and one labelled badge says
+   so more clearly than a paragraph would. Flat tints, no gradients. */
+.login__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.login__kind svg { width: 13px; height: 13px; }
+.login__kind--staff  { background: var(--tint-navy);  color: var(--on-navy); }
+.login__kind--client { background: var(--tint-green); color: var(--on-green); }
+
+/* Anyone who cannot get in needs a way to reach a person. "Contact your
+   administrator" means nothing to a customer, so the real details sit
+   under the card, on the dark ground rather than inside the white. */
+.login__contact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+  margin-bottom: 9px;
+}
+.login__contact a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, .78);
+  text-decoration: none;
+}
+.login__contact a:hover,
+.login__contact a:focus-visible { color: #fff; text-decoration: underline; }
+.login__contact svg { width: 13px; height: 13px; opacity: .7; }
+
+/* The back links at the foot of the set-up pages carry an arrow. */
+.login__help svg { width: 14px; height: 14px; vertical-align: -3px; margin-right: 1px; }

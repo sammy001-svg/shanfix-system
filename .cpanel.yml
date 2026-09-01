@@ -1,74 +1,94 @@
 ---
 # cPanel deployment
 # ---------------------------------------------------------------------
-# Without this file, cPanel's "Update from Remote" pulls the code into the
-# repository folder and stops. It copies nothing to the folder your site
-# is served from, which is why a push can succeed and change nothing you
-# can see.
+# This runs on the server every time you press "Update from Remote", just
+# after the pull.
 #
 # ---------------------------------------------------------------------
-# BEFORE THIS WORKS, SET DEPLOYPATH BELOW TO YOUR OWN FOLDER.
+# YOU DO NOT NEED TO EDIT ANYTHING.
 #
-# It is the directory your domain or subdomain actually serves. Find it in
-# cPanel under Domains, in the "Document Root" column. It usually looks
-# like one of these:
+# On this account cPanel pulls the repository straight into the folder the
+# domain serves, so there is nothing to copy anywhere — the files are
+# already where Apache reads them. That was confirmed against the live
+# site, which is answering with the .htaccess committed in this
+# repository. So the default below copies nothing, and instead does the
+# step that actually gets forgotten — applying pending database changes.
 #
-#     /home/USERNAME/public_html
-#     /home/USERNAME/public_html/system
-#     /home/USERNAME/system.shanfix.co.ke
-#
-# Replace USERNAME and the folder with yours. Everything else can stay.
+# Only set DEPLOYPATH if your account is arranged the other way, with the
+# repository pulled into one folder and the site served from another. Put
+# the served folder (cPanel, then Domains, then the "Document Root"
+# column) in the quotes on the DEPLOYPATH line, and the files will be
+# copied there.
 # ---------------------------------------------------------------------
 #
-# What this does, in order:
+# What is deliberately never touched, wherever it deploys:
 #
-#   1. Builds the flat package with build-cpanel.php. The repository keeps
-#      index.php inside public/, which expects the document root to point
-#      there. On shared hosting that often cannot be changed, so the flat
-#      build puts index.php at the top instead and protects the folders
-#      that must never be served with .htaccess deny rules.
+#   config/config.php   the live database password
+#   storage/            every upload, backup and log
 #
-#   2. Copies the built files over the live folder.
-#
-#   3. Leaves config/config.php and storage/ alone. Those hold the live
-#      database password and every uploaded file, backup and log — a
-#      deployment that overwrote them would take the site down and lose
-#      the attachments with it.
-#
-# After it runs, open https://your-domain/upgrade.php and apply any
-# pending database changes. New code against an old database is the other
-# way a deployment looks like it did nothing.
+# A deployment that overwrote either would take the site down and lose the
+# attachments with it.
 
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/USERNAME/public_html
+    - export DEPLOYPATH=""
     - export SOURCE=$(pwd)
+    - export PHPBIN=$(command -v php || echo /bin/php)
 
-    # Build the flat package into deploy/ inside the repository.
-    - /bin/php "$SOURCE/build-cpanel.php" || php "$SOURCE/build-cpanel.php"
+    # ---------------------------------------------------------------
+    # 1. Copy the files, if and only if there is somewhere to copy to
+    # ---------------------------------------------------------------
+    # Copying a folder onto itself with --delete would empty it partway
+    # through, taking .git with it and leaving no repository to deploy
+    # from again. Refuse rather than find out.
+    - if [ -n "$DEPLOYPATH" ] && [ "$(cd "$SOURCE" && pwd -P)" = "$(cd "$DEPLOYPATH" 2>/dev/null && pwd -P)" ]; then
+        echo "DEPLOYPATH is the repository folder itself. Leave it empty, because the files are already in place.";
+        exit 1;
+      fi
 
-    # Refuse rather than half-deploy: copying into a folder that does not
-    # exist would scatter files somewhere nobody thinks to look.
-    - /bin/test -d "$DEPLOYPATH" || { echo "DEPLOYPATH does not exist: $DEPLOYPATH — edit .cpanel.yml"; exit 1; }
+    - if [ -n "$DEPLOYPATH" ] && [ ! -d "$DEPLOYPATH" ]; then
+        echo "DEPLOYPATH does not exist, check cPanel > Domains > Document Root. Value was $DEPLOYPATH";
+        exit 1;
+      fi
 
-    # Keep what must survive a deployment.
-    - /bin/mkdir -p "$DEPLOYPATH/config" "$DEPLOYPATH/storage"
-    - /bin/cp -f "$DEPLOYPATH/config/config.php" /tmp/shanfix-config-backup.php 2>/dev/null || true
+    # The repository layout is copied as it stands, with index.php inside
+    # public/ and the .htaccess beside this file handing requests into
+    # it. That is the arrangement the site is verified to run under, so
+    # the deployed copy is the tested copy.
+    - if [ -n "$DEPLOYPATH" ]; then
+        rsync -a --delete
+          --exclude '.git/' --exclude 'deploy/' --exclude 'tests/' --exclude 'node_modules/'
+          --exclude 'storage/' --exclude 'config/config.php'
+          "$SOURCE/" "$DEPLOYPATH/"
+        && echo "Copied the site to $DEPLOYPATH";
+      else
+        export DEPLOYPATH="$SOURCE";
+        echo "Serving straight from the repository folder, nothing to copy.";
+      fi
 
-    # Copy the build over the live folder. storage/ and config/config.php
-    # are excluded, so uploads, backups, logs and the live database
-    # credentials are all left as they are.
-    - /bin/rsync -a --delete
-        --exclude 'storage/'
-        --exclude 'config/config.php'
-        "$SOURCE/deploy/" "$DEPLOYPATH/"
+    # ---------------------------------------------------------------
+    # 2. The folders the application writes to
+    # ---------------------------------------------------------------
+    # On a first deployment these do not exist yet, and uploads then fail
+    # with nothing in the log to say why.
+    - mkdir -p "$DEPLOYPATH/storage/logs" "$DEPLOYPATH/storage/uploads" "$DEPLOYPATH/storage/backups"
+    - chmod -R 755 "$DEPLOYPATH/storage" || true
 
-    # Put the live config back if anything disturbed it.
-    - /bin/test -f "$DEPLOYPATH/config/config.php" || /bin/cp -f /tmp/shanfix-config-backup.php "$DEPLOYPATH/config/config.php" 2>/dev/null || true
+    # ---------------------------------------------------------------
+    # 3. Apply pending database changes
+    # ---------------------------------------------------------------
+    # New code against an old database is the other way a deployment
+    # looks like it did nothing. The pages arrive, and half of them fail
+    # on a column that is not there yet. migrate.php keeps a ledger and
+    # skips what has already run, so this is safe to repeat, and it stops
+    # on the first failure rather than pressing on.
+    - if [ ! -f "$DEPLOYPATH/config/config.php" ]; then
+        echo "There is no config/config.php yet, so the database was left alone. Upload your config and deploy again.";
+      elif "$PHPBIN" "$DEPLOYPATH/migrate.php"; then
+        echo "The database is up to date.";
+      else
+        echo "A migration failed. The files are deployed but the database is behind. Fix the error above and press Update from Remote again.";
+        exit 1;
+      fi
 
-    # The folders the application writes to have to exist and be writable
-    # on a first deployment, or uploads fail with nothing in the log.
-    - /bin/mkdir -p "$DEPLOYPATH/storage/logs" "$DEPLOYPATH/storage/uploads" "$DEPLOYPATH/storage/backups"
-    - /bin/chmod -R 755 "$DEPLOYPATH/storage" || true
-
-    - echo "Deployed to $DEPLOYPATH — now open /upgrade.php to apply any pending database changes."
+    - echo "Deployed."

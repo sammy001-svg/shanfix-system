@@ -85,11 +85,33 @@ SHANFIX_URL=http://localhost:8080 SHANFIX_DB=shanfix_ci ./tests/run.sh
 | `backup_test.sh` | taking a copy, and proving it restores |
 | `portal_test.sh` | the client portal: the three ways in, and what it refuses |
 | `brief_test.sh` | asking a client what they want, and getting it back |
+| `deploy_test.sh` | the address the site answers on, and what a push does |
 
 `crawl.sh` is separate: it walks every GET route in `routes.php` as every
 role and reports anything that is not a page or a redirect. It is looking
 for 500s, so it needs no assertions of its own. Run it after any change
 that touches a view or a controller.
+
+## The one thing these suites cannot check
+
+`deploy_test.sh` reads `.htaccess` and asserts the rules are present. It
+cannot tell you Apache *obeys* them, because the dev server the rest of
+the suites talk to is PHP's, which ignores `.htaccess` entirely. Those
+rules are the only thing standing between the open web and
+`config/config.php`, so read them against a real Apache after any change:
+
+```sh
+# A replica of the served layout, with no per-folder .htaccess at all,
+# so the root rules are on their own.
+RIG=/c/xampp/htdocs/_shanfix_rig
+mkdir -p "$RIG"/{public,app/Core,config,database,storage,.well-known}
+cp .htaccess public/.htaccess "$RIG"/ ...
+```
+
+Point a vhost at it with `AllowOverride All`, then check that
+`/config/config.php`, `/database/seed.sql` and `/.git/config` are all
+refused, that `/upgrade.php` runs, and that `/.well-known/...` is served
+— that last one is certificate renewal, and it fails silently.
 
 ## Writing another one
 

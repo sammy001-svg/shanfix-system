@@ -45,6 +45,41 @@ $flat     = is_file($here . '/index.php') && is_dir($here . '/app');
 $standard = is_dir($here . '/public') && is_file($here . '/public/index.php');
 
 // ---------------------------------------------------------------------
+// The address the site will answer on
+// ---------------------------------------------------------------------
+// In the standard layout the document root is meant to be public/. When
+// it is the folder above instead, the site answers at /public rather than
+// at /, and the .htaccess beside this file is what bridges the two. Both
+// halves of that have gone wrong before and neither announces itself, so
+// they are reported here whether or not anything is broken.
+if ($standard) {
+    $rootIsPublic = realpath($docRoot) !== false
+                 && realpath($here . '/public') === realpath($docRoot);
+
+    check(
+        'Document root points at public/',
+        $rootIsPublic,
+        $rootIsPublic
+            ? ''
+            : 'It points at ' . $docRoot . '. That works — the .htaccess beside this file hands '
+            . 'requests into public/ — but pointing it at public/ instead puts app/, config/ and '
+            . 'storage/ outside the folder Apache serves, where no mistake can reach them.',
+        true
+    );
+
+    if (!$rootIsPublic) {
+        $rootHt = is_file($here . '/.htaccess')
+               && str_contains((string) file_get_contents($here . '/.htaccess'), 'public/$1');
+
+        check(
+            'The .htaccess that bridges / to public/ is in place',
+            $rootHt,
+            $rootHt ? '' : 'Without it the site answers only at /public. The file is in the repository.'
+        );
+    }
+}
+
+// ---------------------------------------------------------------------
 // PHP
 // ---------------------------------------------------------------------
 check('PHP 8.0 or newer', version_compare(PHP_VERSION, '8.0.0', '>='), 'Running ' . PHP_VERSION);
