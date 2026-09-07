@@ -116,6 +116,36 @@ if ($doc && !empty($doc['id'])) {
           <?= nl2br(e($intro)) ?>
         </p>
 
+        <?php // A one-time code, where the message carries one.
+              //
+              // The template said "use the code below" and there was no
+              // code below: every verification email ever sent by the
+              // client portal arrived without the one thing it was for.
+              // Somebody with no phone number on file could not get in at
+              // all. Inline styles and a table, because that is all an
+              // email client can be relied on to render. ?>
+        <?php if (!empty($context['code'])): ?>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="background:#F4F7FA;border:1px solid #DDE4EC;border-radius:6px;margin-bottom:20px">
+            <tr>
+              <td style="padding:18px 16px;text-align:center">
+                <div style="font-size:11px;color:<?= $muted ?>;text-transform:uppercase;letter-spacing:1.5px">
+                  Your code
+                </div>
+                <div style="font-family:'Courier New',Courier,monospace;font-size:32px;font-weight:bold;
+                            letter-spacing:8px;color:<?= $ink ?>;padding:8px 0 2px">
+                  <?= e($context['code']) ?>
+                </div>
+                <?php if (!empty($context['minutes'])): ?>
+                  <div style="font-size:12px;color:<?= $muted ?>">
+                    Good for <?= (int) $context['minutes'] ?> minutes
+                  </div>
+                <?php endif; ?>
+              </td>
+            </tr>
+          </table>
+        <?php endif; ?>
+
         <?php if ($isPaid || $isPartial): ?>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                  style="background:#EDF8F2;border:1px solid #D5EFE0;border-radius:6px;margin-bottom:20px">

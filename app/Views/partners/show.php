@@ -4,6 +4,16 @@ require_once APP_PATH . '/Views/partials/icons.php';
 use App\Core\Auth;
 
 $pending = $partner['status'] === 'pending';
+
+// Only needed for the read-only branch, where there is no picker to
+// read the name off.
+$managerName = $partner['account_manager_id']
+    ? (string) \App\Core\Database::scalar(
+        'SELECT name FROM users WHERE id = :u',
+        ['u' => (int) $partner['account_manager_id']],
+        ''
+      )
+    : '';
 $rateOf  = static fn(float $r): string => rtrim(rtrim(number_format($r, 2), '0'), '.') . '%';
 
 $tone = static fn(string $s): string => match ($s) {
@@ -94,9 +104,125 @@ $tone = static fn(string $s): string => match ($s) {
   </div>
 </div>
 
+<?php // Who looks after them. Shown to everybody, changeable only by
+      // somebody allowed to assign — sales are the contact point, not the
+      // people who decide who the contact point is. ?>
+<div class="card">
+  <div class="card__head"><div class="card__title">Looked after by</div></div>
+  <div class="card__body">
+    <?php if (Auth::can('partners.assign')): ?>
+      <form method="post" action="<?= url('/partners-admin/' . (int) $partner['id'] . '/assign') ?>"
+            class="row-form">
+        <?= csrf_field() ?>
+        <div class="field mb-0 flex-1">
+          <label class="label" for="account_manager_id">Account manager</label>
+          <select class="select" id="account_manager_id" name="account_manager_id">
+            <option value="">Nobody</option>
+            <?php foreach ($managers as $m): ?>
+              <option value="<?= (int) $m['id'] ?>"
+                <?= (int) $partner['account_manager_id'] === (int) $m['id'] ? 'selected' : '' ?>>
+                <?= e($m['name']) ?> (<?= e(label_of((string) $m['role'])) ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <button class="btn btn--outline" type="submit">Save</button>
+      </form>
+      <p class="text-xs text-muted mt-8 mb-0">
+        Their contact point here. Being assigned does not let somebody
+        approve an application, move a rate, pay a commission or register a
+        partner — those stay where they are.
+      </p>
+    <?php else: ?>
+      <p class="text-sm mb-0">
+        <?php if ($partner['account_manager_id']): ?>
+          <strong><?= e($managerName ?: 'Somebody') ?></strong>
+          <?php if ($partner['assigned_at']): ?>
+            <span class="text-muted">since <?= e(fdate($partner['assigned_at'])) ?></span>
+          <?php endif; ?>
+        <?php else: ?>
+          <span class="text-muted">Nobody is looking after this partner yet.</span>
+        <?php endif; ?>
+      </p>
+    <?php endif; ?>
+  </div>
+</div>
+
+<?php // Commission is paid monthly, so the ledger is read monthly. Each
+      // month is settled on its own, which is what lets both sides
+      // reconcile against the same figure afterwards. ?>
+<div class="card">
+  <div class="card__head">
+    <div class="card__title">Month by month</div>
+    <a class="btn btn--ghost btn--sm" href="<?= url('/partners-admin/runs') ?>">
+      <?= icon('calendar') ?> All partners, one month
+    </a>
+  </div>
+  <?php if (!$months): ?>
+    <div class="card__body text-sm text-muted">
+      Nothing earned yet. Commission lands in the month the customer pays us.
+    </div>
+  <?php else: ?>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:150px">Month</th>
+            <th style="width:90px" class="num">Entries</th>
+            <th style="width:140px" class="num">Owed</th>
+            <th style="width:140px" class="num">Paid</th>
+            <th>Reference</th>
+            <?php if (Auth::can('partners.pay')): ?>
+              <th style="width:260px">Settle</th>
+            <?php endif; ?>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($months as $m): ?>
+            <?php $t = strtotime($m['period'] . '-01'); ?>
+            <tr>
+              <td class="fw-600"><?= e($t ? date('F Y', $t) : $m['period']) ?></td>
+              <td class="num text-muted"><?= (int) $m['entries'] ?></td>
+              <td class="num <?= (float) $m['due'] > 0.009 ? 'fw-700' : 'text-muted' ?>">
+                <?= e(money($m['due'], false)) ?>
+              </td>
+              <td class="num text-muted"><?= e(money($m['paid'], false)) ?></td>
+              <td class="text-xs">
+                <?= e($m['payout_ref'] ?: '—') ?>
+                <?php if ($m['paid_at']): ?>
+                  <div class="table__muted"><?= e(fdate($m['paid_at'])) ?></div>
+                <?php endif; ?>
+              </td>
+              <?php if (Auth::can('partners.pay')): ?>
+                <td>
+                  <?php if ((float) $m['due'] > 0.009): ?>
+                    <form method="post"
+                          action="<?= url('/partners-admin/' . (int) $partner['id'] . '/payout') ?>"
+                          class="row-form row-form--tight">
+                      <?= csrf_field() ?>
+                      <input type="hidden" name="period" value="<?= e($m['period']) ?>">
+                      <input class="input input--sm" type="text" name="payout_ref" required
+                             maxlength="80" placeholder="Payment reference"
+                             aria-label="Payment reference for <?= e($m['period']) ?>">
+                      <button class="btn btn--primary btn--sm" type="submit">Paid</button>
+                    </form>
+                  <?php else: ?>
+                    <span class="text-xs text-muted">Settled</span>
+                  <?php endif; ?>
+                </td>
+              <?php endif; ?>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+</div>
+
+
 <?php if (Auth::can('partners.pay') && $summary['due'] > 0.009): ?>
   <div class="card">
-    <div class="card__head"><div class="card__title">Pay what is owed</div></div>
+    <div class="card__head"><div class="card__title">Settle everything outstanding</div></div>
     <div class="card__body">
       <form method="post" action="<?= url('/partners-admin/' . (int) $partner['id'] . '/payout') ?>"
             class="row-form">
@@ -111,8 +237,10 @@ $tone = static fn(string $s): string => match ($s) {
         </button>
       </form>
       <p class="text-xs text-muted mt-8 mb-0">
-        Everything currently owed, in one go. What has already been paid is
-        never touched.
+        Commission is paid monthly, so this is the exception rather than the
+        rule: every month still owed, in one payment, against one reference.
+        Use the month-by-month table above for a normal run. What has
+        already been paid is never touched.
       </p>
     </div>
   </div>
@@ -193,6 +321,127 @@ $tone = static fn(string $s): string => match ($s) {
   </div>
 <?php endif; ?>
 
+<?php // What they actually sell for us, taken from the invoices rather
+      // than from anybody's impression of it. ?>
+<div class="card">
+  <div class="card__head"><div class="card__title">What they are reselling</div></div>
+  <?php if (!$reselling): ?>
+    <div class="card__body text-sm text-muted">
+      Nothing yet. This fills in from invoice lines <strong>picked from the
+      service list</strong>. A line typed in by hand is not linked to a
+      service, so it cannot appear here — and it cannot carry that service's
+      own commission rate either, falling back to the partner's rate
+      instead. The commission is still paid; only the rate differs.
+    </div>
+  <?php else: ?>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th style="width:90px" class="num">Rate</th>
+            <th style="width:110px" class="num">Customers</th>
+            <th style="width:100px" class="num">Invoices</th>
+            <th style="width:140px" class="num">Billed</th>
+            <th style="width:120px">Last sold</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($reselling as $s): ?>
+            <?php $rate = $s['commission_rate'] === null
+                ? (float) $partner['default_rate']
+                : (float) $s['commission_rate']; ?>
+            <tr>
+              <td><a class="table__primary" href="<?= url('/services/' . (int) $s['id']) ?>"><?= e($s['name']) ?></a></td>
+              <td class="num">
+                <?= e($rateOf($rate)) ?>
+                <?php if ($s['commission_rate'] === null): ?>
+                  <div class="table__muted">their rate</div>
+                <?php endif; ?>
+              </td>
+              <td class="num"><?= (int) $s['customers'] ?></td>
+              <td class="num"><?= (int) $s['invoices'] ?></td>
+              <td class="num fw-600"><?= e(money($s['billed'], false)) ?></td>
+              <td class="text-xs text-muted"><?= e(fdate($s['last_sold'])) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+</div>
+
+<?php // The recurring side. A renewal is future commission with a date on
+      // it, which is the most useful thing on this page for whoever looks
+      // after the relationship. ?>
+<div class="card">
+  <div class="card__head"><div class="card__title">Recurring, and when it falls due</div></div>
+  <?php if (!$renewals): ?>
+    <div class="card__body text-sm text-muted">
+      None of their customers is on anything recurring.
+    </div>
+  <?php else: ?>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Customer</th>
+            <th style="width:150px" class="num">Amount</th>
+            <th style="width:130px" class="num">Their cut</th>
+            <th style="width:170px">Next due</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($renewals as $r): ?>
+            <?php
+              $days = $r['days_away'];
+              $late = $days !== null && $days < 0;
+              $soon = $days !== null && $days >= 0 && $days <= 30;
+              $off  = $r['status'] !== 'active';
+            ?>
+            <tr>
+              <td>
+                <span class="fw-600"><?= e($r['name']) ?></span>
+                <?php if ($off): ?>
+                  <span class="badge badge--grey"><?= e(label_of((string) $r['status'])) ?></span>
+                <?php endif; ?>
+              </td>
+              <td>
+                <a class="table__primary" href="<?= url('/clients/' . (int) $r['client_id']) ?>">
+                  <?= e($r['client_name']) ?>
+                </a>
+              </td>
+              <td class="num">
+                <?= e(money($r['amount'], false)) ?>
+                <div class="table__muted"><?= e(\App\Services\Renewals::cyclePhrase($r['billing_cycle'])) ?></div>
+              </td>
+              <td class="num fw-600">
+                <?= e(money($r['expected'], false)) ?>
+                <div class="table__muted"><?= e($rateOf((float) $r['effective_rate'])) ?></div>
+              </td>
+              <td>
+                <?php if ($r['next_renewal_date']): ?>
+                  <?= e(fdate($r['next_renewal_date'])) ?>
+                  <?php if (!$off && $days !== null): ?>
+                    <span class="badge badge--<?= $late ? 'red' : ($soon ? 'amber' : 'green') ?>">
+                      <?= $late
+                        ? abs($days) . 'd overdue'
+                        : ($days === 0 ? 'Today' : 'in ' . $days . 'd') ?>
+                    </span>
+                  <?php endif; ?>
+                <?php else: ?>
+                  <span class="text-muted">No date set</span>
+                <?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+</div>
+
 <div class="card">
   <div class="card__head"><div class="card__title">Their customers</div></div>
   <?php if (!$customers): ?>
@@ -229,7 +478,7 @@ $tone = static fn(string $s): string => match ($s) {
 </div>
 
 <div class="card">
-  <div class="card__head"><div class="card__title">Commission earned</div></div>
+  <div class="card__head"><div class="card__title">Every entry</div></div>
   <?php if (!$commissions): ?>
     <div class="card__body text-sm text-muted">
       Nothing earned yet. Commission appears when one of their customers pays.

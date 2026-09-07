@@ -76,12 +76,23 @@ class Auth
         'letters.view'      => ['admin', 'manager', 'sales', 'finance', 'reception'],
         'letters.manage'    => ['admin', 'manager', 'sales'],
 
-        // Partners and what they are owed. Sales work with them day to day
-        // and finance pay them, so both may look; deciding an application
-        // and moving a rate changes what the business owes, so that is
-        // narrower. Paying a commission out is a finance act.
+        // Partners, and what they are owed.
+        //
+        // Sales are the contact point: they look after the relationship,
+        // answer the partner's questions and see everything about the
+        // account. What they cannot do is bring a partner into existence,
+        // decide an application, move a rate, or pay one — each of those
+        // commits the business to money, and none of them is a
+        // relationship job.
+        //
+        // The split is deliberate rather than one 'partners.manage' doing
+        // all of it, because "look after them" and "commit us to paying
+        // them" are different authorities that happen to touch the same
+        // record.
         'partners.view'     => ['admin', 'manager', 'sales', 'finance'],
+        'partners.create'   => ['admin'],
         'partners.manage'   => ['admin', 'manager'],
+        'partners.assign'   => ['admin', 'manager'],
         'partners.pay'      => ['admin', 'finance'],
 
         'leads.view'        => ['admin', 'manager', 'sales', 'reception', 'staff'],

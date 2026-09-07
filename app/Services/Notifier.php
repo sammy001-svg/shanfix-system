@@ -49,6 +49,17 @@ class Notifier
 
         // Client portal
         'client_otp'          => 'Verification code for the client portal',
+
+        // Partners
+        //
+        // Registered here as well as dispatched, because this list is what
+        // the Settings screen offers to write a template for. An event
+        // missing from it can still be sent — with the event name as the
+        // subject, no body, and no SMS at all, because there is no
+        // template for one.
+        'partner_code'        => 'Verification code for the partner portal',
+        'partner_approved'    => 'Partner application approved',
+        'partner_paid'        => 'Commission paid out to a partner',
     ];
 
     /**
@@ -573,6 +584,18 @@ class Notifier
         if ($template === '') {
             return '';
         }
+
+        // Values that are true of every message, whoever dispatched it.
+        // Eight templates use {company}, and before this it resolved only
+        // on the paths that happened to remember to pass it — the rest
+        // sent "nobody from  will ever ask you for it" and an SMS opening
+        // with a bare colon. A caller that passes its own still wins.
+        $context += [
+            'company'         => Settings::get('company_name', 'Shanfix Technology'),
+            'company_phone'   => Settings::get('company_phone', ''),
+            'company_email'   => Settings::get('company_email', ''),
+            'company_website' => Settings::get('company_website', ''),
+        ];
 
         $out = preg_replace_callback(
             '/\{([a-z_]+)\}/i',

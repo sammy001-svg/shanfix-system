@@ -25,16 +25,35 @@ $tone = static fn(string $s): string => match ($s) {
       People who bring us customers, and what we owe them
     </div>
   </div>
+  <div class="page-head__actions">
+    <a class="btn btn--ghost" href="<?= url('/partners-admin/runs') ?>">
+      <?= icon('calendar') ?> Commission run
+    </a>
+    <?php if (\App\Core\Auth::can('partners.create')): ?>
+      <a class="btn btn--primary" href="<?= url('/partners-admin/new') ?>">
+        <?= icon('user-plus') ?> Register a partner
+      </a>
+    <?php endif; ?>
+  </div>
 </div>
 
 <div class="card">
   <nav class="tabs">
     <?php foreach ($tabs as $k => [$label, $n]): ?>
-      <a class="tab <?= $status === $k ? 'is-active' : '' ?>" href="<?= e($tabUrl($k)) ?>">
+      <a class="tab <?= (!$mine && $status === $k) ? 'is-active' : '' ?>" href="<?= e($tabUrl($k)) ?>">
         <?= e($label) ?>
         <?php if ($n): ?><span class="tab__count"><?= (int) $n ?></span><?php endif; ?>
       </a>
     <?php endforeach; ?>
+
+    <?php // Sales are the contact point for named partners, so "mine" is a
+          // real filter for them rather than a convenience. ?>
+    <a class="tab <?= $mine ? 'is-active' : '' ?>" href="<?= url('/partners-admin?mine=1') ?>">
+      Looked after by me
+      <?php if (!empty($counts['mine'])): ?>
+        <span class="tab__count"><?= (int) $counts['mine'] ?></span>
+      <?php endif; ?>
+    </a>
   </nav>
 </div>
 
@@ -57,6 +76,7 @@ $tone = static fn(string $s): string => match ($s) {
             <th>Partner</th>
             <th style="width:110px">Code</th>
             <th style="width:80px" class="num">Rate</th>
+            <th style="width:150px">Looked after by</th>
             <th style="width:100px" class="num">Customers</th>
             <th style="width:130px" class="num">Owed</th>
             <th style="width:130px" class="num">Paid out</th>
@@ -74,6 +94,13 @@ $tone = static fn(string $s): string => match ($s) {
               </td>
               <td class="text-xs"><?= e($p['partner_code'] ?: '—') ?></td>
               <td class="num"><?= e(rtrim(rtrim(number_format((float) $p['default_rate'], 2), '0'), '.')) ?>%</td>
+              <td class="text-xs">
+                <?php if ($p['manager_name']): ?>
+                  <?= e($p['manager_name']) ?>
+                <?php else: ?>
+                  <span class="text-muted">Nobody</span>
+                <?php endif; ?>
+              </td>
               <td class="num"><?= (int) $p['customers'] ?></td>
               <td class="num <?= (float) $p['due'] > 0.009 ? 'fw-700' : 'text-muted' ?>">
                 <?= e(money($p['due'], false)) ?>

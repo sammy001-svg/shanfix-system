@@ -133,6 +133,10 @@ class Commission
                     'base_amount' => $base,
                     'rate'        => $effectiveRate,
                     'amount'      => $delta,
+                    // The month it was earned in — the month the customer
+                    // paid us — because that is the month we owe it for and
+                    // the month both sides will reconcile against.
+                    'period'      => date('Y-m'),
                     'status'      => 'earned',
                 ]);
 
@@ -306,6 +310,69 @@ class Commission
                 0
             ),
         ];
+    }
+
+    /**
+     * What a partner earned, month by month.
+     *
+     * Commission is paid monthly, so the month is the unit both sides
+     * reconcile in — this is the same grouping the payout run uses and
+     * the one the partner sees, rather than two summaries that can
+     * disagree.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function byMonth(int $partnerId, int $limit = 24): array
+    {
+        return Database::all(
+            "SELECT period,
+                    COALESCE(SUM(CASE WHEN status = 'earned' THEN amount END), 0) AS due,
+                    COALESCE(SUM(CASE WHEN status = 'paid'   THEN amount END), 0) AS paid,
+                    COALESCE(SUM(amount), 0)                                      AS total,
+                    COUNT(*)                                                      AS entries,
+                    MIN(paid_at)                                                  AS paid_at,
+                    MAX(payout_ref)                                               AS payout_ref
+               FROM commissions
+              WHERE partner_id = :p AND status <> 'void' AND period IS NOT NULL
+           GROUP BY period
+           ORDER BY period DESC
+              LIMIT " . max(1, $limit),
+            ['p' => $partnerId]
+        );
+    }
+
+    /**
+     * Everyone owed something for a given month.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function runFor(string $period): array
+    {
+        return Database::all(
+            "SELECT p.id, p.partner_code, p.name, p.company, p.email, p.phone,
+                    p.kra_pin, p.status,
+                    COALESCE(SUM(CASE WHEN cm.status = 'earned' THEN cm.amount END), 0) AS due,
+                    COALESCE(SUM(CASE WHEN cm.status = 'paid'   THEN cm.amount END), 0) AS paid,
+                    COUNT(*)                                                            AS entries
+               FROM commissions cm
+               JOIN partners p ON p.id = cm.partner_id
+              WHERE cm.period = :period AND cm.status <> 'void'
+           GROUP BY p.id, p.partner_code, p.name, p.company, p.email, p.phone, p.kra_pin, p.status
+           ORDER BY due DESC, p.name",
+            ['period' => $period]
+        );
+    }
+
+    /** The months that have any commission in them at all, newest first. */
+    public static function periods(int $limit = 24): array
+    {
+        $rows = Database::all(
+            "SELECT period FROM commissions
+              WHERE status <> 'void' AND period IS NOT NULL
+           GROUP BY period ORDER BY period DESC LIMIT " . max(1, $limit)
+        );
+
+        return array_column($rows, 'period');
     }
 
     /**

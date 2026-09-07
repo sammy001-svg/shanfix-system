@@ -192,6 +192,47 @@ T=$(curl -s -b $SJ -c $SJ "$BASE/notifications" | grep -o 'name="_token" value="
 eq "sales BLOCKED from retry"     "$(curl -s -o /dev/null -w '%{http_code}' -b $SJ -X POST "$BASE/notifications/1/retry" --data "_token=$T")" "403"
 
 echo ""
+echo "=== A one-time code has to actually reach the person ==="
+# The template said "use the code below" and there was no code below: the
+# email carried none. Anybody with no phone number on file could not get
+# into the portal at all, and nothing failed loudly to say so.
+$MYSQL -e "DELETE FROM notifications WHERE recipient IN ('codeprobe@example.test','254712345678');
+           UPDATE settings SET setting_value='1' WHERE setting_key IN ('smtp_enabled','sms_enabled');"
+
+$PHP "$ROOT/tests/helpers/dispatch_codes.php" > /dev/null
+
+for pair in "client_otp 123456" "partner_code 654321"; do
+  set -- $pair
+  eq "the $1 email carries the code" \
+     "$(q "SELECT COUNT(*) FROM notifications WHERE channel='email' AND event='$1' AND body LIKE '%$2%';")" "1"
+  eq "and so does the $1 text" \
+     "$(q "SELECT COUNT(*) FROM notifications WHERE channel='sms' AND event='$1' AND body LIKE '%$2%';")" "1"
+done
+
+# {company} resolved only on the paths that remembered to pass it, so the
+# rest sent "nobody from  will ever ask you" and an SMS opening on a colon.
+eq "no message goes out with an unfilled company" \
+   "$(q "SELECT COUNT(*) FROM notifications
+          WHERE recipient IN ('codeprobe@example.test','254712345678')
+            AND (body LIKE '%{company}%' OR body LIKE '%nobody from  %' OR body LIKE ': your%');")" "0"
+
+$MYSQL -e "DELETE FROM notifications WHERE recipient IN ('codeprobe@example.test','254712345678');"
+
+echo ""
+echo "=== Every event the code sends is an event the system knows ==="
+# An event missing from Notifier::EVENTS still sends — with the raw event
+# name as the subject, an empty body, and no SMS at all, because there is
+# no template for one. Nothing errors, which is why it went unnoticed
+# until somebody read a partner's inbox.
+eq "no event is dispatched without being registered" \
+   "$($PHP "$ROOT/tests/helpers/unregistered_events.php")" ""
+
+# And every registered event has something to say by text.
+eq "every registered event has an SMS template" \
+   "$($PHP "$ROOT/tests/helpers/events_without_sms.php")" ""
+
+
+echo ""
 echo "==================================================="
 printf "  \033[32mPASSED: %d\033[0m   \033[31mFAILED: %d\033[0m\n" "$PASS" "$FAIL"
 echo "==================================================="

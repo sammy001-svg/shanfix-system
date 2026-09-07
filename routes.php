@@ -193,11 +193,18 @@ $r->post('/partners/verify', [PartnerAuthController::class, 'verify'], ['csrf'])
 // Partners, from our side of the desk. Staff routes, staff guard: this is
 // the back office for the portal above, not part of it.
 $r->group(['auth'], function ($r) {
-    $r->get('/partners-admin',                    [PartnerAdminController::class, 'index'],  ['permission:partners.view']);
-    $r->get('/partners-admin/{id}',               [PartnerAdminController::class, 'show'],   ['permission:partners.view']);
-    $r->post('/partners-admin/{id}',              [PartnerAdminController::class, 'update'], ['csrf', 'permission:partners.manage']);
-    $r->post('/partners-admin/{id}/decide',       [PartnerAdminController::class, 'decide'], ['csrf', 'permission:partners.manage']);
-    $r->post('/partners-admin/{id}/payout',       [PartnerAdminController::class, 'payout'], ['csrf', 'permission:partners.pay']);
+    $r->get('/partners-admin',              [PartnerAdminController::class, 'index'],  ['permission:partners.view']);
+
+    // Before the {id} route, or "new" and "runs" are read as partner ids.
+    $r->get('/partners-admin/new',          [PartnerAdminController::class, 'create'],  ['permission:partners.create']);
+    $r->post('/partners-admin/new',         [PartnerAdminController::class, 'store'],   ['csrf', 'permission:partners.create']);
+    $r->get('/partners-admin/runs',         [PartnerAdminController::class, 'run'],     ['permission:partners.view']);
+
+    $r->get('/partners-admin/{id}',         [PartnerAdminController::class, 'show'],    ['permission:partners.view']);
+    $r->post('/partners-admin/{id}',        [PartnerAdminController::class, 'update'],  ['csrf', 'permission:partners.manage']);
+    $r->post('/partners-admin/{id}/decide', [PartnerAdminController::class, 'decide'],  ['csrf', 'permission:partners.manage']);
+    $r->post('/partners-admin/{id}/assign', [PartnerAdminController::class, 'assign'],  ['csrf', 'permission:partners.assign']);
+    $r->post('/partners-admin/{id}/payout', [PartnerAdminController::class, 'payout'],  ['csrf', 'permission:partners.pay']);
 });
 
 $r->group(['partner_auth'], function ($r) {
