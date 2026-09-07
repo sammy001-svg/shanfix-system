@@ -424,7 +424,11 @@ PROF=$(curl -s -b "$D/jar_admin.txt" "$BASE/partners-admin/$PID")
 has "the profile lists what they resell" "$PROF" "What they are reselling"
 has "and what falls due"                 "$PROF" "Recurring, and when it falls due"
 has "and who looks after them"           "$PROF" "Looked after by"
-has "and the months"                     "$PROF" "Month by month"
+
+# The months moved behind their own tab when the page was split up. Read
+# from where they live now rather than deleting the check: the assertion
+# was never about which page it was on.
+has "and the months are a tab away"     "$(curl -s -b "$D/jar_admin.txt" "$BASE/partners-admin/$PID?tab=money")" "Month by month"
 
 $MYSQL -e "DELETE FROM partners WHERE email='$REG';
            DELETE FROM users WHERE email='ptestsales@shanfix.co.ke';"
