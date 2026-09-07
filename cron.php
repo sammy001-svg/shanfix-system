@@ -280,6 +280,77 @@ try {
     }
 
     // -----------------------------------------------------------------
+    // 5b. Remind somebody that the partners need paying
+    // -----------------------------------------------------------------
+    // Commission is paid monthly, which means it is paid by somebody
+    // remembering — and a thing a business owes that depends on somebody
+    // remembering is a thing it eventually forgets. On the payout day,
+    // once, say what is owed and for which month.
+    //
+    // The month named is the one just gone, not the current one: this
+    // month is still being earned, and a run against a moving total is
+    // not a run.
+    $payoutDay = max(1, min(28, Settings::int('partner_payout_day', 5)));
+
+    if (Settings::bool('partners_enabled', true) && (int) date('j') === $payoutDay) {
+        $period = date('Y-m', strtotime('first day of last month'));
+        $owed   = \App\Services\Commission::runFor($period);
+
+        $due = 0.0;
+        foreach ($owed as $row) {
+            $due += (float) $row['due'];
+        }
+
+        // Same lock as the stale-backup warning, and for the same reason:
+        // cron runs every few minutes, and a reminder that arrives every
+        // few minutes is one nobody reads.
+        $alreadySaid = false;
+
+        if ($due > 0.009) {
+            try {
+                Database::run(
+                    'INSERT INTO notification_locks (lock_key) VALUES (:k)',
+                    ['k' => 'partner:payout:' . $period]
+                );
+            } catch (\Throwable) {
+                $alreadySaid = true;
+            }
+        }
+
+        if ($due > 0.009 && !$alreadySaid) {
+            $waiting = count(array_filter(
+                $owed,
+                static fn(array $r): bool => (float) $r['due'] > 0.009
+            ));
+
+            // Nobody can be paid without one, so it is worth saying in the
+            // same breath rather than being found at the moment of paying.
+            $noPin = count(array_filter(
+                $owed,
+                static fn(array $r): bool => (float) $r['due'] > 0.009 && trim((string) $r['kra_pin']) === ''
+            ));
+
+            StaffNotifier::notify(
+                StaffNotifier::withRole(['admin', 'finance']),
+                [
+                    'event' => 'partner_payout_due',
+                    'title' => 'Partner commission is due for ' . date('F Y', strtotime($period . '-01')),
+                    'body'  => money($due) . ' is owed across ' . $waiting . ' partner'
+                             . ($waiting === 1 ? '' : 's') . '.'
+                             . ($noPin > 0
+                                ? ' ' . $noPin . ' of them ' . ($noPin === 1 ? 'has' : 'have')
+                                  . ' no KRA PIN on file and cannot be paid yet.'
+                                : ''),
+                    'link'  => '/partners-admin/runs?period=' . $period,
+                ],
+                ['email' => true, 'sms' => false]
+            );
+
+            say('Partner payout due for ' . $period . ': ' . money($due) . ' across ' . $waiting);
+        }
+    }
+
+    // -----------------------------------------------------------------
     // 6. Housekeeping — weekly-ish, cheap enough to attempt every run
     // -----------------------------------------------------------------
     Database::run('DELETE FROM notification_locks WHERE created_at < DATE_SUB(NOW(), INTERVAL 120 DAY)');

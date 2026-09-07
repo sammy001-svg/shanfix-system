@@ -73,6 +73,8 @@ $brand   = \App\Core\Settings::company();
          href="<?= url('/partners/customers') ?>">Customers</a>
       <a class="portal-nav__link <?= $on('/partners/services') ? 'is-active' : '' ?>"
          href="<?= url('/partners/services') ?>">What we do</a>
+      <a class="portal-nav__link <?= $on('/partners/upcoming') ? 'is-active' : '' ?>"
+         href="<?= url('/partners/upcoming') ?>">What is coming</a>
       <a class="portal-nav__link <?= $on('/partners/refer') ? 'is-active' : '' ?>"
          href="<?= url('/partners/refer') ?>">Introduce someone</a>
     </nav>
@@ -94,6 +96,10 @@ $brand   = \App\Core\Settings::company();
         </button>
         <div class="dropdown__menu dropdown__menu--right">
           <div class="dropdown__label"><?= e($partner['email']) ?></div>
+          <div class="dropdown__divider"></div>
+          <a class="dropdown__item" href="<?= url('/partners/account') ?>">
+            <?= icon('user') ?> Your details
+          </a>
           <div class="dropdown__divider"></div>
           <form method="post" action="<?= url('/partners/logout') ?>">
             <?= csrf_field() ?>

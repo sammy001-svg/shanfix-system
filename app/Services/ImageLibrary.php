@@ -215,6 +215,76 @@ class ImageLibrary
      * If it was the main picture the next one takes over, so a record is
      * never left with photos but nothing chosen to represent it.
      */
+    /**
+     * The picture to lead with, for a whole list at once.
+     *
+     * A catalogue page shows dozens of things; asking for each one's
+     * images in turn is dozens of queries to draw one grid. This is the
+     * same ordering as all() — primary first, then sort order — reduced to
+     * one row per owner.
+     *
+     * @param  list<int> $ownerIds
+     * @return array<int, array<string,mixed>> keyed by owner id
+     */
+    public static function primaryFor(string $kind, array $ownerIds): array
+    {
+        if (!self::isKind($kind) || $ownerIds === []) {
+            return [];
+        }
+
+        $k = self::KINDS[$kind];
+
+        // The ids come from rows we have just selected, never from a
+        // request, but they are cast anyway: this builds an IN list by
+        // hand because PDO cannot bind one.
+        $ids = implode(',', array_map('intval', $ownerIds));
+
+        $rows = Database::all(
+            "SELECT * FROM {$k['table']}
+              WHERE {$k['fk']} IN ({$ids})
+           ORDER BY {$k['fk']}, is_primary DESC, sort_order, id"
+        );
+
+        $out = [];
+
+        foreach ($rows as $row) {
+            $owner = (int) $row[$k['fk']];
+
+            // First one wins, and the ordering above decides which that is.
+            if (!isset($out[$owner])) {
+                $out[$owner] = $row;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * One catalogue image, found by its own id.
+     *
+     * Used by the route that serves these to clients and partners, which
+     * must never be able to name an arbitrary file — only a row in one of
+     * these two tables, belonging to something we are still selling.
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function catalogueImage(string $kind, int $imageId): ?array
+    {
+        if (!self::isKind($kind)) {
+            return null;
+        }
+
+        $k     = self::KINDS[$kind];
+        $owner = $kind === 'service' ? 'services' : 'inventory_items';
+
+        return Database::first(
+            "SELECT i.* FROM {$k['table']} i
+               JOIN {$owner} o ON o.id = i.{$k['fk']}
+              WHERE i.id = :id AND o.is_active = 1",
+            ['id' => $imageId]
+        );
+    }
+
     public static function delete(string $kind, int $ownerId, int $imageId): bool
     {
         $image = self::find($kind, $ownerId, $imageId);

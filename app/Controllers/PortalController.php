@@ -389,6 +389,27 @@ class PortalController extends Controller
               )
             : [];
 
+        // The pictures. /files is behind the staff guard, so until there
+        // was a route for these a client browsing the catalogue saw no
+        // photograph of anything we sell, while the images sat in the
+        // database. One query per kind rather than one per row.
+        $serviceImages = \App\Services\ImageLibrary::primaryFor(
+            'service',
+            array_map(static fn(array $r): int => (int) $r['id'], $services)
+        );
+        $productImages = \App\Services\ImageLibrary::primaryFor(
+            'product',
+            array_map(static fn(array $r): int => (int) $r['id'], $inventory)
+        );
+
+        foreach ($services as $n => $row) {
+            $services[$n]['image'] = $serviceImages[(int) $row['id']] ?? null;
+        }
+
+        foreach ($inventory as $n => $row) {
+            $inventory[$n]['image'] = $productImages[(int) $row['id']] ?? null;
+        }
+
         $this->view('portal/catalogue', [
             'title'      => 'What we do',
             'me'         => ClientAuth::user(),

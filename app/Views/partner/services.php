@@ -1,11 +1,14 @@
 <?php
 /**
- * What we do, and what each of them pays.
+ * What we do, as a catalogue a partner can sell from.
  *
- * The catalogue a partner sells from, with their own cut against every
- * line — the whole reason they are looking at it. The rate shown is the
- * one the ledger will actually use, worked out in the controller by the
- * same rule.
+ * Cards with pictures rather than a list of names, because this is the
+ * page somebody opens in front of a customer. Services and products
+ * together, since a partner sells both and does not think of them as two
+ * different systems.
+ *
+ * Every card carries what the partner earns on it, which is the whole
+ * reason they are looking rather than reading the client-facing one.
  */
 require_once APP_PATH . '/Views/partials/icons.php';
 
@@ -18,7 +21,7 @@ $priceLabel = static function (array $s): string {
 
     $amount = money($s['price'], false);
 
-    return match ($s['pricing_type']) {
+    return match ($s['pricing_type'] ?? 'fixed') {
         'hourly'  => $amount . ' / hour',
         'daily'   => $amount . ' / day',
         'monthly' => $amount . ' / month',
@@ -26,6 +29,57 @@ $priceLabel = static function (array $s): string {
         'project' => $amount . ' / project',
         default   => $amount,
     };
+};
+
+/** One card, whether it is something we do or something we sell. */
+$card = static function (array $it) use ($rateOf, $priceLabel): void {
+    $img = $it['image'] ?? null;
+    ?>
+    <article class="cat-card cat-card--<?= e($it['kind']) ?> <?= $img ? '' : 'cat-card--nopic' ?>">
+      <div class="cat-card__figure">
+        <?php if ($img): ?>
+          <img src="<?= url('/catalogue/image/' . e($it['kind']) . '/' . (int) $img['id']) ?>?size=thumb"
+               alt="<?= e($img['alt_text'] ?: $it['name']) ?>" loading="lazy">
+        <?php else: ?>
+          <?php // No picture is a normal state, not a broken one — a great
+                // many services never have one. A mark beats a grey box
+                // with a torn-image icon in it. ?>
+          <span class="cat-card__mark">
+            <?= icon($it['kind'] === 'service' ? 'layers' : 'package') ?>
+          </span>
+        <?php endif; ?>
+
+        <span class="cat-card__kind">
+          <?= $it['kind'] === 'service' ? 'Service' : 'Product' ?>
+        </span>
+      </div>
+
+      <div class="cat-card__body">
+        <h3 class="cat-card__name"><?= e($it['name']) ?></h3>
+
+        <?php if (!empty($it['description'])): ?>
+          <p class="cat-card__desc"><?= e(str_excerpt((string) $it['description'], 96)) ?></p>
+        <?php endif; ?>
+
+        <?php if (!empty($it['lead_time'])): ?>
+          <p class="cat-card__lead"><?= icon('clock') ?> <?= e($it['lead_time']) ?></p>
+        <?php endif; ?>
+      </div>
+
+      <footer class="cat-card__foot">
+        <span class="cat-card__price"><?= e($priceLabel($it)) ?></span>
+
+        <span class="cat-card__cut">
+          <?php if ($it['your_cut'] !== null): ?>
+            you earn <strong><?= e(money($it['your_cut'], false)) ?></strong>
+            <span class="text-muted">(<?= e($rateOf((float) $it['effective_rate'])) ?>)</span>
+          <?php else: ?>
+            <?= e($rateOf((float) $it['effective_rate'])) ?> of what we quote
+          <?php endif; ?>
+        </span>
+      </footer>
+    </article>
+    <?php
 };
 ?>
 
@@ -35,7 +89,7 @@ $priceLabel = static function (array $s): string {
     <p class="portal-lede">
       Everything we sell, and what each one earns you. Your rate is
       <strong><?= e($rateOf((float) $me['default_rate'])) ?></strong> unless
-      the service carries its own.
+      a service carries its own.
     </p>
   </div>
 
@@ -45,7 +99,7 @@ $priceLabel = static function (array $s): string {
            data-debounce-submit>
   </form>
 
-  <?php if (!$rows): ?>
+  <?php if (!$services && !$products): ?>
     <div class="portal-card portal-empty">
       <span class="portal-empty__icon"><?= icon('package') ?></span>
       <div class="portal-empty__title">
@@ -58,41 +112,27 @@ $priceLabel = static function (array $s): string {
       </p>
     </div>
   <?php else: ?>
-    <div class="portal-card portal-card--flush">
-      <ul class="portal-list">
-        <?php foreach ($rows as $s): ?>
-          <li>
-            <span class="portal-list__row">
-              <span class="portal-list__main">
-                <span class="portal-list__title"><?= e($s['name']) ?></span>
-                <?php if ($s['description']): ?>
-                  <span class="portal-list__meta"><?= e(str_excerpt($s['description'], 110)) ?></span>
-                <?php endif; ?>
-                <?php if ($s['lead_time']): ?>
-                  <span class="portal-list__meta">
-                    <?= icon('clock') ?> <?= e($s['lead_time']) ?>
-                  </span>
-                <?php endif; ?>
-              </span>
 
-              <span class="portal-list__side">
-                <span class="portal-list__figures">
-                  <span class="portal-list__amount"><?= e($priceLabel($s)) ?></span>
-                  <span class="partner-cut">
-                    <?php if ($s['your_cut'] !== null): ?>
-                      you earn <strong><?= e(money($s['your_cut'], false)) ?></strong>
-                      <span class="text-muted">(<?= e($rateOf((float) $s['effective_rate'])) ?>)</span>
-                    <?php else: ?>
-                      <?= e($rateOf((float) $s['effective_rate'])) ?> of what we quote
-                    <?php endif; ?>
-                  </span>
-                </span>
-              </span>
-            </span>
-          </li>
-        <?php endforeach; ?>
-      </ul>
-    </div>
+    <?php if ($services): ?>
+      <h2 class="cat-heading">Services <span><?= count($services) ?></span></h2>
+      <div class="cat-grid">
+        <?php foreach ($services as $s): ?><?php $card($s); ?><?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($products): ?>
+      <h2 class="cat-heading">Products <span><?= count($products) ?></span></h2>
+      <div class="cat-grid">
+        <?php foreach ($products as $p): ?><?php $card($p); ?><?php endforeach; ?>
+      </div>
+
+      <?php // Products carry no rate of their own, so they always pay the
+            // partner's. Said once here rather than repeated on every card. ?>
+      <p class="text-xs text-muted mt-8">
+        Products pay your own rate of <?= e($rateOf((float) $me['default_rate'])) ?>.
+        Only services can carry a rate of their own.
+      </p>
+    <?php endif; ?>
   <?php endif; ?>
 
   <p class="portal-help">

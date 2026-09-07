@@ -43,6 +43,42 @@ $tabUrl = static fn(string $k): string =>
     </div>
   </div>
 
+  <?php // The terms say they invoice us monthly, so each month needs to be
+        // something they can actually put in front of their accountant. ?>
+  <?php if (!empty($months)): ?>
+    <div class="portal-card portal-card--flush mb-16">
+      <header class="portal-card__head">
+        <h2 class="portal-card__title">By month</h2>
+        <span class="text-xs text-muted">We pay monthly against your invoice</span>
+      </header>
+      <ul class="portal-list portal-list--tight">
+        <?php foreach ($months as $m): ?>
+          <?php $mt = strtotime($m['period'] . '-01'); ?>
+          <li>
+            <a class="portal-list__row" href="<?= url('/partners/statement/' . e($m['period'])) ?>">
+              <span class="portal-list__main">
+                <span class="portal-list__title"><?= e($mt ? date('F Y', $mt) : $m['period']) ?></span>
+                <span class="portal-list__meta">
+                  <?= (int) $m['entries'] ?> entr<?= (int) $m['entries'] === 1 ? 'y' : 'ies' ?>
+                  <?php if ((float) $m['due'] > 0.009): ?>
+                    &middot; <?= e(money($m['due'], false)) ?> still to come
+                  <?php endif; ?>
+                </span>
+              </span>
+              <span class="portal-list__side">
+                <span class="portal-list__amount"><?= e(money($m['total'], false)) ?></span>
+                <span class="badge badge--<?= (float) $m['due'] > 0.009 ? 'amber' : 'green' ?>">
+                  <?= (float) $m['due'] > 0.009 ? 'Owed to you' : 'Paid out' ?>
+                </span>
+                <span class="portal-list__chev"><?= icon('chevron-right') ?></span>
+              </span>
+            </a>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    </div>
+  <?php endif; ?>
+
   <nav class="portal-tabs" aria-label="Filter">
     <?php foreach ($tabs as $key => $label): ?>
       <a class="portal-tab <?= $show === $key ? 'is-active' : '' ?>" href="<?= e($tabUrl($key)) ?>">

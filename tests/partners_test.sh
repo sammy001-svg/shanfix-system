@@ -430,6 +430,180 @@ $MYSQL -e "DELETE FROM partners WHERE email='$REG';
            DELETE FROM users WHERE email='ptestsales@shanfix.co.ke';"
 
 echo ""
+echo "=== 20. A partner can supply what we need to pay them ==="
+# The commission run refuses to pay a partner with no KRA PIN, and until
+# now the only person who could supply one was a member of staff typing it
+# in off a phone call. The person who actually knows it had no way to say.
+# Section 13 suspended them to prove the door shuts, and a suspended
+# partner cannot sign in — which is the point of it. Let them back in, or
+# everything below fails for want of a session rather than for want of the
+# thing it is meant to be testing.
+$MYSQL -e "UPDATE partners SET status='active', kra_pin=NULL WHERE id = $PID;"
+
+rm -f "$TJ"
+tpost /partners/login --data-urlencode "_token=$(ttok /partners/login)" \
+  --data-urlencode "email=$PEMAIL" --data-urlencode "password=$PPASS" > /dev/null
+
+eq "their own details open" "$(tcode /partners/account)" "200"
+has "and say what is missing" "$(tget /partners/account)" "before we can pay you"
+
+tpost /partners/account \
+  --data-urlencode "_token=$(ttok /partners/account)" \
+  --data-urlencode "name=Partner Tester" \
+  --data-urlencode "company=Tester Agencies" \
+  --data-urlencode "phone=0733111222" \
+  --data-urlencode "kra_pin=a012345678z" > /dev/null
+
+eq "the PIN is stored"     "$(q "SELECT kra_pin FROM partners WHERE id=$PID;")" "A012345678Z"
+eq "and it is upper-cased" "$(q "SELECT IF(kra_pin = UPPER(kra_pin),'yes','no') FROM partners WHERE id=$PID;")" "yes"
+
+# What they may not change from in here: the address they sign in with and
+# the rate we agreed to pay. Posting them anyway must do nothing.
+tpost /partners/account \
+  --data-urlencode "_token=$(ttok /partners/account)" \
+  --data-urlencode "name=Partner Tester" --data-urlencode "phone=0733111222" \
+  --data-urlencode "email=hijack@example.co.ke" \
+  --data-urlencode "default_rate=95" > /dev/null
+
+eq "they cannot move their own rate"  "$(q "SELECT default_rate FROM partners WHERE id=$PID;")" "10.00"
+eq "nor change what they sign in as"  "$(q "SELECT email FROM partners WHERE id=$PID;")" "$PEMAIL"
+
+echo ""
+echo "=== 21. And change their own password ==="
+NEWPASS="partner2026changed"
+
+# The wrong current password must not be enough.
+tpost /partners/account/password \
+  --data-urlencode "_token=$(ttok /partners/account)" \
+  --data-urlencode "current_password=not-the-one" \
+  --data-urlencode "new_password=$NEWPASS" \
+  --data-urlencode "new_password_confirm=$NEWPASS" > /dev/null
+
+rm -f "$TJ"
+eq "the old password still works" \
+   "$(tpost /partners/login --data-urlencode "_token=$(ttok /partners/login)" \
+        --data-urlencode "email=$PEMAIL" --data-urlencode "password=$PPASS")" "302"
+eq "and they are in"  "$(tcode /partners)" "200"
+
+tpost /partners/account/password \
+  --data-urlencode "_token=$(ttok /partners/account)" \
+  --data-urlencode "current_password=$PPASS" \
+  --data-urlencode "new_password=$NEWPASS" \
+  --data-urlencode "new_password_confirm=$NEWPASS" > /dev/null
+
+rm -f "$TJ"
+eq "the new password works" \
+   "$(tpost /partners/login --data-urlencode "_token=$(ttok /partners/login)" \
+        --data-urlencode "email=$PEMAIL" --data-urlencode "password=$NEWPASS")" "302"
+eq "and lets them in" "$(tcode /partners)" "200"
+
+rm -f "$TJ"
+tpost /partners/login --data-urlencode "_token=$(ttok /partners/login)" \
+  --data-urlencode "email=$PEMAIL" --data-urlencode "password=$PPASS" > /dev/null
+ne "the old one no longer does" "$(tcode /partners)" "200"
+
+# Back in, on the new password, for the sections below.
+rm -f "$TJ"
+tpost /partners/login --data-urlencode "_token=$(ttok /partners/login)" \
+  --data-urlencode "email=$PEMAIL" --data-urlencode "password=$NEWPASS" > /dev/null
+
+echo ""
+echo "=== 22. A month they can invoice us against ==="
+# The terms a partner agrees to say they are paid monthly against an
+# invoice from them, so they need something to invoice against.
+PERIOD=$(q "SELECT period FROM commissions WHERE partner_id=$PID AND status<>'void' ORDER BY id LIMIT 1;")
+eq "the month opens"  "$(tcode "/partners/statement/$PERIOD")" "200"
+
+STMT=$(tget "/partners/statement/$PERIOD")
+has "it names the month"        "$STMT" "$(q "SELECT DATE_FORMAT(CONCAT('$PERIOD','-01'),'%M %Y');")"
+has "and carries our letterhead" "$STMT" "$(q "SELECT setting_value FROM settings WHERE setting_key='company_name';")"
+has "and their reference"        "$STMT" "$(q "SELECT partner_code FROM partners WHERE id=$PID;")"
+has "and totals what is due"     "$STMT" "Due to you"
+
+# The total on the statement is the sum of that month, not of everything.
+MONTHTOTAL=$(q "SELECT FORMAT(COALESCE(SUM(amount),0),2) FROM commissions
+                 WHERE partner_id=$PID AND period='$PERIOD' AND status<>'void';")
+has "and the figure is that month's" "$STMT" "$MONTHTOTAL"
+
+# A period is read from the URL, so it has to be a period.
+eq "a month that is not one is refused" "$(tcode /partners/statement/nonsense)" "404"
+eq "and a month with nothing in it too" "$(tcode /partners/statement/1999-01)" "404"
+
+# Two rows per entry would satisfy a "more than none" check while showing
+# somebody else's money, so the count is asserted exactly. The row index
+# cell appears once per line, plus once in the header.
+MINE=$(q "SELECT COUNT(*) FROM commissions WHERE partner_id=$PID AND period='$PERIOD' AND status<>'void';")
+eq "it lists exactly their own entries"    "$(tget "/partners/statement/$PERIOD" | grep -c 'doc-table__idx')" "$((MINE + 1))"
+
+echo ""
+echo "=== 23. What is coming, with a date on it ==="
+eq "the renewals page opens" "$(tcode /partners/upcoming)" "200"
+
+echo ""
+echo "=== 24. Somebody is reminded to pay them ==="
+# Commission paid monthly is commission paid by somebody remembering, and
+# a debt that depends on somebody remembering is one a business forgets.
+PAYDAY=$(q "SELECT setting_value FROM settings WHERE setting_key='partner_payout_day';")
+ne "the payout day is configured" "$PAYDAY" ""
+eq "and the cron reads it"        "$(grep -c 'partner_payout_day' "$SHANFIX_ROOT/cron.php")" "1"
+eq "and only says so once a month" \
+   "$(grep -c "partner:payout:" "$SHANFIX_ROOT/cron.php")" "1"
+
+echo ""
+echo "=== 25. What we do, with pictures ==="
+# /files is behind the staff guard, which is right for receipts and wrong
+# for photographs of what we sell: a partner and a client both saw nothing
+# at all while the pictures sat in the database.
+CAT=$(tget /partners/services)
+has "services are shown as cards" "$CAT" "cat-card--service"
+has "and so are products"        "$CAT" "cat-card--product"
+
+# Both kinds, and all of each: a catalogue missing half of itself is worse
+# than one that says it is empty. Counted on the class rather than the
+# visible word, which CSS upper-cases and the markup wraps in newlines.
+eq "every active service has a card"    "$(echo "$CAT" | grep -c 'cat-card--service')"    "$(q "SELECT COUNT(*) FROM services WHERE is_active=1;")"
+eq "and every active product"    "$(echo "$CAT" | grep -c 'cat-card--product')"    "$(q "SELECT COUNT(*) FROM inventory_items WHERE is_active=1;")"
+
+# The card has to say what it earns them, which is the whole reason a
+# partner is reading this rather than the client-facing one.
+has "each card says what it pays" "$CAT" "you earn"
+
+echo ""
+echo "=== 26. A catalogue picture is served, and only that ==="
+IMGID=$(q "SELECT i.id FROM inventory_images i JOIN inventory_items o ON o.id=i.item_id
+            WHERE o.is_active=1 ORDER BY i.id LIMIT 1;")
+
+if [ -n "$IMGID" ]; then
+  eq "the picture is served to them" \
+     "$(curl -s -o /dev/null -w '%{http_code}' -b "$TJ" "$BASE/catalogue/image/product/$IMGID")" "200"
+  eq "and it really is an image" \
+     "$(curl -s -o /dev/null -w '%{content_type}' -b "$TJ" "$BASE/catalogue/image/product/$IMGID" | cut -d/ -f1)" "image"
+
+  # Signed out it is nothing at all. The picture should be no more public
+  # than the page that shows it.
+  eq "a stranger gets nothing" \
+     "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/catalogue/image/product/$IMGID")" "404"
+
+  # The route takes an image row id, never a path. There is no way through
+  # it to the rest of storage.
+  eq "it cannot be pointed at another file" \
+     "$(curl -s -o /dev/null -w '%{http_code}' -b "$TJ" "$BASE/catalogue/image/product/0")" "404"
+  eq "nor at a kind that does not exist" \
+     "$(curl -s -o /dev/null -w '%{http_code}' -b "$TJ" "$BASE/catalogue/image/receipts/$IMGID")" "404"
+
+  # Switching a product off takes its picture with it.
+  ITEM=$(q "SELECT item_id FROM inventory_images WHERE id=$IMGID;")
+  $MYSQL -e "UPDATE inventory_items SET is_active=0 WHERE id=$ITEM;"
+  eq "and not at something we no longer sell" \
+     "$(curl -s -o /dev/null -w '%{http_code}' -b "$TJ" "$BASE/catalogue/image/product/$IMGID")" "404"
+  $MYSQL -e "UPDATE inventory_items SET is_active=1 WHERE id=$ITEM;"
+fi
+
+# Staff keep their own route; this one does not replace it.
+eq "the staff file route still needs staff" \
+   "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/files/uploads/products/nothing.png")" "302"
+
+echo ""
 echo "=== 14. Tidy up ==="
 scrub
 restore_settings

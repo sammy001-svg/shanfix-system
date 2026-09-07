@@ -153,6 +153,65 @@ $r->post('/brief/{token}', [PublicJobRequestController::class, 'submit'], ['csrf
 $r->get('/b/{token}', [PublicJobRequestController::class, 'show']);
 
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Catalogue pictures
+// ---------------------------------------------------------------------
+// /files is behind the staff guard, which is right for receipts and
+// artwork and wrong for the photographs of what we sell: it meant a
+// client browsing the catalogue and a partner browsing what they resell
+// both saw nothing at all, while the pictures sat in the database.
+//
+// This route cannot name a file. It takes an image row's own id, looks it
+// up in one of the two catalogue image tables, and refuses unless the
+// thing it belongs to is still active. There is no path from here to the
+// rest of storage.
+//
+// Signed in as any of the three, because the picture should be no more
+// public than the page that shows it.
+$r->get('/catalogue/image/{kind}/{id}', function (Request $request) {
+    if (!\App\Core\Auth::check() && !\App\Core\ClientAuth::check() && !\App\Core\PartnerAuth::check()) {
+        throw new \App\Core\HttpException(404, 'Not found.');
+    }
+
+    $kind  = (string) $request->param('kind');
+    $image = \App\Services\ImageLibrary::catalogueImage($kind, $request->paramInt('id'));
+
+    if (!$image) {
+        throw new \App\Core\HttpException(404, 'Not found.');
+    }
+
+    // A card wants the thumbnail; a lightbox wants the picture.
+    $wantThumb = $request->query('size') === 'thumb' && !empty($image['thumb_path']);
+    $relative  = (string) ($wantThumb ? $image['thumb_path'] : $image['file_path']);
+
+    $full = realpath(STORAGE_PATH . '/' . $relative);
+    $root = realpath(STORAGE_PATH . '/uploads');
+
+    if (!$full || !$root || !str_starts_with($full, $root) || !is_file($full)) {
+        throw new \App\Core\HttpException(404, 'Not found.');
+    }
+
+    $mime = 'image/jpeg';
+
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $full) ?: $mime;
+        finfo_close($finfo);
+    }
+
+    // Only ever a picture, whatever ended up on disk under that row.
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+        throw new \App\Core\HttpException(404, 'Not found.');
+    }
+
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($full));
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: private, max-age=86400');
+    readfile($full);
+    exit;
+});
+
 // The client portal
 // ---------------------------------------------------------------------
 // A second application with its own guard. 'client_auth' is not 'auth':
@@ -212,8 +271,20 @@ $r->group(['partner_auth'], function ($r) {
     $r->get('/partners/earnings',    [PartnerController::class, 'commissions']);
     $r->get('/partners/customers',   [PartnerController::class, 'customers']);
     $r->get('/partners/services',    [PartnerController::class, 'services']);
+    $r->get('/partners/upcoming',    [PartnerController::class, 'upcoming']);
     $r->get('/partners/refer',       [PartnerController::class, 'showRefer']);
     $r->post('/partners/refer',      [PartnerController::class, 'refer'], ['csrf']);
+
+    // Their own details. The commission run refuses to pay a partner with
+    // no KRA PIN, and this is the only place the person who knows it can
+    // put it in.
+    $r->get('/partners/account',          [PartnerController::class, 'account']);
+    $r->post('/partners/account',         [PartnerController::class, 'updateAccount'], ['csrf']);
+    $r->post('/partners/account/password',[PartnerController::class, 'changePassword'], ['csrf']);
+
+    // A month set out so they can invoice us against it, which is what the
+    // terms they agreed to actually say happens.
+    $r->get('/partners/statement/{period}', [PartnerController::class, 'statement']);
 });
 
 $r->group(['client_auth'], function ($r) {

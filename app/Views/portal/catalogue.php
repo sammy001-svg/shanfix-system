@@ -61,6 +61,11 @@ $priceLabel = static function (array $s): string {
           <?php foreach ($services as $s): ?>
             <label class="portal-cat__item">
               <input type="checkbox" name="items[]" value="service:<?= (int) $s['id'] ?>">
+              <?php if (!empty($s['image'])): ?>
+                <img class="portal-cat__thumb"
+                     src="<?= url('/catalogue/image/service/' . (int) $s['image']['id']) ?>?size=thumb"
+                     alt="" loading="lazy">
+              <?php endif; ?>
               <span class="portal-cat__body">
                 <span class="portal-cat__name"><?= e($s['name']) ?></span>
                 <?php if ($s['description']): ?>
@@ -84,6 +89,11 @@ $priceLabel = static function (array $s): string {
           <?php foreach ($inventory as $it): ?>
             <label class="portal-cat__item">
               <input type="checkbox" name="items[]" value="inventory:<?= (int) $it['id'] ?>">
+              <?php if (!empty($it['image'])): ?>
+                <img class="portal-cat__thumb"
+                     src="<?= url('/catalogue/image/product/' . (int) $it['image']['id']) ?>?size=thumb"
+                     alt="" loading="lazy">
+              <?php endif; ?>
               <span class="portal-cat__body">
                 <span class="portal-cat__name"><?= e($it['name']) ?></span>
                 <?php if ($it['description']): ?>
