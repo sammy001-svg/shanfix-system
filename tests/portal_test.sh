@@ -470,6 +470,21 @@ ne "and they are not the same label"    "$(echo "$STAFF" | grep -c 'login__kind-
 # page rather than a sign-in one.
 eq "no app chrome before signing in" "$(echo "$PORTAL" | grep -c 'portal-nav')" "0"
 
+# The sign-in ground. A background photograph left at full strength pulled
+# the page to rgb(73,89,110) — pale slate rather than navy — which took the
+# brand colour with it and dropped the tagline to 2.85:1 against its own
+# background, well under the 4.5:1 minimum. Darkening and draining the
+# photograph first put it at 5.75:1 and made the page navy again. Both
+# halves of that treatment have to stay, or the page silently goes pale the
+# next time somebody uploads a bright picture.
+CSS=$(curl -s "$BASE/assets/css/app.css")
+has "the photograph is darkened"  "$CSS" "filter: saturate(.45) brightness(.34)"
+has "and a flat navy sits over it" "$CSS" "background: rgba(8, 32, 58, .82)"
+
+# The card was darker than the ground behind it, which reads as a hole in
+# the page rather than a panel on it.
+has "the card sits above the ground" "$CSS" "background: var(--surface-2)"
+
 # Every one of those has to actually go somewhere.
 for path in /login /portal/login /portal/start /portal/request-access; do
   eq "$path resolves" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE$path")" "200"
