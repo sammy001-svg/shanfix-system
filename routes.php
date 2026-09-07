@@ -28,6 +28,8 @@ use App\Controllers\JobFileController;
 use App\Controllers\LeadController;
 use App\Controllers\MeetingController;
 use App\Controllers\NotificationController;
+use App\Controllers\PartnerAuthController;
+use App\Controllers\PartnerController;
 use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
