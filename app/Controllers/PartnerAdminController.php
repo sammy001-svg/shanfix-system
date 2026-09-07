@@ -169,8 +169,17 @@ class PartnerAdminController extends Controller
                 : null;
         }
 
+        // Nine full-width cards down one page put an approval decision, a
+        // payment, an edit form and four tables at the same weight, and
+        // made anybody looking for one of them scroll past the other
+        // eight. Tabs in the URL rather than in JavaScript, so each one is
+        // a link somebody can send.
+        $tab = (string) $request->query('tab', '');
+        $tab = in_array($tab, ['money', 'customers', 'entries', 'details'], true) ? $tab : 'overview';
+
         $this->view('partners/show', [
             'title'       => $partner['name'],
+            'tab'         => $tab,
             'partner'     => $partner,
             'summary'     => Commission::summaryFor((int) $partner['id']),
             'customers'   => $customers,

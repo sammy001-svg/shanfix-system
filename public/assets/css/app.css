@@ -935,7 +935,13 @@ fieldset:last-of-type { margin-bottom: 0; }
   display: flex;
   gap: 2px;
   border-bottom: 1px solid var(--border);
+  /* Sideways only, and without the bar: overflow-x on its own lets a
+     vertical scrollbar appear inside a strip one row tall, which reads as
+     a rendering fault rather than as something to scroll. */
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   background: var(--surface);
   padding: 0 18px;
 }
@@ -949,6 +955,8 @@ fieldset:last-of-type { margin-bottom: 0; }
   white-space: nowrap;
   display: flex; align-items: center; gap: 7px;
 }
+.tabs::-webkit-scrollbar { display: none; }
+
 .tab:hover { color: var(--on-navy); text-decoration: none; }
 .tab.is-active { color: var(--on-green); border-bottom-color: var(--green-600); font-weight: 650; }
 .tab__count {
@@ -4424,6 +4432,61 @@ a.portal-list__row:hover { background: var(--surface-2); }
 /* The client's catalogue stays a list, because ticking several things
    and asking about them together is the point of it. A thumbnail is
    what it was missing, not a different layout. */
+/* -- One partner, at the top of their page -----------------------------
+   Who they are on the left, what we owe them on the right, and nothing
+   else competing with either. Everything below this is behind a tab. */
+.partner-head {
+  display: grid;
+  gap: 20px 32px;
+  padding: 22px 24px;
+}
+@media (min-width: 900px) {
+  .partner-head { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+}
+
+.partner-head__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.partner-head__name h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 680;
+  letter-spacing: -.02em;
+}
+
+/* Two columns of label-and-value, so the facts read as a block rather
+   than a paragraph somebody has to pick apart. */
+.partner-head__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 13.5px;
+  align-items: baseline;
+}
+.partner-head__facts dt {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+  white-space: nowrap;
+}
+.partner-head__facts dd { margin: 0; color: var(--ink); }
+
+.partner-head__money {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 10px;
+}
+@media (min-width: 900px) {
+  .partner-head__money { grid-template-columns: repeat(3, 150px); }
+}
+
 .portal-cat__thumb {
   width: 46px; height: 46px;
   flex: 0 0 46px;

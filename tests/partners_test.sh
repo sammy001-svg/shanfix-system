@@ -604,6 +604,83 @@ eq "the staff file route still needs staff" \
    "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/files/uploads/products/nothing.png")" "302"
 
 echo ""
+echo "=== 27. A partner's page is read one part at a time ==="
+# Nine full-width cards down one page put an approval decision, a payment,
+# an edit form and four tables at the same weight. Each part is now behind
+# a tab, and the tab is in the URL so it can be sent to somebody.
+signin_admin > /dev/null
+AJ="$D/jar_admin.txt"
+
+OVER=$(curl -s -b "$AJ" "$BASE/partners-admin/$PID")
+# Read from the row rather than hard-coded: this suite makes its own
+# partner, and a name borrowed from somebody's preview data passes
+# or fails on whether that data happens to be lying about.
+has "the header names them"        "$OVER" "$(q "SELECT COALESCE(company, name) FROM partners WHERE id=$PID;")"
+has "and says what we owe"         "$OVER" "Owed to them"
+has "and who looks after them"     "$OVER" "Looked after by"
+
+# Overview is what the relationship is: what they sell and what renews.
+has "overview shows what they sell" "$OVER" "What they are reselling"
+has "and what falls due"            "$OVER" "Recurring, and when it falls due"
+
+# And only that. The whole point is that the other parts are not also here.
+eq "the edit form is not on it"     "$(echo "$OVER" | grep -c 'name="default_rate"')" "0"
+eq "nor the month-by-month table"   "$(echo "$OVER" | grep -c 'Month by month')" "0"
+
+MONEY=$(curl -s -b "$AJ" "$BASE/partners-admin/$PID?tab=money")
+has "the money tab has the months"  "$MONEY" "Month by month"
+# The way to settle everything only appears when there is something to
+# settle — by this point the suite has already paid this partner out, so
+# asserting it unconditionally asserts the wrong thing.
+DUE_NOW=$(q "SELECT COALESCE(SUM(amount),0) FROM commissions WHERE partner_id=$PID AND status='earned';")
+if [ "${DUE_NOW%%.*}" -gt 0 ] 2>/dev/null; then
+  has "and the way to settle the lot" "$MONEY" "Settle everything outstanding"
+else
+  eq "and no way to settle nothing" "$(echo "$MONEY" | grep -c 'Settle everything outstanding')" "0"
+fi
+eq "and not the customers table"    "$(echo "$MONEY" | grep -c 'Their customers')" "0"
+
+DET=$(curl -s -b "$AJ" "$BASE/partners-admin/$PID?tab=details")
+has "the details tab can edit them" "$DET" 'name="default_rate"'
+has "and assign somebody"           "$DET" 'name="account_manager_id"'
+
+CUST=$(curl -s -b "$AJ" "$BASE/partners-admin/$PID?tab=customers")
+has "the customers tab lists them"  "$CUST" "Their customers"
+
+# A tab nobody defined falls back to the overview rather than to a blank
+# page, because the value comes from the URL.
+has "an unknown tab falls back" \
+    "$(curl -s -b "$AJ" "$BASE/partners-admin/$PID?tab=nonsense")" "What they are reselling"
+
+echo ""
+echo "=== 28. Sales are not offered what they cannot do ==="
+# Sales look after the relationship and may read all of it. Offering them
+# an edit form that refuses on submit is worse than not offering it.
+SP='PtestSales2@2026'
+SH=$($PHP -r 'echo password_hash($argv[1], PASSWORD_DEFAULT);' "$SP")
+$MYSQL -e "DELETE FROM users WHERE email='ptabsales@shanfix.co.ke';
+           INSERT INTO users (name,email,password_hash,role,is_active)
+           VALUES ('PTEST Tabs Sales','ptabsales@shanfix.co.ke','$SH','sales',1);"
+signin ptabsales "$SP" > /dev/null
+SJ2="$D/jar_ptabsales.txt"
+
+eq "they are signed in" \
+   "$(curl -s -o /dev/null -w '%{http_code}' -b "$SJ2" "$BASE/dashboard")" "200"
+
+SOVER=$(curl -s -b "$SJ2" "$BASE/partners-admin/$PID")
+has "sales can read the overview" "$SOVER" "What they are reselling"
+eq "but are not offered a details tab" \
+   "$(echo "$SOVER" | grep -c 'tab=details')" "0"
+
+# And the tab is not simply hidden: asking for it directly shows them
+# nothing they could not already see.
+SDET=$(curl -s -b "$SJ2" "$BASE/partners-admin/$PID?tab=details")
+eq "asking for it anyway shows no form" "$(echo "$SDET" | grep -c 'name="default_rate"')" "0"
+eq "and no way to reassign"             "$(echo "$SDET" | grep -c 'name="account_manager_id"')" "0"
+
+$MYSQL -e "DELETE FROM users WHERE email='ptabsales@shanfix.co.ke';"
+
+echo ""
 echo "=== 14. Tidy up ==="
 scrub
 restore_settings
