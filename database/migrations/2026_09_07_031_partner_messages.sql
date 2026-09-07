@@ -45,7 +45,18 @@ INSERT INTO settings (setting_key, setting_value) VALUES
   ('tpl_partner_paid_intro',
    'We have paid you {amount} in commission. The reference is {payment_ref}. You can see every entry behind it in your partner portal.'),
   ('tpl_sms_partner_paid',
-   '{company}: we have paid you {amount} in commission. Ref {payment_ref}.')
+   '{company}: we have paid you {amount} in commission. Ref {payment_ref}.'),
+
+  -- Not a partner message, but the same fault, found by the same check.
+  -- The "ask for job details" button has been dispatching job_request
+  -- since it was built, with nobody having written it anything to say:
+  -- the email went out titled "Job_request" with an empty body, and the
+  -- text was refused outright.
+  ('tpl_job_request_subject', '{company}: a few questions about your {brief}'),
+  ('tpl_job_request_intro',
+   'Before we start on your {brief}, we need a little detail from you. Open {link} and fill in what you can — it takes a few minutes, and you can attach anything you already have. Quote {reference} if you call us about it.'),
+  ('tpl_sms_job_request',
+   '{company}: please fill in the details for your {brief} here: {link} (ref {reference})')
 ON DUPLICATE KEY UPDATE setting_value = settings.setting_value;
 
 -- ---------------------------------------------------------------------

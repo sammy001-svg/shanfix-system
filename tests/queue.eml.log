@@ -1,5 +1,0 @@
-EHLO shanfix.co.ke
-MAIL FROM:<invoices@shanfix.co.ke>
-RCPT TO:<grace@riverside.co.ke>
-DATA
-QUIT
