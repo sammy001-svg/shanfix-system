@@ -60,7 +60,10 @@ $r = $app->router();
 // ---------------------------------------------------------------------
 // Public
 // ---------------------------------------------------------------------
-$r->get('/',       fn() => Response::to('/dashboard'));
+// Three kinds of account sign in here and none of them works in the
+// others' form, so the front door asks which you are. Somebody already
+// signed in is sent straight to whichever of the three they are in.
+$r->get('/',       [AuthController::class, 'choose']);
 $r->get('/login',  [AuthController::class, 'showLogin'], ['guest']);
 $r->post('/login', [AuthController::class, 'login'],     ['guest', 'csrf']);
 $r->post('/logout', [AuthController::class, 'logout'],   ['csrf']);
@@ -165,6 +168,33 @@ $r->get('/portal/request-access',  [PortalAuthController::class, 'showRequestAcc
 $r->post('/portal/request-access', [PortalAuthController::class, 'requestAccess'], ['csrf']);
 
 $r->get('/portal',                 [PortalController::class, 'home'], ['client_auth']);
+
+// ---------------------------------------------------------------------
+// The partner portal
+// ---------------------------------------------------------------------
+// A third application with a third guard. 'partner_auth' is neither
+// 'auth' nor 'client_auth': no session satisfies more than one of them,
+// which is the whole point of there being three.
+$r->get('/partners/login',   [PartnerAuthController::class, 'showLogin']);
+$r->post('/partners/login',  [PartnerAuthController::class, 'login'],  ['csrf']);
+$r->post('/partners/logout', [PartnerAuthController::class, 'logout'], ['csrf']);
+
+$r->get('/partners/apply',   [PartnerAuthController::class, 'showApply']);
+$r->post('/partners/apply',  [PartnerAuthController::class, 'apply'],  ['csrf']);
+
+$r->get('/partners/start',   [PartnerAuthController::class, 'showStart']);
+$r->post('/partners/start',  [PartnerAuthController::class, 'requestCode'], ['csrf']);
+$r->get('/partners/verify',  [PartnerAuthController::class, 'showVerify']);
+$r->post('/partners/verify', [PartnerAuthController::class, 'verify'], ['csrf']);
+
+$r->group(['partner_auth'], function ($r) {
+    $r->get('/partners',             [PartnerController::class, 'home']);
+    $r->get('/partners/earnings',    [PartnerController::class, 'commissions']);
+    $r->get('/partners/customers',   [PartnerController::class, 'customers']);
+    $r->get('/partners/services',    [PartnerController::class, 'services']);
+    $r->get('/partners/refer',       [PartnerController::class, 'showRefer']);
+    $r->post('/partners/refer',      [PartnerController::class, 'refer'], ['csrf']);
+});
 
 $r->group(['client_auth'], function ($r) {
     // The doc type is bound by the route, so it can never come from

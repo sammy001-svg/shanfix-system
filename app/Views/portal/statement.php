@@ -19,11 +19,33 @@ $buckets = [
     <h1 class="portal-h1">Your statement</h1>
     <p class="portal-lede">
       Everything invoiced and everything paid, in the order it happened.
+      <?php // fdate() answers an em dash for an empty date, and an em dash
+            // is truthy, so the old fallback never fired and the page read
+            // "— to 07 Sep". Test the date, not what fdate made of it. ?>
       <?php if ($s['from'] || $s['to']): ?>
-        <?= e(fdate($s['from']) ?: 'The beginning') ?> to <?= e(fdate($s['to']) ?: 'today') ?>.
+        <?= $s['from'] ? e(fdate($s['from'])) : 'From the beginning' ?>
+        to <?= $s['to'] ? e(fdate($s['to'])) : 'today' ?>.
       <?php endif; ?>
     </p>
   </div>
+
+  <?php // The controller has always accepted a range; there was no way to
+        // ask for one. "What did we spend with them last quarter" is a
+        // normal thing for a client to want. ?>
+  <form class="portal-range" method="get" action="<?= url('/portal/statement') ?>">
+    <div class="field mb-0">
+      <label class="label" for="from">From</label>
+      <input class="input" type="date" id="from" name="from" value="<?= e($askedFrom) ?>">
+    </div>
+    <div class="field mb-0">
+      <label class="label" for="to">To</label>
+      <input class="input" type="date" id="to" name="to" value="<?= e($askedTo) ?>">
+    </div>
+    <button class="btn btn--outline" type="submit">Show</button>
+    <?php if ($askedFrom !== '' || $askedTo !== ''): ?>
+      <a class="btn btn--ghost" href="<?= url('/portal/statement') ?>">Clear</a>
+    <?php endif; ?>
+  </form>
 
   <div class="portal-grid">
     <div class="portal-tile">
@@ -58,11 +80,11 @@ $buckets = [
     </div>
   <?php endif; ?>
 
-  <div class="portal-card mt-16" style="padding:0;overflow:hidden">
+  <div class="portal-card portal-card--flush mt-16">
     <?php if (!$s['rows']): ?>
-      <div class="card__body text-center">
-        <div class="text-muted" style="font-size:30px;line-height:1"><?= icon('file-text') ?></div>
-        <div class="card__title mt-8">Nothing on your account yet</div>
+      <div class="portal-empty">
+        <span class="portal-empty__icon"><?= icon('file-text') ?></span>
+        <div class="portal-empty__title">Nothing on your account yet</div>
         <p class="text-sm text-muted mb-0">Invoices and payments will appear here.</p>
       </div>
     <?php else: ?>

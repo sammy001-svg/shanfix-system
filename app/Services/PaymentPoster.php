@@ -162,6 +162,12 @@ class PaymentPoster
             'balance'     => $balance,
             'status'      => $status,
         ], ['id' => $documentId]);
+
+        // Partner commission is earned as the customer pays, so it belongs
+        // exactly here: the one place a payment can move an invoice, and the
+        // one that reverse() comes through as well. Hooking it anywhere else
+        // would mean a reversed payment left the commission behind it.
+        Commission::sync($documentId);
     }
 
     /**

@@ -100,7 +100,31 @@ class Migrator
                     '42S21', // duplicate column
                 ];
 
-                if (in_array($e->getCode(), $harmless, true)) {
+                // Indexes and foreign keys report under the catch-all 42000,
+                // so they have to be recognised by the driver's own code
+                // instead. Without these an ALTER that adds a column and an
+                // index is only half re-runnable: the column is forgiven and
+                // the index it needs is not, which is how a migration that
+                // says "safe to re-run" stops being true.
+                $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+                $harmlessDriver = [
+                    1061, // duplicate key name
+                    1826, // duplicate foreign key constraint name
+                    1022, // duplicate key (older MariaDB wording for the same)
+                    1091, // cannot drop; it is not there to drop
+                ];
+
+                // Re-adding a foreign key that is already there comes back as
+                // a generic "can't create table" with InnoDB's errno 121
+                // buried in the message. 1005 on its own covers real
+                // failures too, so both halves have to match before this is
+                // treated as something already done.
+                $dupConstraint = $driverCode === 1005 && str_contains($e->getMessage(), '121');
+
+                if (in_array($e->getCode(), $harmless, true)
+                    || in_array($driverCode, $harmlessDriver, true)
+                    || $dupConstraint) {
                     $skipped++;
                     continue;
                 }

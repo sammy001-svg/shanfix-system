@@ -13,6 +13,35 @@ use App\Core\Validator;
 
 class AuthController extends Controller
 {
+    /**
+     * The front door.
+     *
+     * Three kinds of account sign in here and none of them works in the
+     * other two's form, so the first thing asked is which one you are.
+     * Somebody already signed in is not asked at all — they are sent to
+     * whichever of the three they are signed in to.
+     */
+    public function choose(Request $request): void
+    {
+        if (Auth::check()) {
+            Response::to('/dashboard');
+        }
+
+        if (\App\Core\ClientAuth::check()) {
+            Response::to('/portal');
+        }
+
+        if (\App\Core\PartnerAuth::check()) {
+            Response::to('/partners');
+        }
+
+        $this->view('auth/choose', [
+            'title'     => 'Sign in',
+            'portalOn'  => \App\Core\Settings::bool('portal_enabled', true),
+            'partnerOn' => \App\Core\Settings::bool('partners_enabled', true),
+        ], 'auth');
+    }
+
     public function showLogin(Request $request): void
     {
         $this->view('auth/login', ['title' => 'Sign in'], 'auth');

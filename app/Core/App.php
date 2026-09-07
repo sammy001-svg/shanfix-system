@@ -178,6 +178,16 @@ class App
                 }
                 break;
 
+            case 'partner_auth':
+                // The third guard, for the same reason as the second: three
+                // kinds of account, and none of them able to stand in for
+                // another however the routes are later rearranged.
+                if (!\App\Core\PartnerAuth::check()) {
+                    Session::put('partner_intended_url', $request->uri);
+                    Response::to('/partners/login');
+                }
+                break;
+
             case 'guest':
                 if (Auth::check()) {
                     Response::to('/dashboard');

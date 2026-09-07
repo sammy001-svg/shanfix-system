@@ -40,9 +40,7 @@ $whenTone = static function (?int $days, string $status): array {
 
           <div class="text-sm text-muted">
             <?= e(money($r['amount'], false)) ?>
-            <?php if ($r['billing_cycle']): ?>
-              every <?= e(strtolower(label_of($r['billing_cycle']))) ?>
-            <?php endif; ?>
+            <?= e(\App\Services\Renewals::cyclePhrase($r['billing_cycle'])) ?>
             <?php if ($r['catalogue_name']): ?> · <?= e($r['catalogue_name']) ?><?php endif; ?>
           </div>
 

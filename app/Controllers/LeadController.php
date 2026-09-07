@@ -645,6 +645,22 @@ class LeadController extends Controller
                 'converted_at'        => date('Y-m-d H:i:s'),
             ], ['id' => $lead['id']]);
 
+            // A partner who introduced this lead owns the customer it became,
+            // and every invoice we ever raise to them. Without this the
+            // introduction is recorded and the commission never flows.
+            //
+            // An existing client already tagged to somebody keeps that tag:
+            // whoever brought them first brought them, and a second lead is
+            // not a reason to move the relationship.
+            if (!empty($lead['partner_id'])) {
+                Database::run(
+                    'UPDATE clients
+                        SET partner_id = :p, partner_linked_at = NOW()
+                      WHERE id = :c AND partner_id IS NULL',
+                    ['p' => (int) $lead['partner_id'], 'c' => $clientId]
+                );
+            }
+
             Database::insert('lead_activities', [
                 'lead_id'       => $lead['id'],
                 'user_id'       => Auth::id(),

@@ -39,16 +39,21 @@ $brand      = \App\Core\Settings::company();
 <header class="portal-top">
   <a class="portal-brand" href="<?= url($portalUser ? '/portal' : '/portal/login') ?>">
     <?php if ($brand['logo']): ?>
-      <img class="portal-brand__logo" src="<?= url('files/' . $brand['logo']) ?>" alt="<?= e($brand['name']) ?>">
+      <?php // /brand/logo, not /files — that route is behind the staff guard,
+            // so a client got a broken image where the logo should be.
+            //
+            // A wordmark already carries the company name, so it stands on
+            // its own here rather than being repeated in text beside it. ?>
+      <img class="portal-brand__logo" src="<?= url('/brand/logo') ?>" alt="<?= e($brand['name']) ?>">
     <?php else: ?>
       <span class="portal-brand__mark">SF</span>
+      <span>
+        <span class="portal-brand__name"><?= e($brand['name']) ?></span>
+        <?php if ($brand['tagline']): ?>
+          <span class="portal-brand__tag"><?= e($brand['tagline']) ?></span>
+        <?php endif; ?>
+      </span>
     <?php endif; ?>
-    <span>
-      <span class="portal-brand__name"><?= e($brand['name']) ?></span>
-      <?php if ($brand['tagline']): ?>
-        <span class="portal-brand__tag"><?= e($brand['tagline']) ?></span>
-      <?php endif; ?>
-    </span>
   </a>
 
   <?php if ($portalUser): ?>

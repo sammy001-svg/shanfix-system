@@ -511,6 +511,12 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 .btn--outline  { background: var(--surface); color: var(--slate-700); border-color: var(--border-strong); }
 .btn--outline:hover  { background: var(--surface-2); border-color: var(--slate-400); color: var(--ink); }
 
+/* For sitting on a filled panel — the navy balance block, or the green
+   one — where the themed surface tokens would vanish into the colour
+   behind them. Fixed on purpose: the panel is the same in both themes. */
+.btn--light { background: rgba(255, 255, 255, .14); color: #fff; border-color: rgba(255, 255, 255, .28); }
+.btn--light:hover { background: rgba(255, 255, 255, .22); color: #fff; border-color: rgba(255, 255, 255, .40); }
+
 .btn--ghost    { background: transparent; color: var(--slate-600); }
 .btn--ghost:hover    { background: var(--surface-2); color: var(--ink); }
 
@@ -3836,6 +3842,19 @@ body.lightbox-open {
    Same tokens throughout, so it is recognisably the same company and it
    follows the viewer's light or dark preference like everything else.
    --------------------------------------------------------------------- */
+/* =====================================================================
+   The client portal
+   =====================================================================
+   Deliberately not the staff app. Somebody signing in here is a customer,
+   not an administrator: they arrive with three questions — what do I owe,
+   what did you quote me, what happens next — and the shell is built to
+   answer those rather than to be worked in all day.
+
+   The header is navy so the portal carries the brand the way the sign-in
+   page does, and so nobody confuses it with the back office. Everything
+   below it is flat colour; there are no gradients anywhere in here.
+   ------------------------------------------------------------------- */
+
 .portal-body {
   background: var(--bg);
   min-height: 100vh;
@@ -3843,13 +3862,15 @@ body.lightbox-open {
   flex-direction: column;
 }
 
+/* -- The header ------------------------------------------------------ */
+
 .portal-top {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 14px 24px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  gap: 18px;
+  padding: 12px 26px;
+  background: var(--navy-900);
+  border-bottom: 1px solid rgba(255, 255, 255, .09);
 }
 
 .portal-brand {
@@ -3857,39 +3878,41 @@ body.lightbox-open {
   align-items: center;
   gap: 11px;
   text-decoration: none;
-  color: var(--ink);
+  color: #fff;
 }
-.portal-brand__logo { max-height: 38px; max-width: 150px; display: block; }
+.portal-brand__logo { max-height: 34px; max-width: 148px; display: block; }
 .portal-brand__mark {
   display: grid;
   place-items: center;
-  width: 38px; height: 38px;
+  width: 36px; height: 36px;
   border-radius: var(--r);
-  background: var(--navy-800);
+  background: var(--green-600);
   color: #fff;
   font-weight: 700;
   font-size: 13px;
   letter-spacing: .04em;
 }
-.portal-brand__name { display: block; font-weight: 650; font-size: 15px; }
+.portal-brand__name { display: block; font-weight: 650; font-size: 15px; color: #fff; }
 .portal-brand__tag {
   display: block;
   font-size: 11.5px;
-  color: var(--green-600);
+  color: var(--green-400);
   font-weight: 600;
 }
 
-.portal-nav { display: flex; gap: 4px; margin-left: 12px; }
+.portal-nav { display: flex; gap: 3px; margin-left: 10px; }
 .portal-nav__link {
   padding: 8px 13px;
   border-radius: var(--r);
   text-decoration: none;
-  color: var(--slate-600);
-  font-size: 14px;
+  color: rgba(255, 255, 255, .74);
+  font-size: 13.5px;
   font-weight: 550;
+  white-space: nowrap;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
 }
-.portal-nav__link:hover { background: var(--surface-2); color: var(--ink); }
-.portal-nav__link.is-active { background: var(--tint-green); color: var(--on-green); }
+.portal-nav__link:hover { background: rgba(255, 255, 255, .10); color: #fff; }
+.portal-nav__link.is-active { background: var(--green-700); color: #fff; }
 
 .portal-top__right {
   margin-left: auto;
@@ -3898,28 +3921,41 @@ body.lightbox-open {
   gap: 6px;
 }
 
+/* The header is navy in both themes, so the controls sitting on it are
+   painted against that rather than against the page surface. */
+.portal-top .icon-btn {
+  color: rgba(255, 255, 255, .78);
+  border-color: transparent;
+  background: transparent;
+}
+.portal-top .icon-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, .10);
+  border-color: transparent;
+}
+
 .portal-who {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 9px 5px 5px;
-  border: 1px solid var(--border);
+  padding: 4px 10px 4px 4px;
+  border: 1px solid rgba(255, 255, 255, .20);
   border-radius: 999px;
   background: transparent;
-  color: var(--ink);
+  color: #fff;
   font: inherit;
   font-size: 13.5px;
   cursor: pointer;
 }
-.portal-who:hover { background: var(--surface-2); }
+.portal-who:hover { background: rgba(255, 255, 255, .10); }
 .portal-who__name { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .portal-main {
   flex: 1;
   width: 100%;
-  max-width: 980px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 28px 20px 44px;
+  padding: 30px 20px 52px;
 }
 
 /* The sign-in and sign-up pages: one column, centred, nothing else on
@@ -3929,13 +3965,15 @@ body.lightbox-open {
   margin: 4vh auto 0;
 }
 
+/* -- Cards ----------------------------------------------------------- */
+
 .portal-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 26px;
-  margin-bottom: 14px;
-  box-shadow: var(--shadow);
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
 }
 .portal-card--quiet {
   background: var(--surface-2);
@@ -3943,11 +3981,41 @@ body.lightbox-open {
   padding: 20px;
 }
 
+/* A card whose content runs to its own edges — a list, or a table. */
+.portal-card--flush { padding: 0; overflow: hidden; }
+
+.portal-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.portal-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -.005em;
+}
+.portal-card__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--link);
+  white-space: nowrap;
+}
+.portal-card__more:hover { color: var(--link-hover); }
+.portal-card__more svg { width: 14px; height: 14px; }
+
 .portal-h1 {
   margin: 0 0 6px;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 680;
-  letter-spacing: -.015em;
+  letter-spacing: -.02em;
 }
 
 .portal-lede {
@@ -3956,6 +4024,316 @@ body.lightbox-open {
   font-size: 14px;
   line-height: 1.55;
 }
+
+.portal-wrap { max-width: 100%; }
+.portal-hello { margin-bottom: 20px; }
+
+/* -- The balance ------------------------------------------------------
+   The number the client came to see, and the one action worth offering.
+   Navy in both themes: this is the brand's moment on the page, and it
+   should not change character when somebody switches to light. */
+
+.portal-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 26px 28px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background: var(--navy-800);
+  border: 1px solid var(--navy-700);
+}
+
+/* The owing panel stacks label, figure and note down the left. Only the
+   paid-up variant puts a tick beside its text, so the flex belongs there
+   rather than here, where it laid the three out in a row. */
+.portal-balance__body { min-width: 0; }
+.portal-balance--clear .portal-balance__body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.portal-balance__label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .60);
+}
+.portal-balance__figure {
+  margin-top: 6px;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -.025em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.portal-balance__figure--sm { font-size: 20px; letter-spacing: -.01em; margin-top: 0; }
+.portal-balance__note {
+  margin-top: 7px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, .72);
+}
+.portal-balance__act { text-align: right; }
+.portal-balance__hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, .58);
+}
+.portal-balance__tick {
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  flex: 0 0 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+}
+.portal-balance__tick svg { width: 24px; height: 24px; color: var(--green-400); }
+
+/* Nothing outstanding is good news and should look like it. */
+.portal-balance--clear {
+  background: var(--tint-green);
+  border-color: var(--green-700);
+}
+.portal-balance--clear .portal-balance__figure,
+.portal-balance--clear .portal-balance__note { color: var(--on-green); }
+.portal-balance--clear .portal-balance__tick { background: rgba(52, 182, 115, .18); }
+
+/* -- The three tiles --------------------------------------------------- */
+
+.portal-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.portal-stat {
+  display: block;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.portal-stat:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.portal-stat__figure {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.portal-stat__figure--icon svg { width: 26px; height: 26px; color: var(--icon-accent); }
+.portal-stat__label {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+}
+.portal-stat__note {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--on-green);
+  font-weight: 600;
+}
+
+/* -- Two columns ------------------------------------------------------- */
+
+.portal-cols { display: grid; gap: 16px; }
+@media (min-width: 900px) {
+  .portal-cols { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; }
+}
+.portal-side > :last-child { margin-bottom: 0; }
+
+/* -- A list of things, each one a row --------------------------------- */
+
+.portal-list { list-style: none; margin: 0; padding: 0; }
+.portal-list li + li { border-top: 1px solid var(--border); }
+
+.portal-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  text-decoration: none;
+  color: inherit;
+}
+a.portal-list__row:hover { background: var(--surface-2); }
+
+.portal-list__main { min-width: 0; }
+.portal-list__title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.portal-list__meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--slate-500);
+}
+.portal-list__side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.portal-list__amount {
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.portal-list--tight .portal-list__row { padding: 12px 22px; }
+.portal-list--tight .portal-list__side { flex-direction: column; align-items: flex-end; gap: 3px; }
+
+/* -- Shortcuts --------------------------------------------------------- */
+
+.portal-acts { display: grid; gap: 4px; }
+.portal-act {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 11px 12px;
+  margin: 0 -12px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+.portal-act:hover { background: var(--surface-2); }
+.portal-act svg { width: 19px; height: 19px; flex: 0 0 19px; color: var(--icon-accent); }
+.portal-act strong { display: block; font-size: 13.5px; font-weight: 600; }
+.portal-act em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--slate-500);
+}
+
+.portal-help {
+  margin: 22px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--slate-500);
+}
+
+.portal-empty { padding: 34px 22px; text-align: center; }
+.portal-empty--inline { padding: 22px; text-align: left; }
+.portal-empty__icon { display: block; color: var(--slate-500); }
+.portal-empty__icon svg { width: 30px; height: 30px; }
+.portal-empty__title { margin: 10px 0 4px; font-size: 15px; font-weight: 650; }
+
+/* -- Filter tabs ------------------------------------------------------- */
+
+.portal-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.portal-tabs::-webkit-scrollbar { display: none; }
+
+.portal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--slate-600);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.portal-tab:hover { border-color: var(--border-strong); color: var(--ink); }
+.portal-tab.is-active {
+  background: var(--tint-green);
+  border-color: var(--green-700);
+  color: var(--on-green);
+}
+.portal-tab__count {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--slate-500);
+  font-variant-numeric: tabular-nums;
+}
+.portal-tab.is-active .portal-tab__count {
+  background: rgba(52, 182, 115, .20);
+  color: var(--on-green);
+}
+
+/* -- Amounts and actions on a list row --------------------------------- */
+
+.portal-list__figures { text-align: right; line-height: 1.3; }
+.portal-list__owing {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-red);
+  white-space: nowrap;
+}
+.portal-list__chev { display: flex; color: var(--slate-400); }
+.portal-list__chev svg { width: 17px; height: 17px; }
+
+/* The row is the link, so this is a button in looks only — a real one
+   inside an anchor would be a link inside a link. */
+.portal-list__pay { pointer-events: none; }
+
+/* -- Paging ------------------------------------------------------------ */
+
+.portal-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 4px;
+}
+.portal-pager__at { font-size: 13px; color: var(--slate-600); }
+.portal-pager .is-disabled { opacity: .4; pointer-events: none; }
+
+/* -- A date range ------------------------------------------------------ */
+
+.portal-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.portal-range .field { min-width: 150px; }
+.portal-range .label { font-size: 11.5px; }
+
+
 
 /* The one-time code. Spaced and large because it is copied from a text
    message by somebody looking between two screens. */
@@ -3967,10 +4345,6 @@ body.lightbox-open {
   padding: 12px;
 }
 
-.portal-wrap { max-width: 820px; }
-
-.portal-hello { margin-bottom: 22px; }
-
 .portal-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -3980,7 +4354,7 @@ body.lightbox-open {
 .portal-tile {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  border-radius: 14px;
   padding: 20px;
 }
 .portal-tile__figure {
@@ -4013,7 +4387,7 @@ body.lightbox-open {
   flex-wrap: wrap;
 }
 
-@media (max-width: 620px) {
+@media (max-width: 760px) {
   .portal-top {
     padding: 11px 14px;
     gap: 10px;
@@ -4023,25 +4397,107 @@ body.lightbox-open {
   /* The name is the first thing to go: the logo already says who this is. */
   .portal-who__name { display: none; }
 
+  /* The nav scrolls sideways rather than wrapping to three rows. The bar
+     itself is hidden — a scrollbar drawn across the header reads as a
+     rendering fault, and the row of links already invites the swipe. */
   .portal-nav {
     order: 3;
     width: 100%;
     margin-left: 0;
     overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 2px;
   }
+  .portal-nav::-webkit-scrollbar { display: none; }
 
   .portal-main { padding: 18px 14px 34px; }
   .portal-narrow { margin-top: 0; }
   .portal-card { padding: 20px; }
-  .portal-h1 { font-size: 20px; }
+  .portal-h1 { font-size: 21px; }
+
+  /* The balance reads down the screen, and its action is a full-width
+     target rather than something to reach for in the corner. */
+  .portal-balance { padding: 22px 20px; gap: 18px; }
+  .portal-balance__figure { font-size: 31px; }
+  .portal-balance__act { width: 100%; text-align: left; }
+  .portal-balance__act .btn { width: 100%; }
+  .portal-balance__hint { text-align: center; }
+
+  /* A row has no room for two columns at this width. Title and detail
+     first, then the money and its status on a line of their own, which is
+     also where the amounts line up with each other down the list. */
+  .portal-list__row { flex-wrap: wrap; gap: 4px 10px; padding: 14px 18px; }
+  .portal-list__side { width: 100%; justify-content: flex-start; }
+  .portal-list__figures { text-align: left; }
+  .portal-list--tight .portal-list__side { flex-direction: row; align-items: center; gap: 10px; }
+  .portal-list__chev { display: none; }
+
+  .portal-card__head { padding: 14px 18px; }
+  .portal-doc__body { padding: 16px 18px 18px; }
+  .portal-doc__figures { gap: 22px; }
+  .portal-pager { flex-wrap: wrap; justify-content: center; }
 }
 
-/* A document, as the client reads it. */
-.portal-doc__head {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 20px; flex-wrap: wrap;
+/* A document, as the client reads it. What it is and what is owed sit at
+   the top, because that is what they opened it to find out. */
+.portal-back { margin: 0 0 14px; font-size: 13.5px; }
+.portal-back a { display: inline-flex; align-items: center; gap: 5px; text-decoration: none; }
+.portal-back a:hover { text-decoration: underline; }
+.portal-back svg { width: 15px; height: 15px; }
+
+.portal-doc {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
 }
-.portal-doc__meta { font-size: 13px; color: var(--slate-600); line-height: 1.7; text-align: right; }
+.portal-doc__id { min-width: 0; }
+.portal-doc__kind {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+}
+.portal-doc__number {
+  margin: 8px 0 0;
+  font-size: 23px;
+  font-weight: 680;
+  letter-spacing: -.015em;
+  font-family: var(--mono);
+}
+.portal-doc__title { margin: 6px 0 0; font-size: 14.5px; color: var(--slate-700); }
+.portal-doc__dates { margin-top: 8px; font-size: 13px; color: var(--slate-500); }
+
+.portal-doc__figures { display: flex; gap: 30px; flex-wrap: wrap; }
+.portal-doc__fig { text-align: right; }
+.portal-doc__fig-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+}
+.portal-doc__fig-value {
+  display: block;
+  margin-top: 5px;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.portal-doc__fig--owing .portal-doc__fig-value { color: var(--on-red); }
+.portal-doc__fig--owing .portal-doc__fig-label { color: var(--on-red); }
+.portal-doc__fig--clear .portal-doc__fig-value { color: var(--on-green); }
+
+.portal-doc__body { padding: 20px 22px 22px; }
+.portal-doc__prose { margin-top: 4px; }
 
 /* The totals block. Set right against the table above it so the figures
    line up down the page the way they do on the printed copy. */
@@ -4311,3 +4767,52 @@ body.lightbox-open {
 
 /* The back links at the foot of the set-up pages carry an arrow. */
 .login__help svg { width: 14px; height: 14px; vertical-align: -3px; margin-right: 1px; }
+
+/* -- Which door -------------------------------------------------------
+   Three kinds of account, asked once rather than found out by being
+   refused. Rows rather than tiles: they are read down, and each one is a
+   sentence about who it is for. */
+.choose { display: grid; gap: 8px; margin-bottom: 4px; }
+
+.choose__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 15px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.choose__row:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.choose__icon {
+  display: grid;
+  place-items: center;
+  width: 38px; height: 38px;
+  flex: 0 0 38px;
+  border-radius: 10px;
+}
+.choose__icon svg { width: 19px; height: 19px; }
+.choose__icon--staff   { background: var(--tint-navy);  color: var(--on-navy); }
+.choose__icon--client  { background: var(--tint-green); color: var(--on-green); }
+.choose__icon--partner { background: var(--tint-amber); color: var(--on-amber); }
+
+.choose__body { min-width: 0; flex: 1; }
+.choose__body strong { display: block; font-size: 14.5px; font-weight: 650; }
+.choose__body em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--slate-500);
+}
+
+.choose__go { display: flex; color: var(--slate-400); }
+.choose__go svg { width: 17px; height: 17px; }

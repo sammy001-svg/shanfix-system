@@ -21,6 +21,14 @@ use App\Core\Settings;
  */
 class PortalController extends Controller
 {
+    /**
+     * The overview.
+     *
+     * A client arrives with three questions — what do I owe, what have you
+     * quoted me, what is coming up — so this page answers those in that
+     * order and offers the one action worth offering: paying. Everything
+     * else on it is a shortcut to a page that already existed.
+     */
     public function home(Request $request): void
     {
         $me       = ClientAuth::user();
@@ -30,15 +38,22 @@ class PortalController extends Controller
             throw new HttpException(403, 'Please sign in.');
         }
 
-        $counts = [
-            'quotations' => 0,
-            'invoices'   => 0,
-            'owing'      => money(0),
-            'owing_raw'  => 0.0,
+        $summary = [
+            'owing'        => 0.0,
+            'unpaid'       => 0,
+            'oldest_days'  => null,
+            'pay_invoice'  => null,   // the one a "Pay now" button should open
+            'quotations'   => 0,
+            'open_quotes'  => 0,
+            'invoices'     => 0,
+            'paid_total'   => 0.0,
         ];
 
+        $recent   = [];
+        $renewals = [];
+
         if ($clientId !== null) {
-            $counts['quotations'] = (int) Database::scalar(
+            $summary['quotations'] = (int) Database::scalar(
                 "SELECT COUNT(*) FROM documents
                   WHERE client_id = :c AND doc_type = 'quotation'
                     AND status <> 'draft' AND approval_status <> 'pending'",
@@ -46,7 +61,18 @@ class PortalController extends Controller
                 0
             );
 
-            $counts['invoices'] = (int) Database::scalar(
+            // Quotations still waiting on the client rather than on us.
+            $summary['open_quotes'] = (int) Database::scalar(
+                "SELECT COUNT(*) FROM documents
+                  WHERE client_id = :c AND doc_type = 'quotation'
+                    AND status IN ('sent', 'viewed')
+                    AND approval_status <> 'pending'
+                    AND (valid_until IS NULL OR valid_until >= CURDATE())",
+                ['c' => $clientId],
+                0
+            );
+
+            $summary['invoices'] = (int) Database::scalar(
                 "SELECT COUNT(*) FROM documents
                   WHERE client_id = :c AND doc_type = 'invoice'
                     AND status <> 'draft' AND approval_status <> 'pending'",
@@ -54,51 +80,149 @@ class PortalController extends Controller
                 0
             );
 
-            $owing = (float) Database::scalar(
-                "SELECT COALESCE(SUM(balance), 0) FROM documents
+            $owed = Database::first(
+                "SELECT COALESCE(SUM(balance), 0) AS owing,
+                        COUNT(*)                  AS unpaid,
+                        MIN(issue_date)           AS oldest
+                   FROM documents
                   WHERE client_id = :c AND doc_type = 'invoice'
                     AND status NOT IN ('draft','cancelled','paid')
-                    AND approval_status <> 'pending'",
-                ['c' => $clientId],
-                0
+                    AND approval_status <> 'pending'
+                    AND balance > 0.009",
+                ['c' => $clientId]
+            ) ?: [];
+
+            $summary['owing']  = (float) ($owed['owing'] ?? 0);
+            $summary['unpaid'] = (int) ($owed['unpaid'] ?? 0);
+
+            if (!empty($owed['oldest'])) {
+                $summary['oldest_days'] = (int) floor(
+                    (strtotime(date('Y-m-d')) - strtotime((string) $owed['oldest'])) / 86400
+                );
+            }
+
+            // Oldest first: the one that has been waiting longest is the one
+            // to offer, not whichever happens to be newest.
+            $summary['pay_invoice'] = Database::first(
+                "SELECT id, doc_number, balance FROM documents
+                  WHERE client_id = :c AND doc_type = 'invoice'
+                    AND status NOT IN ('draft','cancelled','paid')
+                    AND approval_status <> 'pending'
+                    AND balance > 0.009
+               ORDER BY issue_date ASC, id ASC
+                  LIMIT 1",
+                ['c' => $clientId]
             );
 
-            $counts['owing']     = money($owing);
-            $counts['owing_raw'] = $owing;
+            $recent = Database::all(
+                "SELECT id, doc_type, doc_number, title, issue_date, status, total, balance
+                   FROM documents
+                  WHERE client_id = :c
+                    AND doc_type IN ('quotation','invoice')
+                    AND status <> 'draft' AND approval_status <> 'pending'
+               ORDER BY issue_date DESC, id DESC
+                  LIMIT 6",
+                ['c' => $clientId]
+            );
+
+            $renewals = Database::all(
+                "SELECT s.id, s.name, s.amount, s.next_renewal_date, s.billing_cycle
+                   FROM subscriptions s
+                  WHERE s.client_id = :c AND s.status = 'active'
+                    AND s.next_renewal_date IS NOT NULL
+               ORDER BY s.next_renewal_date ASC
+                  LIMIT 3",
+                ['c' => $clientId]
+            );
+
+            $today = strtotime(date('Y-m-d'));
+
+            foreach ($renewals as $i => $row) {
+                $renewals[$i]['days_away'] = (int) floor(
+                    (strtotime((string) $row['next_renewal_date']) - $today) / 86400
+                );
+            }
         }
 
         $this->view('portal/home', [
-            'title'   => 'Your account',
-            'me'      => $me,
-            'counts'  => $counts,
-            'company' => Settings::company(),
+            'title'    => 'Your account',
+            'me'       => $me,
+            'summary'  => $summary,
+            'recent'   => $recent,
+            'renewals' => $renewals,
+            'canPay'   => Settings::bool('kopokopo_enabled'),
+            'company'  => Settings::company(),
         ], 'portal');
     }
 
     // -- Their documents ---------------------------------------------------
+
+    /** How many documents one page of the list holds. */
+    private const PER_PAGE = 25;
 
     /** Quotations, or invoices — the same list with a different filter. */
     public function documents(Request $request, string $type): void
     {
         $clientId = $this->mustHaveClient();
 
+        // A client who has been with us for years has hundreds of these. The
+        // filter is what makes the list usable — almost always they came to
+        // find what is still outstanding, not to read the archive.
+        $show  = (string) $request->query('show', '');
+        $show  = in_array($show, ['open', 'settled'], true) ? $show : '';
+        $where = match ($show) {
+            'open'    => $type === 'invoice'
+                ? " AND balance > 0.009 AND status NOT IN ('cancelled')"
+                : " AND status IN ('sent','viewed') AND (valid_until IS NULL OR valid_until >= CURDATE())",
+            'settled' => $type === 'invoice'
+                ? " AND balance <= 0.009"
+                : " AND status IN ('accepted','rejected','expired','cancelled')",
+            default   => '',
+        };
+
+        $base   = "FROM documents
+                   WHERE client_id = :c AND doc_type = :t
+                     AND status <> 'draft' AND approval_status <> 'pending'";
+        $params = ['c' => $clientId, 't' => $type];
+
+        $total = (int) Database::scalar("SELECT COUNT(*) " . $base . $where, $params, 0);
+        $pages = max(1, (int) ceil($total / self::PER_PAGE));
+        $page  = max(1, min($pages, (int) $request->query('page', 1)));
+
         $rows = Database::all(
             "SELECT id, doc_number, title, issue_date, due_date, valid_until,
-                    status, total, amount_paid, balance
-               FROM documents
-              WHERE client_id = :c
-                AND doc_type = :t
-                AND status <> 'draft'
-                AND approval_status <> 'pending'
-           ORDER BY issue_date DESC, id DESC",
-            ['c' => $clientId, 't' => $type]
+                    status, total, amount_paid, balance "
+            . $base . $where . "
+             ORDER BY issue_date DESC, id DESC
+                LIMIT " . self::PER_PAGE . " OFFSET " . (($page - 1) * self::PER_PAGE),
+            $params
         );
+
+        // The tab counts, so the filter says how much is behind each one
+        // rather than making them click to find out.
+        $counts = [
+            'all'  => (int) Database::scalar("SELECT COUNT(*) " . $base, $params, 0),
+            'open' => (int) Database::scalar(
+                "SELECT COUNT(*) " . $base . ($type === 'invoice'
+                    ? " AND balance > 0.009 AND status NOT IN ('cancelled')"
+                    : " AND status IN ('sent','viewed') AND (valid_until IS NULL OR valid_until >= CURDATE())"),
+                $params,
+                0
+            ),
+        ];
+        $counts['settled'] = $counts['all'] - $counts['open'];
 
         $this->view('portal/documents', [
             'title'   => $type === 'invoice' ? 'Your invoices' : 'Your quotations',
             'me'      => ClientAuth::user(),
             'type'    => $type,
             'rows'    => $rows,
+            'show'    => $show,
+            'counts'  => $counts,
+            'page'    => $page,
+            'pages'   => $pages,
+            'total'   => $total,
+            'canPay'  => Settings::bool('kopokopo_enabled'),
             'company' => Settings::company(),
         ], 'portal');
     }
@@ -172,6 +296,12 @@ class PortalController extends Controller
             'title'     => 'Your statement',
             'me'        => ClientAuth::user(),
             'statement' => $statement,
+            // What was asked for, not what the statement resolved it to.
+            // Statement::build() fills an open end with today, and echoing
+            // that back into the form makes it look like a filter is on
+            // when none was set.
+            'askedFrom' => $from,
+            'askedTo'   => $to,
             'company'   => Settings::company(),
         ], 'portal');
     }

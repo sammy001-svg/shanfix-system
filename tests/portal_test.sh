@@ -210,9 +210,16 @@ eq "their quotations open" "$(pcode /portal/quotations)" "200"
 eq "their invoices open"   "$(pcode /portal/invoices)"   "200"
 eq "their statement opens" "$(pcode /portal/statement)"  "200"
 
-# Every invoice they should see, and no more.
+# Every invoice they should see, and no more. The list pages at 25 now, so
+# what is asserted is the first page and the total it reports — not that
+# every last row is on screen at once, which is what it used to check and
+# is no longer what the page is meant to do.
 VISIBLE=$(q "SELECT COUNT(*) FROM documents WHERE client_id=$DCID AND doc_type='invoice' AND status<>'draft' AND approval_status<>'pending';")
-eq "the list shows exactly their invoices"    "$(pget /portal/invoices | grep -c 'portal/invoices/')" "$VISIBLE"
+FIRSTPAGE=$(q "SELECT LEAST($VISIBLE, 25);")
+eq "the first page shows a page of their invoices"    "$(pget /portal/invoices | grep -c 'class="portal-list__row"')" "$FIRSTPAGE"
+
+# The count on the All tab is the one that has to match the books.
+has "and the count matches their ledger" "$(pget /portal/invoices)"     "<span class=\"portal-tab__count\">$VISIBLE</span>"
 
 # The statement has to reconcile, or it is worse than not showing one.
 DB_BALANCE=$(q "SELECT FORMAT(COALESCE(SUM(balance),0),2) FROM documents WHERE client_id=$DCID AND doc_type='invoice' AND status NOT IN ('draft','cancelled','paid') AND approval_status<>'pending';")
@@ -401,6 +408,57 @@ eq "and capped at six an hour"        "$(q "SELECT COUNT(*) FROM stk_requests WH
 has "with a reason given"             "$(pget "/portal/invoices/$INV")" "Too many payment attempts"
 
 $MYSQL -e "DELETE FROM stk_requests WHERE document_id=$INV;"
+
+echo ""
+echo "=== 14b. The overview answers what they came for ==="
+
+# The page a client lands on used to be a placeholder telling them the
+# portal was still being built, while every feature it named was already
+# working. Whatever else changes here, it must never say that again.
+HOME=$(pget /portal)
+ne "the overview is not a placeholder" "$(echo "$HOME" | grep -c 'More is on the way')" "1"
+has "the balance is the headline"      "$HOME" "Outstanding balance"
+has "and it is the real figure"        "$HOME"     "$(q "SELECT CONCAT('KES ', FORMAT(COALESCE(SUM(balance),0), 2)) FROM documents
+           WHERE client_id=$PCID AND doc_type='invoice'
+             AND status NOT IN ('draft','cancelled','paid')
+             AND approval_status <> 'pending' AND balance > 0.009;")"
+
+# Paying is the one thing this portal exists to make easy, so the overview
+# offers it rather than leaving them to find an invoice first.
+has "paying is offered from the overview" "$HOME" "Pay by M-Pesa"
+
+# The logo route. /files is behind the staff guard, so a client got a
+# broken image in the header where the branding should be.
+ne "the portal logo is not on the staff route"    "$(grep -c "url('files/' . \$brand\['logo'\])" "$SHANFIX_ROOT/app/Views/layouts/portal.php")" "1"
+eq "it uses the public brand route"    "$(grep -c "url('/brand/logo')" "$SHANFIX_ROOT/app/Views/layouts/portal.php")" "1"
+
+echo ""
+echo "=== 14c. A long list stays usable ==="
+INVLIST=$(pget /portal/invoices)
+has "the list can be filtered"  "$INVLIST" 'href="/portal/invoices?show=open"'
+has "and says how many are open" "$INVLIST" "portal-tab__count"
+
+# A client of some years has hundreds of invoices. Rendering all of them
+# on one page is slow to load and impossible to read.
+ROWS=$(echo "$INVLIST" | grep -c 'portal-list__row')
+eq "one page holds no more than 25" "$( [ "$ROWS" -le 25 ] && echo yes || echo "no ($ROWS)" )" "yes"
+
+# Outstanding means outstanding: nothing settled may appear under it.
+OPENROWS=$(pget "/portal/invoices?show=open" | grep -c 'portal-list__row')
+OPENDB=$(q "SELECT LEAST(COUNT(*), 25) FROM documents
+             WHERE client_id=$PCID AND doc_type='invoice' AND status <> 'draft'
+               AND approval_status <> 'pending' AND balance > 0.009
+               AND status NOT IN ('cancelled');")
+eq "the outstanding filter agrees with the ledger" "$OPENROWS" "$OPENDB"
+
+echo ""
+echo "=== 14d. The statement reads as a sentence ==="
+# fdate() answers an em dash for an empty date, and an em dash is truthy,
+# so the "from the beginning" fallback never fired and the page opened
+# with "— to 07 Sep".
+STMT=$(pget /portal/statement)
+ne "no em dash where a date should be" "$(echo "$STMT" | grep -c 'in the order it happened. — to')" "1"
+has "a range can be asked for"         "$STMT" 'name="from"'
 
 echo ""
 echo "=== 15. Sending us artwork ==="

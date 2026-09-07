@@ -4,6 +4,13 @@ require_once APP_PATH . '/Views/partials/icons.php';
 // "from 5,000" reads differently from "5,000", and the difference matters
 // to somebody deciding whether to ask.
 $priceLabel = static function (array $s): string {
+    // Work we scope before quoting carries no price, and "0.00 / project"
+    // is a worse answer than saying so — it reads either as free or as an
+    // unfinished page.
+    if ((float) $s['price'] <= 0.009) {
+        return 'Price on request';
+    }
+
     $amount = money($s['price'], false);
 
     return match ($s['pricing_type']) {

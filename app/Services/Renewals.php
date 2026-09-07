@@ -26,6 +26,27 @@ class Renewals
         'custom'     => 'Custom number of days',
     ];
 
+    /**
+     * The same cycles as they read inside a sentence.
+     *
+     * CYCLES are headings — "Yearly" — and the client portal was dropping
+     * them into "45,000 every ..." where they came out as "every annual".
+     * These are the wording for that position.
+     */
+    public const CYCLE_PHRASE = [
+        'monthly'    => 'a month',
+        'quarterly'  => 'every 3 months',
+        'semiannual' => 'every 6 months',
+        'annual'     => 'a year',
+        'custom'     => 'each cycle',
+    ];
+
+    /** How a cycle reads after an amount, e.g. "KES 45,000 a year". */
+    public static function cyclePhrase(?string $cycle): string
+    {
+        return self::CYCLE_PHRASE[(string) $cycle] ?? 'each cycle';
+    }
+
     public const TYPES = [
         'website'     => 'Website',
         'hosting'     => 'Hosting',
