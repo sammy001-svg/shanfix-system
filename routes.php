@@ -29,6 +29,7 @@ use App\Controllers\LeadController;
 use App\Controllers\MeetingController;
 use App\Controllers\NotificationController;
 use App\Controllers\PartnerAuthController;
+use App\Controllers\PartnerAdminController;
 use App\Controllers\PartnerController;
 use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
@@ -188,6 +189,16 @@ $r->get('/partners/start',   [PartnerAuthController::class, 'showStart']);
 $r->post('/partners/start',  [PartnerAuthController::class, 'requestCode'], ['csrf']);
 $r->get('/partners/verify',  [PartnerAuthController::class, 'showVerify']);
 $r->post('/partners/verify', [PartnerAuthController::class, 'verify'], ['csrf']);
+
+// Partners, from our side of the desk. Staff routes, staff guard: this is
+// the back office for the portal above, not part of it.
+$r->group(['auth'], function ($r) {
+    $r->get('/partners-admin',                    [PartnerAdminController::class, 'index'],  ['permission:partners.view']);
+    $r->get('/partners-admin/{id}',               [PartnerAdminController::class, 'show'],   ['permission:partners.view']);
+    $r->post('/partners-admin/{id}',              [PartnerAdminController::class, 'update'], ['csrf', 'permission:partners.manage']);
+    $r->post('/partners-admin/{id}/decide',       [PartnerAdminController::class, 'decide'], ['csrf', 'permission:partners.manage']);
+    $r->post('/partners-admin/{id}/payout',       [PartnerAdminController::class, 'payout'], ['csrf', 'permission:partners.pay']);
+});
 
 $r->group(['partner_auth'], function ($r) {
     $r->get('/partners',             [PartnerController::class, 'home']);

@@ -146,6 +146,22 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php if (can('partners.view')): ?>
+        <?php // An application nobody has looked at is the only thing here
+              // that is actually waiting on somebody, so it is the only
+              // thing that gets a count. ?>
+        <?php $partnersWaiting = (int) \App\Core\Database::scalar(
+            "SELECT COUNT(*) FROM partners WHERE status = 'pending'", [], 0
+        ); ?>
+        <a class="nav-link <?= is_active_nav('/partners-admin') ? 'is-active' : '' ?>"
+           href="<?= url('/partners-admin') ?>">
+          <?= icon('users', 'nav-link__icon') ?> Partners
+          <?php if ($partnersWaiting > 0): ?>
+            <span class="nav-link__badge"><?= $partnersWaiting ?></span>
+          <?php endif; ?>
+        </a>
+      <?php endif; ?>
+
       <?php if (can('documents.view')): ?>
         <a class="nav-link <?= is_active_nav('/proposals') ? 'is-active' : '' ?>" href="<?= url('/proposals') ?>">
           <?= icon('briefcase', 'nav-link__icon') ?> Proposals

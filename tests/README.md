@@ -85,6 +85,7 @@ SHANFIX_URL=http://localhost:8080 SHANFIX_DB=shanfix_ci ./tests/run.sh
 | `backup_test.sh` | taking a copy, and proving it restores |
 | `portal_test.sh` | the client portal: the three ways in, and what it refuses |
 | `brief_test.sh` | asking a client what they want, and getting it back |
+| `partners_test.sh` | the third door, and the commission behind it |
 | `deploy_test.sh` | the address the site answers on, and what a push does |
 
 `crawl.sh` is separate: it walks every GET route in `routes.php` as every

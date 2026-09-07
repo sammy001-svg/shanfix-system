@@ -110,6 +110,24 @@ $val = static function (string $key, $fallback = '') use ($service) {
               <?= error_for($errors ?? [], 'price') ?>
             </div>
 
+            <?php // What a partner earns on this one. Empty is not zero:
+                  // empty means "use whatever that partner's own rate is",
+                  // and zero means this service pays no commission at all. ?>
+            <div class="field">
+              <label class="label" for="commission_rate">Partner commission</label>
+              <div class="input-group">
+                <input class="input" type="number" step="0.5" min="0" max="100"
+                       id="commission_rate" name="commission_rate"
+                       placeholder="Their own rate"
+                       value="<?= e($val('commission_rate', '')) ?>">
+                <span class="input-group__addon">%</span>
+              </div>
+              <span class="field-hint">
+                Leave empty to use each partner's own rate. Enter 0 for a service
+                that pays no commission.
+              </span>
+            </div>
+
             <div class="field">
               <label class="label" for="unit_label">Unit label</label>
               <input class="input" id="unit_label" name="unit_label" value="<?= e($val('unit_label')) ?>"

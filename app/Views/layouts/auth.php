@@ -15,7 +15,19 @@
 require_once APP_PATH . '/Views/partials/icons.php';
 
 $brand   = \App\Core\Settings::company();
-$isGuest = ($authKind ?? 'staff') === 'client';
+// Which door this is. 'none' is a real answer: the chooser is not a
+// door, it is the question of which one you want, and badging it as any
+// of the three would be wrong.
+$kind = $authKind ?? 'staff';
+
+$kinds = [
+    'staff'   => ['Staff sign-in',    'briefcase', 'login__kind--staff'],
+    'client'  => ['Customer portal',  'user',      'login__kind--client'],
+    'partner' => ['Partner portal',   'users',     'login__kind--partner'],
+];
+
+$badge   = $kinds[$kind] ?? null;
+$isGuest = $kind !== 'staff';
 
 // The photo is optional — the navy ground underneath stands on its own,
 // so a missing file degrades to a plain dark page rather than a broken
@@ -130,10 +142,11 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
       <?php // Which door this is. Two accounts that look alike and do not
             // work in each other's page is the confusion worth heading off,
             // and one badge does it without a paragraph of explanation. ?>
-      <p class="login__kind <?= $isGuest ? 'login__kind--client' : 'login__kind--staff' ?>">
-        <?= $isGuest ? icon('user') : icon('briefcase') ?>
-        <?= $isGuest ? 'Customer portal' : 'Staff sign-in' ?>
-      </p>
+      <?php if ($badge !== null): ?>
+        <p class="login__kind <?= e($badge[2]) ?>">
+          <?= icon($badge[1]) ?> <?= e($badge[0]) ?>
+        </p>
+      <?php endif; ?>
 
       <?php foreach (($flashes ?? []) as $flash): ?>
         <div class="alert alert--<?= e($flash['type']) ?>">

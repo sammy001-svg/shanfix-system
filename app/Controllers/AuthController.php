@@ -39,6 +39,8 @@ class AuthController extends Controller
             'title'     => 'Sign in',
             'portalOn'  => \App\Core\Settings::bool('portal_enabled', true),
             'partnerOn' => \App\Core\Settings::bool('partners_enabled', true),
+            // Not a door, so it wears no badge.
+            'authKind'  => 'none',
         ], 'auth');
     }
 

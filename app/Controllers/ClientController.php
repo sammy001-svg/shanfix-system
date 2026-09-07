@@ -101,8 +101,9 @@ class ClientController extends Controller
         $this->authorize('clients.manage');
 
         $this->view('clients/form', [
-            'title'  => 'New Client',
-            'client' => null,
+            'title'    => 'New Client',
+            'client'   => null,
+            'partners' => $this->activePartners(),
         ]);
     }
 
@@ -115,6 +116,8 @@ class ClientController extends Controller
         $data['created_by']  = Auth::id();
 
         $id = Database::insert('clients', $data);
+
+        $this->applyPartner($request, $id);
 
         ActivityLog::record('client_created', 'client', $id, 'Registered client ' . $data['name']);
         Session::success($data['name'] . ' has been registered as a client.');
@@ -260,8 +263,9 @@ class ClientController extends Controller
         $client = $this->findOrFail($request->paramInt('id'));
 
         $this->view('clients/form', [
-            'title'  => 'Edit ' . $client['name'],
-            'client' => $client,
+            'title'    => 'Edit ' . $client['name'],
+            'client'   => $client,
+            'partners' => $this->activePartners(),
         ]);
     }
 
@@ -273,6 +277,8 @@ class ClientController extends Controller
         $data   = $this->validated($request, (int) $client['id']);
 
         Database::update('clients', $data, ['id' => $client['id']]);
+
+        $this->applyPartner($request, (int) $client['id']);
 
         ActivityLog::record('client_updated', 'client', (int) $client['id'], 'Updated client ' . $data['name']);
         Session::success('Client details updated.');
@@ -379,6 +385,64 @@ class ClientController extends Controller
             'credit_limit'   => $request->decimal('credit_limit'),
             'status'         => (string) $request->input('status', 'active'),
         ];
+    }
+
+    /**
+     * Who a client may be tagged to.
+     *
+     * Only active partners: a suspended or refused one must not be
+     * selectable, and a pending application is not a partner yet.
+     */
+    private function activePartners(): array
+    {
+        if (!Auth::can('partners.manage')) {
+            return [];
+        }
+
+        return Database::all(
+            "SELECT id, name, company, default_rate FROM partners
+              WHERE status = 'active'
+           ORDER BY COALESCE(company, name)"
+        );
+    }
+
+    /**
+     * Tag a client to a partner, or move them, and rebuild the ledger.
+     *
+     * The commission history has to follow the tag or the books say one
+     * thing and the partner portal another. Deliberately not part of
+     * fields(): it is only ever set by somebody allowed to set it, and a
+     * form that omits the field must not clear it.
+     */
+    private function applyPartner(Request $request, int $clientId): void
+    {
+        if (!Auth::can('partners.manage') || $request->input('partner_id') === null) {
+            return;
+        }
+
+        $raw     = trim((string) $request->input('partner_id'));
+        $partner = $raw === '' ? null : (int) $raw;
+
+        $current = Database::scalar('SELECT partner_id FROM clients WHERE id = :c', ['c' => $clientId]);
+        $current = $current === null ? null : (int) $current;
+
+        if ($partner === $current) {
+            return;
+        }
+
+        Database::update('clients', [
+            'partner_id'        => $partner,
+            'partner_linked_at' => $partner === null ? null : date('Y-m-d H:i:s'),
+        ], ['id' => $clientId]);
+
+        \App\Services\Commission::resyncClient($clientId);
+
+        ActivityLog::record(
+            'client_partner_changed',
+            'client',
+            $clientId,
+            $partner === null ? 'Removed the introducing partner' : 'Tagged to partner #' . $partner
+        );
     }
 
     /**

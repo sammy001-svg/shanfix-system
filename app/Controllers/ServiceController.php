@@ -436,6 +436,13 @@ class ServiceController extends Controller
             'unit_label'   => $request->input('unit_label') ?: null,
             'lead_time'    => $request->input('lead_time') ?: null,
             'is_active'    => $request->bool('is_active') ? 1 : 0,
+
+            // Empty is not zero. Empty means "whatever that partner's own
+            // rate is"; zero means this service pays no commission at all,
+            // and the two have to stay tellable apart.
+            'commission_rate' => trim((string) $request->input('commission_rate')) === ''
+                ? null
+                : max(0, min(100, (float) $request->input('commission_rate'))),
         ];
     }
 

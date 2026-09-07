@@ -4301,6 +4301,16 @@ a.portal-list__row:hover { background: var(--surface-2); }
 .portal-list__chev { display: flex; color: var(--slate-400); }
 .portal-list__chev svg { width: 17px; height: 17px; }
 
+/* What a line earns the partner looking at it. */
+.partner-cut {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--on-green);
+  white-space: nowrap;
+}
+.partner-cut strong { font-weight: 700; }
+
 /* The row is the link, so this is a button in looks only — a real one
    inside an anchor would be a link inside a link. */
 .portal-list__pay { pointer-events: none; }
@@ -4741,8 +4751,45 @@ a.portal-list__row:hover { background: var(--surface-2); }
   text-transform: uppercase;
 }
 .login__kind svg { width: 13px; height: 13px; }
-.login__kind--staff  { background: var(--tint-navy);  color: var(--on-navy); }
-.login__kind--client { background: var(--tint-green); color: var(--on-green); }
+.login__kind--staff   { background: var(--tint-navy);  color: var(--on-navy); }
+.login__kind--client  { background: var(--tint-green); color: var(--on-green); }
+.login__kind--partner { background: var(--tint-amber); color: var(--on-amber); }
+
+/* The partner portal's own badge, in the header rather than on a card. */
+.portal-kind {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* What applying gets you, said before the form rather than after it. */
+.apply-terms {
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  border: 1px solid var(--green-700);
+  border-radius: 12px;
+  background: var(--tint-green);
+}
+.apply-terms__row { display: flex; align-items: baseline; gap: 10px; }
+.apply-terms__figure {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--on-green);
+}
+.apply-terms__label { font-size: 13px; line-height: 1.5; color: var(--on-green); }
+.apply-terms__note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--on-green);
+  opacity: .85;
+}
 
 /* Anyone who cannot get in needs a way to reach a person. "Contact your
    administrator" means nothing to a customer, so the real details sit

@@ -155,6 +155,30 @@ $val = static function (string $key, $fallback = '') use ($client) {
             <span class="field-hint">0 means no limit is tracked.</span>
           </div>
 
+          <?php // Who introduced them. This is what earns a partner
+                // commission on everything this customer ever pays, so it
+                // is a deliberate choice rather than something inferred. ?>
+          <?php if (!empty($partners) && \App\Core\Auth::can('partners.manage')): ?>
+            <div class="field mb-16">
+              <label class="label" for="partner_id">Introduced by</label>
+              <select class="select" id="partner_id" name="partner_id">
+                <option value="">Nobody — we found them ourselves</option>
+                <?php foreach ($partners as $ptr): ?>
+                  <option value="<?= (int) $ptr['id'] ?>"
+                    <?= (string) $val('partner_id', '') === (string) $ptr['id'] ? 'selected' : '' ?>>
+                    <?= e($ptr['company'] ?: $ptr['name']) ?>
+                    (<?= e(rtrim(rtrim(number_format((float) $ptr['default_rate'], 2), '0'), '.')) ?>%)
+                  </option>
+                <?php endforeach; ?>
+              </select>
+              <span class="field-hint">
+                Every invoice this customer pays earns them commission, including
+                repeat work. Changing it rebuilds the commission on this
+                customer's history.
+              </span>
+            </div>
+          <?php endif; ?>
+
           <div class="field">
             <label class="label" for="status">Status</label>
             <select class="select" id="status" name="status">

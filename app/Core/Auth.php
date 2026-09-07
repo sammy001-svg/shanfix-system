@@ -76,6 +76,14 @@ class Auth
         'letters.view'      => ['admin', 'manager', 'sales', 'finance', 'reception'],
         'letters.manage'    => ['admin', 'manager', 'sales'],
 
+        // Partners and what they are owed. Sales work with them day to day
+        // and finance pay them, so both may look; deciding an application
+        // and moving a rate changes what the business owes, so that is
+        // narrower. Paying a commission out is a finance act.
+        'partners.view'     => ['admin', 'manager', 'sales', 'finance'],
+        'partners.manage'   => ['admin', 'manager'],
+        'partners.pay'      => ['admin', 'finance'],
+
         'leads.view'        => ['admin', 'manager', 'sales', 'reception', 'staff'],
         // Everyone else sees only the leads allocated to them. Reception
         // is included because they log walk-ins before anyone owns them.
