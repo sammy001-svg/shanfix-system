@@ -25,6 +25,8 @@ class Numbering
         'agreement'     => 'agreement_prefix',
         'artwork'       => 'artwork_prefix',
         'partner'       => 'partner_prefix',
+        'employee'      => 'employee_prefix',
+        'equipment'     => 'equipment_prefix',
     ];
 
     private const DEFAULTS = [
@@ -43,6 +45,8 @@ class Numbering
         'agreement'     => 'AGR',
         'artwork'       => 'ART',
         'partner'       => 'PTR',
+        'employee'      => 'EMP',
+        'equipment'     => 'EQP',
     ];
 
     /**

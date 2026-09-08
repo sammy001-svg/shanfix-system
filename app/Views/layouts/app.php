@@ -170,6 +170,39 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php if (can('hr.view')): ?>
+        <a class="nav-link <?= is_active_nav('/staff') ? 'is-active' : '' ?>"
+           href="<?= url('/staff') ?>">
+          <?= icon('user', 'nav-link__icon') ?> Staff
+        </a>
+      <?php endif; ?>
+
+      <?php if (can('payroll.view')): ?>
+        <a class="nav-link <?= is_active_nav('/payroll') ? 'is-active' : '' ?>"
+           href="<?= url('/payroll') ?>">
+          <?= icon('briefcase', 'nav-link__icon') ?> Payroll
+        </a>
+      <?php endif; ?>
+
+      <?php if (can('equipment.view')): ?>
+        <?php // The count is what is falling due, because that is the only
+              // thing on this page anybody has to act on. ?>
+        <?php $equipmentDue = (int) \App\Core\Database::scalar(
+            "SELECT COUNT(*) FROM equipment
+              WHERE status <> 'disposed' AND next_service_on IS NOT NULL
+                AND next_service_on <= :h",
+            ['h' => date('Y-m-d', strtotime('+' . (int) setting('equipment_service_warn_days', 14) . ' days'))],
+            0
+        ); ?>
+        <a class="nav-link <?= is_active_nav('/equipment') ? 'is-active' : '' ?>"
+           href="<?= url('/equipment') ?>">
+          <?= icon('package', 'nav-link__icon') ?> Equipment
+          <?php if ($equipmentDue > 0): ?>
+            <span class="nav-link__badge"><?= $equipmentDue ?></span>
+          <?php endif; ?>
+        </a>
+      <?php endif; ?>
+
       <?php if (can('documents.view')): ?>
         <a class="nav-link <?= is_active_nav('/proposals') ? 'is-active' : '' ?>" href="<?= url('/proposals') ?>">
           <?= icon('briefcase', 'nav-link__icon') ?> Proposals

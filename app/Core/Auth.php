@@ -26,6 +26,7 @@ class Auth
         'admin'      => 'Administrator — full access including users and settings',
         'manager'    => 'Manager — all operations, no user or settings administration',
         'finance'    => 'Finance — invoicing, payments, expenses and reports',
+        'hr'         => 'HR — staff records, pay and payroll',
         'sales'      => 'Sales — leads, clients, quotations and invoices',
         'production' => 'Production — job cards, artwork, printing and delivery notes',
         'designer'   => 'Designer — artwork requests, proofs and client approvals',
@@ -45,7 +46,7 @@ class Auth
      * anyone's account.
      */
     private const PERMISSIONS = [
-        'dashboard.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
+        'dashboard.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'hr'],
 
         'inventory.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'inventory.manage'  => ['admin', 'manager', 'production'],
@@ -131,9 +132,34 @@ class Auth
         'subscriptions.view'   => ['admin', 'manager', 'finance', 'sales', 'reception'],
         'subscriptions.manage' => ['admin', 'manager', 'finance'],
 
+        // Staff records and pay.
+        //
+        // Its own role rather than folded into 'manager', because an
+        // employee record carries what that person earns, their ID number
+        // and their bank account. A production manager needs none of that
+        // to run a print floor, and every extra pair of eyes on a payroll
+        // is a place it can leak from.
+        //
+        // Preparing a payroll and approving one are deliberately different
+        // authorities, as with a partner payout: whoever works out what
+        // everybody is paid should not also be the person who signs it
+        // off, and paying it is finance's job either way.
+        'hr.view'           => ['admin', 'hr'],
+        'hr.manage'         => ['admin', 'hr'],
+        'payroll.view'      => ['admin', 'hr', 'finance'],
+        'payroll.run'       => ['admin', 'hr'],
+        'payroll.approve'   => ['admin'],
+        'payroll.pay'       => ['admin', 'finance'],
+
+        // The machines. Nearly everyone needs to look one up — whether the
+        // laminator is out of action decides what can be promised today —
+        // but changing the register is for the people answerable for it.
+        'equipment.view'    => ['admin', 'manager', 'finance', 'production', 'designer', 'sales', 'reception', 'staff', 'hr'],
+        'equipment.manage'  => ['admin', 'manager', 'production'],
+
         'reports.view'      => ['admin', 'manager', 'finance'],
 
-        'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
+        'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'hr'],
 
         // Who may put people into a channel or take them out. The
         // channel's own creator can do it too — see ChatController —

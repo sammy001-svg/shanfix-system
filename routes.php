@@ -19,6 +19,8 @@ use App\Controllers\ClientController;
 use App\Controllers\DashboardController;
 use App\Controllers\DeliveryNoteController;
 use App\Controllers\DocumentController;
+use App\Controllers\EmployeeController;
+use App\Controllers\EquipmentController;
 use App\Controllers\ExpenseController;
 use App\Controllers\InventoryController;
 use App\Controllers\JobController;
@@ -32,6 +34,7 @@ use App\Controllers\PartnerAuthController;
 use App\Controllers\PartnerAdminController;
 use App\Controllers\PartnerController;
 use App\Controllers\PayoutController;
+use App\Controllers\PayrollController;
 use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
@@ -522,6 +525,48 @@ $r->group(['auth'], function ($r) {
         $r->post('/inventory/images/{imageId}/delete',      [InventoryController::class, 'deleteImage'], ['permission:records.delete']);
         $r->post('/inventory/images/{imageId}/primary',     [InventoryController::class, 'setPrimaryImage']);
     });
+
+    // -- The people who work here
+    //
+    // Behind hr.* rather than a manager's permission: these records carry
+    // what people earn, their ID numbers and their bank accounts.
+    $r->get('/staff',                 [EmployeeController::class, 'index'],  ['permission:hr.view']);
+    // Before {id}, or "new" is read as a person.
+    $r->get('/staff/new',             [EmployeeController::class, 'create'], ['permission:hr.manage']);
+    $r->post('/staff/new',            [EmployeeController::class, 'store'],  ['csrf', 'permission:hr.manage']);
+    $r->get('/staff/{id}',            [EmployeeController::class, 'show'],   ['permission:hr.view']);
+    $r->post('/staff/{id}',           [EmployeeController::class, 'update'], ['csrf', 'permission:hr.manage']);
+    $r->post('/staff/{id}/pay-items', [EmployeeController::class, 'addPayItem'],    ['csrf', 'permission:hr.manage']);
+    $r->post('/staff/{id}/pay-items/{item}/end',
+                                      [EmployeeController::class, 'removePayItem'], ['csrf', 'permission:hr.manage']);
+
+    // -- Payroll
+    //
+    // Working one out, approving it and paying it are three different
+    // authorities on purpose. Whoever decides what everybody is paid
+    // should not be the only person who has looked at it.
+    $r->get('/payroll',                  [PayrollController::class, 'index'],     ['permission:payroll.view']);
+    // Before {id}, or "rates" is read as a run.
+    $r->get('/payroll/rates',            [PayrollController::class, 'rates'],     ['permission:payroll.view']);
+    $r->post('/payroll/rates',           [PayrollController::class, 'saveRates'], ['csrf', 'permission:payroll.approve']);
+    $r->get('/payroll/payslip/{id}',     [PayrollController::class, 'payslip'],   ['permission:payroll.view']);
+    $r->post('/payroll',                 [PayrollController::class, 'build'],     ['csrf', 'permission:payroll.run']);
+    $r->get('/payroll/{id}',             [PayrollController::class, 'show'],      ['permission:payroll.view']);
+    $r->post('/payroll/{id}/approve',    [PayrollController::class, 'approve'],   ['csrf', 'permission:payroll.approve']);
+    $r->post('/payroll/{id}/paid',       [PayrollController::class, 'markPaid'],  ['csrf', 'permission:payroll.pay']);
+    $r->get('/payroll/{id}/export/{kind}', [PayrollController::class, 'export'],  ['permission:payroll.pay']);
+    $r->post('/payroll/{id}/discard',    [PayrollController::class, 'destroy'],   ['csrf', 'permission:payroll.run']);
+
+    // -- The machines
+    //
+    // Nearly everyone may look one up: whether the laminator is working
+    // decides what can be promised today. Changing the register is not.
+    $r->get('/equipment',              [EquipmentController::class, 'index'],  ['permission:equipment.view']);
+    $r->get('/equipment/new',          [EquipmentController::class, 'create'], ['permission:equipment.manage']);
+    $r->post('/equipment/new',         [EquipmentController::class, 'store'],  ['csrf', 'permission:equipment.manage']);
+    $r->get('/equipment/{id}',         [EquipmentController::class, 'show'],   ['permission:equipment.view']);
+    $r->post('/equipment/{id}',        [EquipmentController::class, 'update'], ['csrf', 'permission:equipment.manage']);
+    $r->post('/equipment/{id}/service', [EquipmentController::class, 'logService'], ['csrf', 'permission:equipment.manage']);
 
     // -- Suppliers and purchasing
     //
