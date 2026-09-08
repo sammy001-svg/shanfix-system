@@ -63,6 +63,14 @@ class Notifier
         'partner_code'        => 'Verification code for the partner portal',
         'partner_approved'    => 'Partner application approved',
         'partner_paid'        => 'Commission paid out to a partner',
+
+        // Keeping a partner told about their own customers. They cannot
+        // raise a quotation, an invoice or a payment themselves — that is
+        // ours to do — so without these they would only find out what has
+        // happened on their account by logging in and looking.
+        'partner_client_registered' => 'A partner has registered a customer',
+        'partner_document'          => 'Quotation or invoice raised for a partner\'s customer',
+        'partner_payment'           => 'A partner\'s customer has paid',
     ];
 
     /**

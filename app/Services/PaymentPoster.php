@@ -127,6 +127,12 @@ class PaymentPoster
                 'payment_id' => $paymentId,
             ]);
         }
+
+        // And the partner who introduced them, if there is one. This is
+        // the moment their commission is earned, so it is the one they
+        // most want to hear about. Outside the try above on purpose: the
+        // client's receipt failing is no reason to skip the partner's.
+        PartnerAlerts::paymentTaken($paymentId);
     }
 
     /**

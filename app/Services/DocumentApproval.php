@@ -144,6 +144,12 @@ class DocumentApproval
                 ['email' => false, 'sms' => false]
             );
         }
+
+        // If it belongs to a partner's customer, this is the moment it
+        // became real. Sending is guarded so a document that was created
+        // as issued and a document approved later are announced once
+        // between them, not once each.
+        PartnerAlerts::documentRaised($documentId);
     }
 
     /** An administrator sends it back with something to change. */

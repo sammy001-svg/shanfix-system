@@ -12,6 +12,7 @@ use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
 use App\Services\Commission;
+use App\Services\Notifier;
 use App\Services\Payouts;
 use App\Services\StaffNotifier;
 
@@ -139,6 +140,202 @@ class PartnerController extends Controller
         ], 'partner');
     }
 
+    // -- Registering a customer ---------------------------------------------
+
+    public function showRegisterClient(Request $request): void
+    {
+        $me = $this->me();
+
+        $this->view('partner/client-new', [
+            'title'   => 'Register a customer',
+            'me'      => $me,
+            'company' => Settings::company(),
+        ], 'partner');
+    }
+
+    /**
+     * Put a customer of theirs on our books.
+     *
+     * A partner may register a customer and say what they want. They may
+     * not raise a quotation, an invoice or a payment against them — that
+     * is ours — so this is the one place a partner writes something into
+     * the trading side of the system, and it is fenced accordingly.
+     *
+     * The brief becomes a lead as well as a client, because a paragraph
+     * about what somebody wants is worth nothing sitting in a notes field.
+     * As a lead it lands in the pipeline where a person works it.
+     */
+    public function registerClient(Request $request): void
+    {
+        $me = $this->me();
+
+        $v = new Validator($request->all());
+        $v->require('name', 'Their name')
+          ->maxLen('name', 180, 'Their name')
+          ->in('client_type', ['individual', 'company'], 'Kind of customer')
+          ->maxLen('contact_person', 140, 'Contact person')
+          ->email('email', 'Email address')
+          ->phone('phone', 'Phone number')
+          ->phone('alt_phone', 'Alternative phone')
+          ->maxLen('kra_pin', 30, 'KRA PIN')
+          ->maxLen('address', 255, 'Address')
+          ->maxLen('city', 80, 'Town')
+          ->maxLen('industry', 120, 'Industry')
+          ->require('brief', 'What they want');
+
+        // We have to be able to reach them, or there is nothing to act on.
+        if (!$request->input('email') && !$request->input('phone')) {
+            $v->custom('phone', false, 'Give at least a phone number or an email address.');
+        }
+
+        if ($v->fails()) {
+            Session::flashErrors($v->errors());
+            Session::flashInput($request->all());
+            Response::to('/partners/clients/new');
+        }
+
+        $email = $request->input('email') ? strtolower(trim((string) $request->input('email'))) : null;
+        $phone = $request->input('phone') ? trim((string) $request->input('phone')) : null;
+
+        // Somebody already on our books is not theirs to claim. Commission
+        // follows the customer, so re-tagging on a second registration
+        // would let a partner take a share of business that was already
+        // ours, or somebody else's, by typing in an address they guessed.
+        //
+        // So an existing customer is never re-tagged here. It goes to a
+        // person to sort out, and the partner is told it is being looked
+        // at rather than being told whose it is — the answer to "is this
+        // company already your customer" is not one a form should give.
+        $existing = null;
+
+        if ($email !== null || $phone !== null) {
+            $existing = Database::first(
+                'SELECT id FROM clients
+                  WHERE (:e IS NOT NULL AND email = :e2)
+                     OR (:p IS NOT NULL AND phone = :p2)
+                  LIMIT 1',
+                ['e' => $email, 'e2' => $email, 'p' => $phone, 'p2' => $phone]
+            );
+        }
+
+        $brief = trim((string) $request->input('brief'));
+        $name  = trim((string) $request->input('name'));
+
+        if ($existing) {
+            $this->flagForStaff($me, $name, $email, $phone, $brief);
+
+            Session::flash(
+                'success',
+                'Thank you. We already have a record that looks like ' . $name
+                . ', so your account manager is checking it before anything is '
+                . 'tagged to you. They will come back to you.'
+            );
+            Response::to('/partners/customers');
+        }
+
+        $clientId = Database::insert('clients', [
+            'client_code'       => \App\Core\Numbering::next('client'),
+            'client_type'       => (string) $request->input('client_type', 'company'),
+            'name'              => $name,
+            'contact_person'    => trim((string) $request->input('contact_person')) ?: null,
+            'email'             => $email,
+            'phone'             => $phone,
+            'alt_phone'         => trim((string) $request->input('alt_phone')) ?: null,
+            'kra_pin'           => $request->input('kra_pin')
+                                     ? strtoupper(trim((string) $request->input('kra_pin')))
+                                     : null,
+            'address'           => trim((string) $request->input('address')) ?: null,
+            'city'              => trim((string) $request->input('city')) ?: null,
+            'industry'          => trim((string) $request->input('industry')) ?: null,
+            'status'            => 'active',
+            // created_by is a staff user, and a partner is not one. The
+            // partner link below is what records who brought them.
+            'partner_id'        => (int) $me['id'],
+            'partner_linked_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        // The brief, as work rather than as a paragraph nobody opens.
+        $leadId = Database::insert('leads', [
+            'lead_number'         => \App\Core\Numbering::next('lead'),
+            'name'                => $name,
+            'company'             => (string) $request->input('client_type', 'company') === 'company' ? $name : null,
+            'email'               => $email,
+            'phone'               => $phone,
+            'source'              => 'referral',
+            'partner_id'          => (int) $me['id'],
+            'requirement'         => $brief,
+            'stage'               => 'new',
+            'converted_client_id' => $clientId,
+        ]);
+
+        ActivityLog::record(
+            'partner_registered_client',
+            'client',
+            $clientId,
+            $me['name'] . ' registered ' . $name
+        );
+
+        $this->tellStaff(
+            'A partner has registered a customer',
+            $me['name'] . ' registered ' . $name . '.',
+            '/clients/' . $clientId,
+            'client',
+            $clientId
+        );
+
+        // The partner hears it from us rather than having to trust that
+        // the form worked.
+        Notifier::dispatch('partner_client_registered', [
+            'entity_type'  => 'partner',
+            'entity_id'    => (int) $me['id'],
+            'contact_name' => $me['name'],
+            'email'        => $me['email'],
+            'phone'        => $me['phone'],
+            'client_name'  => $name,
+        ]);
+
+        Notifier::processQueue(4);
+
+        Session::flash('success', $name . ' is registered to you. We will be in touch with them.');
+        Response::to('/partners/customers/' . $clientId);
+    }
+
+    /**
+     * Raise a possible duplicate with the people who can settle it.
+     *
+     * Deliberately a lead and not a client: nothing is tagged to anybody
+     * until somebody has looked.
+     */
+    private function flagForStaff(array $me, string $name, ?string $email, ?string $phone, string $brief): void
+    {
+        $leadId = Database::insert('leads', [
+            'lead_number' => \App\Core\Numbering::next('lead'),
+            'name'        => $name,
+            'email'       => $email,
+            'phone'       => $phone,
+            'source'      => 'referral',
+            'partner_id'  => (int) $me['id'],
+            'requirement' => "[Already on our books — check who this belongs to before tagging]\n\n" . $brief,
+            'stage'       => 'new',
+        ]);
+
+        ActivityLog::record(
+            'partner_client_duplicate',
+            'lead',
+            $leadId,
+            $me['name'] . ' tried to register ' . $name . ', who looks like an existing customer'
+        );
+
+        $this->tellStaff(
+            'A partner registered a customer we may already have',
+            $me['name'] . ' registered ' . $name . ', who matches a customer already on our books. '
+            . 'Nothing has been tagged to them.',
+            '/leads/' . $leadId,
+            'lead',
+            $leadId
+        );
+    }
+
     // -- Their customers ----------------------------------------------------
 
     public function customers(Request $request): void
@@ -173,6 +370,93 @@ class PartnerController extends Controller
      * is worked out here rather than in the view: the fallback to their own
      * rate is a rule, and it is the same rule the commission ledger uses.
      */
+    /**
+     * One customer of theirs, and everything we have done for them.
+     *
+     * Read-only, and scoped by partner_id in the first query rather than
+     * checked afterwards: a partner asking for a customer who is not
+     * theirs gets a 404, not somebody else's trading history.
+     *
+     * Drafts are left out. A quotation still being written is not
+     * something the partner should be telling their customer about, and a
+     * figure that changes before it is sent would only cause an argument.
+     */
+    public function client(Request $request): void
+    {
+        $me = $this->me();
+        $id = $request->paramInt('id');
+
+        $client = Database::first(
+            'SELECT * FROM clients WHERE id = :id AND partner_id = :p',
+            ['id' => $id, 'p' => $me['id']]
+        );
+
+        if (!$client) {
+            throw new HttpException(404, 'That is not one of your customers.');
+        }
+
+        $documents = Database::all(
+            "SELECT id, doc_type, doc_number, issue_date, due_date, status,
+                    total, amount_paid, balance
+               FROM documents
+              WHERE client_id = :c
+                AND doc_type IN ('quotation', 'invoice')
+                AND status <> 'draft'
+           ORDER BY issue_date DESC, id DESC",
+            ['c' => $client['id']]
+        );
+
+        $invoiced = 0.0;
+        $paid     = 0.0;
+        $owing    = 0.0;
+
+        foreach ($documents as $doc) {
+            if ($doc['doc_type'] !== 'invoice' || $doc['status'] === 'cancelled') {
+                continue;
+            }
+
+            $invoiced += (float) $doc['total'];
+            $paid     += (float) $doc['amount_paid'];
+            $owing    += (float) $doc['balance'];
+        }
+
+        // What this one customer has earned them, split the way the money
+        // actually behaves: earned when the customer paid, paid when it
+        // reached the partner.
+        $commission = Database::first(
+            "SELECT COALESCE(SUM(amount), 0)                                        AS total,
+                    COALESCE(SUM(CASE WHEN status = 'earned' THEN amount END), 0)    AS due,
+                    COALESCE(SUM(CASE WHEN status = 'paid'   THEN amount END), 0)    AS paid,
+                    COUNT(*)                                                         AS entries
+               FROM commissions
+              WHERE client_id = :c AND partner_id = :p AND status <> 'void'",
+            ['c' => $client['id'], 'p' => $me['id']]
+        ) ?: ['total' => 0, 'due' => 0, 'paid' => 0, 'entries' => 0];
+
+        // What they told us the customer wanted, when they registered them.
+        $briefs = Database::all(
+            "SELECT lead_number, requirement, stage, created_at
+               FROM leads
+              WHERE converted_client_id = :c AND partner_id = :p
+                AND requirement IS NOT NULL AND requirement <> ''
+           ORDER BY id DESC",
+            ['c' => $client['id'], 'p' => $me['id']]
+        );
+
+        $this->view('partner/client', [
+            'title'      => $client['name'],
+            'me'         => $me,
+            'client'     => $client,
+            'documents'  => $documents,
+            'invoiced'   => $invoiced,
+            'paid'       => $paid,
+            'owing'      => $owing,
+            'commission' => $commission,
+            'briefs'     => $briefs,
+            'company'    => Settings::company(),
+        ], 'partner');
+    }
+
     public function services(Request $request): void
     {
         $me     = $this->me();
@@ -572,27 +856,68 @@ class PartnerController extends Controller
             $me['name'] . ' introduced ' . trim((string) $request->input('name'))
         );
 
-        $staff = Database::all(
-            "SELECT id FROM users WHERE status = 'active' AND role IN ('admin','manager','sales')"
+        // users has no 'status' column — it has is_active — so this threw
+        // on every referral, after the lead had already been written: the
+        // partner saw an error page having done nothing wrong, and nobody
+        // was told an introduction had come in.
+        //
+        $this->tellStaff(
+            'A partner has introduced somebody',
+            $me['name'] . ' introduced ' . trim((string) $request->input('name')) . '.',
+            '/leads/' . $leadId,
+            'lead',
+            $leadId,
+            'partner_referral'
         );
-
-        if ($staff) {
-            StaffNotifier::notify(
-                array_map(static fn(array $u): int => (int) $u['id'], $staff),
-                [
-                    'event'       => 'partner_referral',
-                    'title'       => 'A partner has introduced somebody',
-                    'body'        => $me['name'] . ' introduced '
-                                   . trim((string) $request->input('name')) . '.',
-                    'link'        => '/leads/' . $leadId,
-                    'entity_type' => 'lead',
-                    'entity_id'   => $leadId,
-                ],
-                ['email' => true, 'sms' => false]
-            );
-        }
 
         Session::flash('success', 'Thank you. We have it, and we will follow it up.');
         Response::to('/partners/refer');
+    }
+
+    /**
+     * Tell whoever handles partner work that something has come in.
+     *
+     * One place, because the query behind it was wrong in two: it read
+     * users.status, and users has is_active instead, so it threw after the
+     * row had already been written. The partner saw an error page having
+     * done nothing wrong, and nobody was told at all.
+     *
+     * Both places a role can live are checked, because Auth counts the
+     * primary role even when the join table has missed it, and somebody
+     * who is only a manager in one of them still handles this.
+     */
+    private function tellStaff(
+        string $title,
+        string $body,
+        string $link,
+        string $entityType,
+        int $entityId,
+        string $event = 'partner_client'
+    ): void {
+        $staff = Database::all(
+            "SELECT DISTINCT u.id
+               FROM users u
+          LEFT JOIN user_roles ur ON ur.user_id = u.id
+              WHERE u.is_active = 1
+                AND (u.role IN ('admin','manager','sales')
+                     OR ur.role IN ('admin','manager','sales'))"
+        );
+
+        if (!$staff) {
+            return;
+        }
+
+        StaffNotifier::notify(
+            array_map(static fn(array $u): int => (int) $u['id'], $staff),
+            [
+                'event'       => $event,
+                'title'       => $title,
+                'body'        => $body,
+                'link'        => $link,
+                'entity_type' => $entityType,
+                'entity_id'   => $entityId,
+            ],
+            ['email' => true, 'sms' => false]
+        );
     }
 }

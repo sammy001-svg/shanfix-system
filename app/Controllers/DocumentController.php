@@ -190,6 +190,12 @@ class DocumentController extends Controller
         // administrator raised it themselves it waits to be approved.
         DocumentApproval::afterSave($id, $type);
 
+        // If this is a partner's customer, tell them work is happening on
+        // their account — they cannot raise any of this themselves, so
+        // otherwise they would only find out by signing in and looking.
+        // Skips drafts, and never fires twice for one document.
+        \App\Services\PartnerAlerts::documentRaised($id);
+
         if (DocumentApproval::governs($type) && !DocumentApproval::canApprove()) {
             Session::success(
                 self::TYPES[$type]['label'] . ' created and sent for approval. '

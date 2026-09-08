@@ -75,6 +75,8 @@ $brand   = \App\Core\Settings::company();
          href="<?= url('/partners/services') ?>">What we do</a>
       <a class="portal-nav__link <?= $on('/partners/upcoming') ? 'is-active' : '' ?>"
          href="<?= url('/partners/upcoming') ?>">What is coming</a>
+      <a class="portal-nav__link <?= $on('/partners/clients') ? 'is-active' : '' ?>"
+         href="<?= url('/partners/clients/new') ?>">Register a customer</a>
       <a class="portal-nav__link <?= $on('/partners/refer') ? 'is-active' : '' ?>"
          href="<?= url('/partners/refer') ?>">Introduce someone</a>
     </nav>

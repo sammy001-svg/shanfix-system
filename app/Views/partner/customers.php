@@ -16,6 +16,11 @@ require_once APP_PATH . '/Views/partials/icons.php';
       Everyone you introduced. Every invoice they pay earns you commission —
       the first job and every one after it.
     </p>
+    <p>
+      <a class="btn btn--primary" href="<?= url('/partners/clients/new') ?>">
+        <?= icon('user-plus') ?> Register a customer
+      </a>
+    </p>
   </div>
 
   <?php if (!$rows): ?>
@@ -23,8 +28,10 @@ require_once APP_PATH . '/Views/partials/icons.php';
       <span class="portal-empty__icon"><?= icon('users') ?></span>
       <div class="portal-empty__title">Nobody yet</div>
       <p class="text-sm text-muted mb-0">
-        <a href="<?= url('/partners/refer') ?>">Introduce someone</a> and they
-        will appear here once we have taken them on.
+        <a href="<?= url('/partners/clients/new') ?>">Register one</a> and
+        they are yours from that moment — or
+        <a href="<?= url('/partners/refer') ?>">introduce someone</a> and we
+        will take it from there.
       </p>
     </div>
   <?php else: ?>
@@ -32,7 +39,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
       <ul class="portal-list">
         <?php foreach ($rows as $c): ?>
           <li>
-            <span class="portal-list__row">
+            <a class="portal-list__row" href="<?= url('/partners/customers/' . (int) $c['id']) ?>">
               <span class="portal-list__main">
                 <span class="portal-list__title"><?= e($c['name']) ?></span>
                 <span class="portal-list__meta">
@@ -50,7 +57,8 @@ require_once APP_PATH . '/Views/partials/icons.php';
                   <span class="badge badge--grey"><?= e(label_of((string) $c['status'])) ?></span>
                 <?php endif; ?>
               </span>
-            </span>
+              <span class="portal-list__chev"><?= icon('chevron-right') ?></span>
+            </a>
           </li>
         <?php endforeach; ?>
       </ul>

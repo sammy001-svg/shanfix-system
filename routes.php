@@ -297,6 +297,15 @@ $r->group(['partner_auth'], function ($r) {
     $r->get('/partners',             [PartnerController::class, 'home']);
     $r->get('/partners/earnings',    [PartnerController::class, 'commissions']);
     $r->get('/partners/customers',   [PartnerController::class, 'customers']);
+
+    // Registering a customer is the one thing a partner writes into the
+    // trading side. Before the {id} route, or "new" is read as a customer.
+    $r->get('/partners/clients/new',  [PartnerController::class, 'showRegisterClient']);
+    $r->post('/partners/clients/new', [PartnerController::class, 'registerClient'], ['csrf']);
+
+    // Read-only. There is deliberately no route here that raises a
+    // quotation, an invoice or a payment — that is ours to do.
+    $r->get('/partners/customers/{id}', [PartnerController::class, 'client']);
     $r->get('/partners/services',    [PartnerController::class, 'services']);
     $r->get('/partners/upcoming',    [PartnerController::class, 'upcoming']);
     $r->get('/partners/refer',       [PartnerController::class, 'showRefer']);
