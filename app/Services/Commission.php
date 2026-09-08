@@ -78,7 +78,7 @@ class Commission
                 return;
             }
 
-            [$base, $commissionTotal] = self::valueOf($documentId, (float) $partner['default_rate'], $doc);
+            [$base, $commissionTotal] = self::valueOf($documentId, $partnerId, $doc);
 
             $total = (float) $doc['total'];
             $paid  = (float) Database::scalar(
@@ -91,9 +91,6 @@ class Commission
             // The share of the commission the customer has actually paid
             // for. Computed against the running total rather than payment
             // by payment, so the ledger cannot drift by a cent a time.
-            $share  = $total > 0.009 ? min(1.0, $paid / $total) : 0.0;
-            $target = round($commissionTotal * $share, 2);
-
             // A client can be moved from one partner to another. Anything
             // the previous partner earned on this invoice and has not been
             // paid is withdrawn; what they have already been paid stays
@@ -106,33 +103,55 @@ class Commission
                 ['id' => $documentId, 'p' => $partnerId]
             );
 
-            // What has already been written for THIS partner, ignoring
-            // anything voided. Counting another partner's rows here is what
-            // would leave the new one earning nothing at all.
-            $already = (float) Database::scalar(
-                "SELECT COALESCE(SUM(amount), 0) FROM commissions
+            // The ledger is kept in SHARES of the invoice, not in money.
+            //
+            // Recomputing the money instead looks equivalent and is not: it
+            // prices the whole invoice at today's rates every time, so
+            // moving a rate re-prices commission that was earned months ago
+            // and already agreed. A partner who earned 3% on a paid invoice
+            // would find themselves on 50% of it because somebody changed a
+            // rate for future work.
+            //
+            // So each row records the slice of the invoice it covers, in
+            // base_amount. What is already earned keeps the rate it was
+            // earned at, and only the slice that is genuinely new is priced
+            // at today's rates.
+            $paidShare = $total > 0.009 ? min(1.0, $paid / $total) : 0.0;
+
+            $earnedBase = (float) Database::scalar(
+                "SELECT COALESCE(SUM(base_amount), 0) FROM commissions
                   WHERE document_id = :id AND partner_id = :p AND status <> 'void'",
                 ['id' => $documentId, 'p' => $partnerId],
                 0
             );
 
-            $delta = round($target - $already, 2);
+            $earnedShare = $base > 0.009 ? $earnedBase / $base : 0.0;
+            $deltaShare  = $paidShare - $earnedShare;
 
-            if (abs($delta) < 0.005) {
+            // A hundredth of a percent of an invoice is not worth a row.
+            if (abs($deltaShare) < 0.0001) {
                 return;
             }
 
-            $effectiveRate = $base > 0.009 ? round($commissionTotal / $base * 100, 2) : 0.0;
+            if ($deltaShare > 0) {
+                $sliceBase = round($base * $deltaShare, 2);
+                $amount    = round($commissionTotal * $deltaShare, 2);
 
-            if ($delta > 0) {
+                if ($amount < 0.005 && $sliceBase < 0.005) {
+                    return;
+                }
+
                 Database::insert('commissions', [
                     'partner_id'  => $partnerId,
                     'client_id'   => (int) $doc['client_id'],
                     'document_id' => $documentId,
                     'payment_id'  => self::latestPaymentId($documentId),
-                    'base_amount' => $base,
-                    'rate'        => $effectiveRate,
-                    'amount'      => $delta,
+                    // The slice this row covers, not the whole invoice, so
+                    // the shares add up and a statement can show what each
+                    // entry was worked out on.
+                    'base_amount' => $sliceBase,
+                    'rate'        => $sliceBase > 0.009 ? round($amount / $sliceBase * 100, 2) : 0.0,
+                    'amount'      => $amount,
                     // The month it was earned in — the month the customer
                     // paid us — because that is the month we owe it for and
                     // the month both sides will reconcile against.
@@ -147,7 +166,7 @@ class Commission
             // earned has to come back. Anything already paid out to the
             // partner is left alone — that money has gone, and clawing it
             // back is a conversation, not a database write.
-            self::clawBack($documentId, $partnerId, abs($delta));
+            self::clawBack($documentId, $partnerId, round($base * -$deltaShare, 2));
         } catch (\Throwable $e) {
             // Commission must never be able to break payment recording.
             Logger::error('Commission sync failed: ' . $e->getMessage(), [
@@ -157,11 +176,70 @@ class Commission
     }
 
     /**
+     * The rate one partner earns on one thing.
+     *
+     * Three places a rate can come from, checked most specific first:
+     *
+     *   1. this partner, this thing   an override they negotiated
+     *   2. this thing, any partner    the service's own rate
+     *   3. this partner, anything     their default
+     *
+     * Zero is a real answer at every level and means "earns nothing on
+     * this"; it is absence, not zero, that falls through to the next rule.
+     *
+     * @param array<string,float> $overrides keyed "type:refId"
+     */
+    public static function rateFor(
+        array $overrides,
+        string $itemType,
+        ?int $refId,
+        ?float $serviceRate,
+        float $default
+    ): float {
+        $key = $itemType . ':' . (int) $refId;
+
+        if ($refId !== null && array_key_exists($key, $overrides)) {
+            return $overrides[$key];
+        }
+
+        if ($serviceRate !== null) {
+            return (float) $serviceRate;
+        }
+
+        return $default;
+    }
+
+    /**
+     * Every rate one partner has negotiated, keyed "type:refId".
+     *
+     * @return array<string,float>
+     */
+    public static function overridesFor(int $partnerId): array
+    {
+        $rows = Database::all(
+            'SELECT item_type, ref_id, rate FROM partner_rates WHERE partner_id = :p',
+            ['p' => $partnerId]
+        );
+
+        $out = [];
+
+        foreach ($rows as $row) {
+            $out[$row['item_type'] . ':' . (int) $row['ref_id']] = (float) $row['rate'];
+        }
+
+        return $out;
+    }
+
+    /**
      * What an invoice is worth in commission if it were paid in full.
+     *
+     * Takes the partner rather than a bare rate, because what a line pays
+     * now depends on who introduced the customer as well as what the line
+     * is.
      *
      * @return array{0: float, 1: float} the commissionable base, and the commission on it
      */
-    public static function valueOf(int $documentId, float $defaultRate, ?array $doc = null): array
+    public static function valueOf(int $documentId, int $partnerId, ?array $doc = null): array
     {
         $doc ??= Database::first(
             'SELECT subtotal, discount_amount FROM documents WHERE id = :id',
@@ -171,6 +249,14 @@ class Commission
         if (!$doc) {
             return [0.0, 0.0];
         }
+
+        $default = (float) Database::scalar(
+            'SELECT default_rate FROM partners WHERE id = :p',
+            ['p' => $partnerId],
+            0
+        );
+
+        $overrides = self::overridesFor($partnerId);
 
         $items = Database::all(
             "SELECT i.item_type, i.ref_id, i.line_total, s.commission_rate
@@ -201,12 +287,13 @@ class Commission
         foreach ($items as $item) {
             $net = (float) $item['line_total'] * $netFactor;
 
-            // Null means "no rate of its own, use the partner's". Zero is a
-            // real answer and means this line pays nothing, which is why the
-            // two cannot be the same value.
-            $rate = $item['commission_rate'] === null
-                ? $defaultRate
-                : (float) $item['commission_rate'];
+            $rate = self::rateFor(
+                $overrides,
+                (string) $item['item_type'],
+                $item['ref_id'] === null ? null : (int) $item['ref_id'],
+                $item['commission_rate'] === null ? null : (float) $item['commission_rate'],
+                $default
+            );
 
             $base       += $net;
             $commission += $net * $rate / 100;
@@ -226,43 +313,54 @@ class Commission
     }
 
     /**
-     * Take back $amount of commission earned on this invoice.
+     * Take back a slice of the invoice from what a partner earned on it.
      *
-     * Newest first, and only what has not been paid out. A row is voided
-     * whole where it can be and trimmed where it cannot, so the ledger
-     * still sums to what is genuinely owed.
+     * Measured in base rather than money, because that is what the ledger
+     * is kept in — and because a row must keep the rate it was earned at
+     * even while it shrinks. Newest first, and only what has not been paid
+     * out: money that has gone is a conversation, not a database write.
+     *
+     * @param float $baseToRemove the slice, as a share of the invoice base
      */
-    private static function clawBack(int $documentId, int $partnerId, float $amount): void
+    private static function clawBack(int $documentId, int $partnerId, float $baseToRemove): void
     {
         $rows = Database::all(
-            "SELECT id, amount FROM commissions
+            "SELECT id, base_amount, amount FROM commissions
               WHERE document_id = :id AND partner_id = :p AND status = 'earned'
            ORDER BY id DESC",
             ['id' => $documentId, 'p' => $partnerId]
         );
 
-        $left = $amount;
+        $left = $baseToRemove;
 
         foreach ($rows as $row) {
             if ($left < 0.005) {
                 break;
             }
 
+            $rowBase   = (float) $row['base_amount'];
             $rowAmount = (float) $row['amount'];
 
-            if ($rowAmount <= $left + 0.005) {
+            if ($rowBase <= $left + 0.005) {
                 Database::update('commissions', [
                     'status' => 'void',
                     'notes'  => 'Withdrawn: the payment behind it was reversed',
                 ], ['id' => $row['id']]);
 
-                $left -= $rowAmount;
+                $left -= $rowBase;
                 continue;
             }
 
+            // Part of this row survives. It keeps its rate, so the money
+            // shrinks in proportion to the slice rather than being
+            // recomputed at whatever the rate is today.
+            $keepBase = round($rowBase - $left, 2);
+            $keepRate = $rowBase > 0.009 ? $rowAmount / $rowBase : 0.0;
+
             Database::update('commissions', [
-                'amount' => round($rowAmount - $left, 2),
-                'notes'  => 'Reduced: part of the payment behind it was reversed',
+                'base_amount' => $keepBase,
+                'amount'      => round($keepBase * $keepRate, 2),
+                'notes'       => 'Reduced: part of the payment behind it was reversed',
             ], ['id' => $row['id']]);
 
             $left = 0.0;

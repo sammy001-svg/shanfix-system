@@ -260,6 +260,11 @@ $r->group(['auth'], function ($r) {
     $r->get('/partners-admin/runs',         [PartnerAdminController::class, 'run'],     ['permission:partners.view']);
 
     $r->get('/partners-admin/{id}',         [PartnerAdminController::class, 'show'],    ['permission:partners.view']);
+
+    // What this partner earns on each thing. Reading is a view right;
+    // moving a rate commits us to paying differently, so that is not.
+    $r->get('/partners-admin/{id}/rates',   [PartnerAdminController::class, 'rates'],     ['permission:partners.view']);
+    $r->post('/partners-admin/{id}/rates',  [PartnerAdminController::class, 'saveRates'], ['csrf', 'permission:partners.manage']);
     $r->post('/partners-admin/{id}',        [PartnerAdminController::class, 'update'],  ['csrf', 'permission:partners.manage']);
     $r->post('/partners-admin/{id}/decide', [PartnerAdminController::class, 'decide'],  ['csrf', 'permission:partners.manage']);
     $r->post('/partners-admin/{id}/assign', [PartnerAdminController::class, 'assign'],  ['csrf', 'permission:partners.assign']);

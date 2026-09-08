@@ -201,6 +201,11 @@ class PartnerController extends Controller
 
         $default = (float) $me['default_rate'];
 
+        // Whatever this partner has negotiated. Without it the catalogue
+        // shows them the generic rate and the ledger pays them a different
+        // one, which is the worst of both.
+        $overrides = Commission::overridesFor((int) $me['id']);
+
         // One query per kind for the pictures, rather than one per row.
         $serviceImages = \App\Services\ImageLibrary::primaryFor(
             'service',
@@ -212,7 +217,13 @@ class PartnerController extends Controller
         );
 
         foreach ($services as $i => $row) {
-            $rate = $row['commission_rate'] === null ? $default : (float) $row['commission_rate'];
+            $rate = Commission::rateFor(
+                $overrides,
+                'service',
+                (int) $row['id'],
+                $row['commission_rate'] === null ? null : (float) $row['commission_rate'],
+                $default
+            );
 
             $services[$i]['kind']           = 'service';
             $services[$i]['effective_rate'] = $rate;
@@ -223,12 +234,17 @@ class PartnerController extends Controller
         }
 
         foreach ($products as $i => $row) {
+            // 'inventory' here, not 'product': that is the word a line on an
+            // invoice uses, and it is what a rate is stored against. The
+            // display word stops at the view.
+            $rate = Commission::rateFor($overrides, 'inventory', (int) $row['id'], null, $default);
+
             $products[$i]['kind']           = 'product';
             $products[$i]['pricing_type']   = 'fixed';
             $products[$i]['lead_time']      = null;
-            $products[$i]['effective_rate'] = $default;
+            $products[$i]['effective_rate'] = $rate;
             $products[$i]['your_cut']       = (float) $row['price'] > 0.009
-                ? round((float) $row['price'] * $default / 100, 2)
+                ? round((float) $row['price'] * $rate / 100, 2)
                 : null;
             $products[$i]['image']          = $productImages[(int) $row['id']] ?? null;
         }

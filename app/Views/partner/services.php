@@ -89,7 +89,8 @@ $card = static function (array $it) use ($rateOf, $priceLabel): void {
     <p class="portal-lede">
       Everything we sell, and what each one earns you. Your rate is
       <strong><?= e($rateOf((float) $me['default_rate'])) ?></strong> unless
-      a service carries its own.
+      we have agreed something different on a particular one — each card
+      shows what it actually pays.
     </p>
   </div>
 
@@ -126,11 +127,13 @@ $card = static function (array $it) use ($rateOf, $priceLabel): void {
         <?php foreach ($products as $p): ?><?php $card($p); ?><?php endforeach; ?>
       </div>
 
-      <?php // Products carry no rate of their own, so they always pay the
-            // partner's. Said once here rather than repeated on every card. ?>
+      <?php // Products used to pay the partner's rate and nothing else.
+            // A rate can now be agreed on any single one of them, so the
+            // note says where the figure comes from rather than claiming
+            // it is always the same. ?>
       <p class="text-xs text-muted mt-8">
-        Products pay your own rate of <?= e($rateOf((float) $me['default_rate'])) ?>.
-        Only services can carry a rate of their own.
+        Unless we have agreed otherwise on one of them, products pay your
+        rate of <?= e($rateOf((float) $me['default_rate'])) ?>.
       </p>
     <?php endif; ?>
   <?php endif; ?>

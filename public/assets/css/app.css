@@ -867,6 +867,11 @@ fieldset:last-of-type { margin-bottom: 0; }
 
 .input--sm { padding: 5px 9px; font-size: 12.5px; }
 
+/* A rate box in a table cell, where a full-height control would make
+   every row a third taller than it needs to be. */
+.input-group--sm .input { padding: 5px 9px; font-size: 12.5px; }
+.input-group--sm .input-group__addon { padding: 5px 9px; font-size: 12.5px; }
+
 /* ---------------------------------------------------------------------
    Alerts
    --------------------------------------------------------------------- */

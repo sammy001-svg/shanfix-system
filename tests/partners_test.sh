@@ -194,8 +194,13 @@ eq "paid in full earns it all, exactly" \
    "$(q "SELECT COALESCE(SUM(amount),0) FROM commissions WHERE document_id=$INV AND status<>'void';")" "30000.00"
 
 # Each line took its own rate, not one blended guess.
-eq "and the per-service rate was used" \
-   "$(q "SELECT ROUND(base_amount) FROM commissions WHERE document_id=$INV ORDER BY id LIMIT 1;")" "200000"
+#
+# base_amount is the SLICE of the invoice a row covers, not the whole of
+# it — that is what lets the ledger keep each entry at the rate it was
+# earned at while a rate changes underneath. So the slices add up to the
+# invoice, and the first one is the quarter that was paid first.
+eq "the slices add up to the whole invoice"    "$(q "SELECT ROUND(COALESCE(SUM(base_amount),0)) FROM commissions WHERE document_id=$INV AND status<>'void';")"    "200000"
+eq "and the first covers the quarter paid first"    "$(q "SELECT ROUND(base_amount) FROM commissions WHERE document_id=$INV ORDER BY id LIMIT 1;")"    "50000"
 
 echo ""
 echo "=== 8. A reversed payment takes its commission with it ==="
@@ -683,6 +688,138 @@ eq "asking for it anyway shows no form" "$(echo "$SDET" | grep -c 'name="default
 eq "and no way to reassign"             "$(echo "$SDET" | grep -c 'name="account_manager_id"')" "0"
 
 $MYSQL -e "DELETE FROM users WHERE email='ptabsales@shanfix.co.ke';"
+
+echo ""
+echo "=== 29. A rate can be agreed with one partner and not another ==="
+# Partners are not all on the same terms, so a rate belongs to a pair —
+# this partner and this thing — rather than to the thing alone.
+signin_admin > /dev/null
+AJ="$D/jar_admin.txt"
+
+# Two things to price: a service that carries a rate of its own, and a
+# product, which never can.
+$MYSQL -e "DELETE FROM services WHERE code='RATE-SVC';
+           DELETE FROM inventory_items WHERE sku='RATE-PRD';
+           INSERT INTO services (code,name,pricing_type,price,commission_rate,is_active)
+             VALUES ('RATE-SVC','RATE test service','fixed',100000,20.00,1);
+           INSERT INTO inventory_items (sku,name,selling_price,is_active)
+             VALUES ('RATE-PRD','RATE test product',100000,1);"
+RSVC=$(q "SELECT id FROM services WHERE code='RATE-SVC';")
+RPRD=$(q "SELECT id FROM inventory_items WHERE sku='RATE-PRD';")
+
+eq "the rates page opens" \
+   "$(curl -s -o /dev/null -w '%{http_code}' -b "$AJ" "$BASE/partners-admin/$PID/rates")" "200"
+
+RPAGE=$(curl -s -b "$AJ" "$BASE/partners-admin/$PID/rates")
+has "it lists the service"  "$RPAGE" "RATE test service"
+has "and the product"       "$RPAGE" "RATE test product"
+has "and says where a rate comes from" "$RPAGE" "the first one found wins"
+
+# With nothing agreed, the service's own rate stands and the product falls
+# to the partner's default.
+RTOK=$(echo "$RPAGE" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+
+curl -s -o /dev/null -b "$AJ" -X POST "$BASE/partners-admin/$PID/rates" \
+  --data-urlencode "_token=$RTOK" \
+  --data-urlencode "rate[service:$RSVC]=12.5" \
+  --data-urlencode "rate[inventory:$RPRD]=3"
+
+eq "a rate is agreed on the service" \
+   "$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='service' AND ref_id=$RSVC;")" "12.50"
+eq "and on the product"              \
+   "$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='inventory' AND ref_id=$RPRD;")" "3.00"
+
+# Only one row per pair, or the commission would depend on which the query
+# read first.
+curl -s -o /dev/null -b "$AJ" -X POST "$BASE/partners-admin/$PID/rates" \
+  --data-urlencode "_token=$RTOK" --data-urlencode "rate[service:$RSVC]=14"
+eq "saving again moves it rather than adding" \
+   "$(q "SELECT COUNT(*) FROM partner_rates WHERE partner_id=$PID AND item_type='service' AND ref_id=$RSVC;")" "1"
+eq "and it is the new figure" \
+   "$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='service' AND ref_id=$RSVC;")" "14.00"
+
+echo ""
+echo "=== 30. Empty is not zero ==="
+# Zero means "earns nothing on this"; empty means "no rate of your own,
+# fall through". Storing them the same way would make one of the two
+# impossible to express.
+curl -s -o /dev/null -b "$AJ" -X POST "$BASE/partners-admin/$PID/rates" \
+  --data-urlencode "_token=$RTOK" --data-urlencode "rate[service:$RSVC]=0"
+eq "zero is stored" \
+   "$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='service' AND ref_id=$RSVC;")" "0.00"
+
+curl -s -o /dev/null -b "$AJ" -X POST "$BASE/partners-admin/$PID/rates" \
+  --data-urlencode "_token=$RTOK" --data-urlencode "rate[service:$RSVC]="
+eq "empty removes it"  \
+   "$(q "SELECT COUNT(*) FROM partner_rates WHERE partner_id=$PID AND item_type='service' AND ref_id=$RSVC;")" "0"
+eq "and the product's is untouched" \
+   "$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='inventory' AND ref_id=$RPRD;")" "3.00"
+
+echo ""
+echo "=== 31. A filtered page saves only what it showed ==="
+# A search or a filter hides rows. Saving must not read that as "clear
+# them" — which a naive "delete everything then insert what was posted"
+# would.
+$MYSQL -e "DELETE FROM partner_rates WHERE partner_id=$PID;
+           INSERT INTO partner_rates (partner_id,item_type,ref_id,rate)
+             VALUES ($PID,'service',$RSVC,11.00),($PID,'inventory',$RPRD,4.00);"
+
+# Post as though only the service row had been on screen.
+curl -s -o /dev/null -b "$AJ" -X POST "$BASE/partners-admin/$PID/rates" \
+  --data-urlencode "_token=$RTOK" --data-urlencode "rate[service:$RSVC]=13"
+
+eq "the row that was shown is saved"   \
+   "$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='service' AND ref_id=$RSVC;")" "13.00"
+eq "and the one that was not survives" \
+   "$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='inventory' AND ref_id=$RPRD;")" "4.00"
+
+echo ""
+echo "=== 32. The rate reaches the money, and the partner sees the same one ==="
+# The catalogue a partner reads and the ledger that pays them must agree,
+# or they are told one figure and paid another.
+CATP=$(tget /partners/services)
+has "their catalogue shows the agreed rate" "$CATP" "(13%)"
+
+# And the ledger works it out the same way.
+eq "the engine resolves it identically" \
+   "$($PHP "$ROOT/tests/helpers/rate_for.php" "$PID" "service" "$RSVC")" "13"
+eq "and for the product"                \
+   "$($PHP "$ROOT/tests/helpers/rate_for.php" "$PID" "inventory" "$RPRD")" "4"
+
+# Something with no agreement falls through to the service's own rate.
+eq "an unagreed service keeps its own rate" \
+   "$($PHP "$ROOT/tests/helpers/rate_for.php" "$PID" "service" "$(q "SELECT id FROM services WHERE commission_rate IS NOT NULL AND code<>'RATE-SVC' AND is_active=1 LIMIT 1;")")" \
+   "$(q "SELECT ROUND(commission_rate) FROM services WHERE commission_rate IS NOT NULL AND code<>'RATE-SVC' AND is_active=1 LIMIT 1;")"
+
+echo ""
+echo "=== 33. Sales may read the rates and not move them ==="
+SP3='PtestRates@2026'
+SH3=$($PHP -r 'echo password_hash($argv[1], PASSWORD_DEFAULT);' "$SP3")
+$MYSQL -e "DELETE FROM users WHERE email='pratesales@shanfix.co.ke';
+           INSERT INTO users (name,email,password_hash,role,is_active)
+           VALUES ('PTEST Rates Sales','pratesales@shanfix.co.ke','$SH3','sales',1);"
+signin pratesales "$SP3" > /dev/null
+SJ3="$D/jar_pratesales.txt"
+
+eq "they are signed in" "$(curl -s -o /dev/null -w '%{http_code}' -b "$SJ3" "$BASE/dashboard")" "200"
+eq "and can read the rates" \
+   "$(curl -s -o /dev/null -w '%{http_code}' -b "$SJ3" "$BASE/partners-admin/$PID/rates")" "200"
+
+# But not change one. What is on the page for them is text, not inputs.
+SRP=$(curl -s -b "$SJ3" "$BASE/partners-admin/$PID/rates")
+eq "with no boxes to type in" "$(echo "$SRP" | grep -c 'name="rate\[')" "0"
+
+BEFORE_RATE=$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='service' AND ref_id=$RSVC;")
+STOK3=$(echo "$SRP" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -s -o /dev/null -b "$SJ3" -X POST "$BASE/partners-admin/$PID/rates" \
+  --data-urlencode "_token=$STOK3" --data-urlencode "rate[service:$RSVC]=99" > /dev/null
+eq "and posting one anyway changes nothing" \
+   "$(q "SELECT rate FROM partner_rates WHERE partner_id=$PID AND item_type='service' AND ref_id=$RSVC;")" "$BEFORE_RATE"
+
+$MYSQL -e "DELETE FROM users WHERE email='pratesales@shanfix.co.ke';
+           DELETE FROM partner_rates WHERE partner_id=$PID;
+           DELETE FROM services WHERE code='RATE-SVC';
+           DELETE FROM inventory_items WHERE sku='RATE-PRD';"
 
 echo ""
 echo "=== 14. Tidy up ==="

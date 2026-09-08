@@ -187,6 +187,11 @@ class PartnerAdminController extends Controller
             'reselling'   => $reselling,
             'renewals'    => $renewals,
             'months'      => Commission::byMonth((int) $partner['id']),
+            'rateCount'   => (int) Database::scalar(
+                'SELECT COUNT(*) FROM partner_rates WHERE partner_id = :p',
+                ['p' => $partner['id']],
+                0
+            ),
             'managers'    => $this->salesTeam(),
         ]);
     }
@@ -395,6 +400,182 @@ class PartnerAdminController extends Controller
             . ($byMonth ? ' for ' . $period : '') . ', across ' . $n . ' entries.'
         );
         Response::to('/partners-admin/' . $partner['id']);
+    }
+
+    // -- What this partner earns on each thing --------------------------------
+
+    /**
+     * Every service and product, with what this partner earns on it.
+     *
+     * Partners are not all on the same terms — one brings volume, another
+     * brings customers nobody else reaches — so a rate has to be settable
+     * for this partner on this thing, not only globally per service.
+     *
+     * @return array{services: list<array<string,mixed>>, products: list<array<string,mixed>>}
+     */
+    private function rateRows(array $partner, string $search, bool $onlySet): array
+    {
+        $overrides = Commission::overridesFor((int) $partner['id']);
+        $default   = (float) $partner['default_rate'];
+
+        $like   = '%' . $search . '%';
+        $params = $search !== '' ? ['q' => $like, 'q2' => $like] : [];
+        $where  = $search !== '' ? ' AND (name LIKE :q OR description LIKE :q2)' : '';
+
+        $services = Database::all(
+            "SELECT id, name, price, pricing_type, commission_rate
+               FROM services WHERE is_active = 1" . $where . " ORDER BY name",
+            $params
+        );
+
+        $products = Database::all(
+            "SELECT id, name, selling_price AS price
+               FROM inventory_items WHERE is_active = 1" . $where . " ORDER BY name",
+            $params
+        );
+
+        foreach ($services as $i => $row) {
+            $key = 'service:' . (int) $row['id'];
+
+            $services[$i]['item_type'] = 'service';
+            $services[$i]['override']  = $overrides[$key] ?? null;
+            $services[$i]['effective'] = Commission::rateFor(
+                $overrides,
+                'service',
+                (int) $row['id'],
+                $row['commission_rate'] === null ? null : (float) $row['commission_rate'],
+                $default
+            );
+            $services[$i]['source'] = isset($overrides[$key])
+                ? 'this partner'
+                : ($row['commission_rate'] === null ? 'their default' : 'the service');
+        }
+
+        foreach ($products as $i => $row) {
+            $key = 'inventory:' . (int) $row['id'];
+
+            $products[$i]['item_type']       = 'inventory';
+            $products[$i]['commission_rate'] = null;   // only services carry one
+            $products[$i]['override']        = $overrides[$key] ?? null;
+            $products[$i]['effective']       = $overrides[$key] ?? $default;
+            $products[$i]['source']          = isset($overrides[$key]) ? 'this partner' : 'their default';
+        }
+
+        // "Only the ones I have set" is what makes this usable for a
+        // business with hundreds of products: the exceptions are the point,
+        // and the rest are just the default written out.
+        if ($onlySet) {
+            $keep = static fn(array $r): bool => $r['override'] !== null;
+
+            $services = array_values(array_filter($services, $keep));
+            $products = array_values(array_filter($products, $keep));
+        }
+
+        return ['services' => $services, 'products' => $products];
+    }
+
+    public function rates(Request $request): void
+    {
+        $this->authorize('partners.view');
+
+        $partner = $this->find($request->paramInt('id'));
+        $search  = trim((string) $request->query('q', ''));
+        $onlySet = $request->query('set') !== null;
+
+        $rows = $this->rateRows($partner, $search, $onlySet);
+
+        $this->view('partners/rates', [
+            'title'    => 'Rates — ' . $partner['name'],
+            'partner'  => $partner,
+            'services' => $rows['services'],
+            'products' => $rows['products'],
+            'search'   => $search,
+            'onlySet'  => $onlySet,
+            'setCount' => (int) Database::scalar(
+                'SELECT COUNT(*) FROM partner_rates WHERE partner_id = :p',
+                ['p' => $partner['id']],
+                0
+            ),
+        ]);
+    }
+
+    /**
+     * Save the rates on this page.
+     *
+     * Only what is on the page is touched: with a search or a filter
+     * applied, the rows nobody could see must not be wiped by saving the
+     * ones they could.
+     *
+     * An empty box is not zero. Empty means "no rate of your own here,
+     * fall through to the next rule", so the row is deleted; zero means
+     * "you earn nothing on this", and is stored.
+     */
+    public function saveRates(Request $request): void
+    {
+        $this->authorize('partners.manage');
+
+        $partner = $this->find($request->paramInt('id'));
+        $posted  = $request->array('rate');
+        $changed = 0;
+
+        foreach ($posted as $key => $value) {
+            if (!preg_match('/^(service|inventory):([0-9]+)$/', (string) $key, $m)) {
+                continue;
+            }
+
+            [$whole, $type, $ref] = $m;
+            $ref   = (int) $ref;
+            $value = trim((string) $value);
+
+            if ($value === '') {
+                $changed += Database::run(
+                    'DELETE FROM partner_rates
+                      WHERE partner_id = :p AND item_type = :t AND ref_id = :r',
+                    ['p' => $partner['id'], 't' => $type, 'r' => $ref]
+                )->rowCount();
+
+                continue;
+            }
+
+            if (!is_numeric($value)) {
+                continue;
+            }
+
+            $rate = max(0, min(100, (float) $value));
+
+            // One row per partner per thing, so an existing rate is moved
+            // rather than added to.
+            Database::run(
+                'INSERT INTO partner_rates (partner_id, item_type, ref_id, rate, set_by)
+                 VALUES (:p, :t, :r, :rate, :u)
+                 ON DUPLICATE KEY UPDATE rate = VALUES(rate), set_by = VALUES(set_by)',
+                [
+                    'p'    => $partner['id'],
+                    't'    => $type,
+                    'r'    => $ref,
+                    'rate' => $rate,
+                    'u'    => Auth::id(),
+                ]
+            );
+
+            $changed++;
+        }
+
+        ActivityLog::record(
+            'partner_rates_set',
+            'partner',
+            (int) $partner['id'],
+            'Set commission rates for ' . $partner['name']
+        );
+
+        // Deliberately no resync. A rate is what the next commission is
+        // earned at, never a repricing of what is already earned — the
+        // ledger keeps each entry at the rate in force when the customer
+        // paid, and moving that after the fact would change what we have
+        // already agreed we owe.
+        Session::success('Saved. It applies to commission earned from now on.');
+
+        Response::to('/partners-admin/' . $partner['id'] . '/rates');
     }
 
     // -- Registering one ourselves ------------------------------------------

@@ -178,6 +178,12 @@ $noPin = trim((string) $partner['kra_pin']) === '';
     <a class="tab <?= $tab === 'entries' ? 'is-active' : '' ?>" href="<?= e($tabUrl('entries')) ?>">
       Every entry
     </a>
+    <?php // Its own page rather than a tab: it is a long form with a search
+          // over it, and it is where a negotiation gets written down. ?>
+    <a class="tab" href="<?= url('/partners-admin/' . (int) $partner['id'] . '/rates') ?>">
+      What they earn
+      <?php if (!empty($rateCount)): ?><span class="tab__count"><?= (int) $rateCount ?></span><?php endif; ?>
+    </a>
     <?php if (Auth::can('partners.manage') || Auth::can('partners.assign')): ?>
       <a class="tab <?= $tab === 'details' ? 'is-active' : '' ?>" href="<?= e($tabUrl('details')) ?>">
         Details
