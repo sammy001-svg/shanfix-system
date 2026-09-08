@@ -115,14 +115,44 @@ class PartnerAuthController extends Controller
             throw new HttpException(404, 'We are not taking new partner applications at the moment.');
         }
 
+        // A preference, not a promise. Staff check it before anything is
+        // sent, and it cannot be changed from the portal afterwards —
+        // moving where money goes is finance's call, not the account
+        // holder's, so an application is the one moment they may say.
+        $method = (string) $request->input('pay_method');
+        $method = in_array($method, ['mpesa', 'bank'], true) ? $method : null;
+
         $v = new Validator($request->all());
-        $v->require('name', 'Your name')
-          ->maxLen('name', 140, 'Your name')
+        $v->require('first_name', 'First name')
+          ->maxLen('first_name', 60, 'First name')
+          ->maxLen('middle_name', 60, 'Second name')
+          ->require('last_name', 'Third name')
+          ->maxLen('last_name', 60, 'Third name')
+          ->require('id_number', 'ID number')
+          ->maxLen('id_number', 30, 'ID number')
+          ->require('occupation', 'What you do')
+          ->maxLen('occupation', 120, 'What you do')
           ->maxLen('company', 180, 'Your business')
           ->email('email', 'Email address', true)
           ->phone('phone', 'Phone number', true)
+          ->require('office_location', 'Where you work from')
+          ->maxLen('office_location', 200, 'Where you work from')
           ->maxLen('kra_pin', 30, 'KRA PIN')
-          ->require('pitch', 'Who you sell to');
+          ->maxLen('pay_phone', 30, 'M-Pesa number')
+          ->maxLen('bank_name', 120, 'Bank')
+          ->maxLen('bank_branch', 120, 'Branch')
+          ->maxLen('bank_account_name', 160, 'Account name')
+          ->maxLen('bank_account_no', 40, 'Account number')
+          ->require('pitch', 'Who you sell to')
+          // Choosing a method and giving nothing to send money to is
+          // worse than choosing nothing at all: it looks answered, and
+          // only fails on payment day. Leaving it until later is a
+          // perfectly good answer, and the form says so.
+          ->custom(
+              'bank_account_no',
+              $method !== 'bank' || trim((string) $request->input('bank_account_no')) !== '',
+              'Give the account number, or choose "tell us later".'
+          );
 
         if ($v->fails()) {
             Session::flashErrors($v->errors());
@@ -131,21 +161,53 @@ class PartnerAuthController extends Controller
         }
 
         $email = strtolower(trim((string) $request->input('email')));
+        $idNo  = trim((string) $request->input('id_number'));
 
-        $existing = Database::first('SELECT id, status FROM partners WHERE email = :e', ['e' => $email]);
+        // An ID is one person, so a second application under one is the
+        // same applicant again. Matched here rather than by a unique
+        // index: a duplicate key would raise a database error on a public
+        // form, and an error that appears only for real ID numbers is a
+        // way to test whether one is on file.
+        $existing = Database::first(
+            'SELECT id FROM partners WHERE email = :e OR id_number = :i',
+            ['e' => $email, 'i' => $idNo]
+        );
 
         // Never say whether the address is already a partner of ours. An
         // application form that answers that question is a way to find out
         // who works with us, one guess at a time. Either way they are told
         // the same thing, and either way somebody looks at it.
         if (!$existing) {
+            // Names are collected in three parts because that is how they
+            // are written on an ID, which is what they have to match when
+            // money moves. `name` is what everything downstream reads.
+            $name = full_name(
+                (string) $request->input('first_name'),
+                (string) $request->input('middle_name'),
+                (string) $request->input('last_name')
+            );
+
             $partnerId = Database::insert('partners', [
-                'name'         => trim((string) $request->input('name')),
-                'company'      => trim((string) $request->input('company')) ?: null,
-                'email'        => $email,
-                'phone'        => trim((string) $request->input('phone')),
-                'kra_pin'      => trim((string) $request->input('kra_pin')) ?: null,
-                'pitch'        => trim((string) $request->input('pitch')),
+                'first_name'      => trim((string) $request->input('first_name')),
+                'middle_name'     => trim((string) $request->input('middle_name')) ?: null,
+                'last_name'       => trim((string) $request->input('last_name')),
+                'name'            => $name,
+                'company'         => trim((string) $request->input('company')) ?: null,
+                'occupation'      => trim((string) $request->input('occupation')),
+                'email'           => $email,
+                'phone'           => trim((string) $request->input('phone')),
+                'kra_pin'         => trim((string) $request->input('kra_pin')) ?: null,
+                'id_number'       => $idNo,
+                'office_location' => trim((string) $request->input('office_location')),
+                'pitch'           => trim((string) $request->input('pitch')),
+
+                'pay_method'        => $method,
+                'pay_phone'         => trim((string) $request->input('pay_phone')) ?: null,
+                'bank_name'         => trim((string) $request->input('bank_name')) ?: null,
+                'bank_branch'       => trim((string) $request->input('bank_branch')) ?: null,
+                'bank_account_name' => trim((string) $request->input('bank_account_name')) ?: null,
+                'bank_account_no'   => trim((string) $request->input('bank_account_no')) ?: null,
+
                 'default_rate' => (float) Settings::get('partner_default_rate', 10),
                 'status'       => 'pending',
             ]);
@@ -158,7 +220,22 @@ class PartnerAuthController extends Controller
             );
 
             // Whoever decides these needs to know one is waiting.
-            $admins = Database::all("SELECT id FROM users WHERE role = 'admin' AND status = 'active'");
+            // users has no 'status' column — it has is_active — so this
+            // threw on every single application, after the row had already
+            // been written. The applicant saw an error page having been
+            // saved, and no administrator was ever told.
+            //
+            // Both places a role can live are checked, because Auth counts
+            // the primary role even when the join table has missed it, and
+            // an admin who is only an admin in one of them is still the
+            // person who has to decide this.
+            $admins = Database::all(
+                "SELECT DISTINCT u.id
+                   FROM users u
+              LEFT JOIN user_roles ur ON ur.user_id = u.id
+                  WHERE u.is_active = 1
+                    AND (u.role = 'admin' OR ur.role = 'admin')"
+            );
 
             if ($admins) {
                 StaffNotifier::notify(
@@ -166,8 +243,7 @@ class PartnerAuthController extends Controller
                     [
                         'event'       => 'partner_applied',
                         'title'       => 'A partner has applied',
-                        'body'        => trim((string) $request->input('name'))
-                                       . ' has asked to become a partner.',
+                        'body'        => $name . ' has asked to become a partner.',
                         'link'        => '/partners-admin/' . $partnerId,
                         'entity_type' => 'partner',
                         'entity_id'   => $partnerId,

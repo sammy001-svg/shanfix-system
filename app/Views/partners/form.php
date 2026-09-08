@@ -32,18 +32,56 @@ $val = static fn(string $k, string $d = ''): string => (string) old($k, $d);
     <div class="card__head"><div class="card__title">Who they are</div></div>
     <div class="card__body">
       <div class="form-grid">
+        <?php // Three parts rather than one box, because that is how a name
+              // appears on an ID and a KRA certificate — the documents it
+              // has to match when money moves. ?>
         <div class="field">
-          <label class="label" for="name">Name <span class="req">*</span></label>
-          <input class="input <?= isset($errors['name']) ? 'has-error' : '' ?>"
-                 type="text" id="name" name="name" required maxlength="140"
-                 value="<?= e($val('name')) ?>" autofocus>
-          <?= error_for($errors ?? [], 'name') ?>
+          <label class="label" for="first_name">First name <span class="req">*</span></label>
+          <input class="input <?= isset($errors['first_name']) ? 'has-error' : '' ?>"
+                 type="text" id="first_name" name="first_name" required maxlength="60"
+                 value="<?= e($val('first_name')) ?>" autofocus>
+          <?= error_for($errors ?? [], 'first_name') ?>
+        </div>
+
+        <div class="field">
+          <label class="label" for="middle_name">Second name</label>
+          <input class="input" type="text" id="middle_name" name="middle_name" maxlength="60"
+                 value="<?= e($val('middle_name')) ?>">
+          <span class="field-hint">Not everyone uses one.</span>
+        </div>
+
+        <div class="field">
+          <label class="label" for="last_name">Third name <span class="req">*</span></label>
+          <input class="input <?= isset($errors['last_name']) ? 'has-error' : '' ?>"
+                 type="text" id="last_name" name="last_name" required maxlength="60"
+                 value="<?= e($val('last_name')) ?>">
+          <?= error_for($errors ?? [], 'last_name') ?>
+        </div>
+
+        <div class="field">
+          <label class="label" for="id_number">ID number</label>
+          <input class="input" type="text" id="id_number" name="id_number" maxlength="30"
+                 value="<?= e($val('id_number')) ?>">
+        </div>
+
+        <div class="field">
+          <label class="label" for="occupation">Occupation</label>
+          <input class="input" type="text" id="occupation" name="occupation" maxlength="120"
+                 value="<?= e($val('occupation')) ?>"
+                 placeholder="Architect, supplies dealer, events organiser…">
         </div>
 
         <div class="field">
           <label class="label" for="company">Business</label>
           <input class="input" type="text" id="company" name="company" maxlength="180"
                  value="<?= e($val('company')) ?>">
+        </div>
+
+        <div class="field">
+          <label class="label" for="office_location">Office location</label>
+          <input class="input" type="text" id="office_location" name="office_location" maxlength="200"
+                 value="<?= e($val('office_location')) ?>"
+                 placeholder="Town, building, floor">
         </div>
 
         <div class="field">

@@ -410,8 +410,13 @@ class PartnerController extends Controller
         $me = $this->me();
 
         $v = new Validator($request->all());
-        $v->require('name', 'Your name')
-          ->maxLen('name', 140, 'Your name')
+        $v->require('first_name', 'First name')
+          ->maxLen('first_name', 60, 'First name')
+          ->maxLen('middle_name', 60, 'Second name')
+          ->require('last_name', 'Third name')
+          ->maxLen('last_name', 60, 'Third name')
+          ->maxLen('occupation', 120, 'What you do')
+          ->maxLen('office_location', 200, 'Where you work from')
           ->maxLen('company', 180, 'Your business')
           ->phone('phone', 'Phone number', true)
           ->maxLen('kra_pin', 30, 'KRA PIN');
@@ -422,15 +427,29 @@ class PartnerController extends Controller
             Response::to('/partners/account');
         }
 
-        // Deliberately not the email address or the rate. The address is
-        // what they sign in with and what an approval was sent to, and the
-        // rate is what we agreed to pay — neither is theirs to change from
-        // in here.
+        // Deliberately not the email address, the rate, or where their
+        // money goes. The address is what they sign in with and what an
+        // approval was sent to; the rate is what we agreed to pay; and the
+        // payment details are finance's to set, so that somebody who talked
+        // their way into this account cannot redirect the money.
+        //
+        // The display name is written from the three parts rather than
+        // taken as its own field, so the name we pay against cannot drift
+        // from the one that has to match their ID.
         Database::update('partners', [
-            'name'    => trim((string) $request->input('name')),
-            'company' => trim((string) $request->input('company')) ?: null,
-            'phone'   => trim((string) $request->input('phone')),
-            'kra_pin' => strtoupper(trim((string) $request->input('kra_pin'))) ?: null,
+            'first_name'      => trim((string) $request->input('first_name')),
+            'middle_name'     => trim((string) $request->input('middle_name')) ?: null,
+            'last_name'       => trim((string) $request->input('last_name')),
+            'name'            => full_name(
+                (string) $request->input('first_name'),
+                (string) $request->input('middle_name'),
+                (string) $request->input('last_name')
+            ),
+            'company'         => trim((string) $request->input('company')) ?: null,
+            'occupation'      => trim((string) $request->input('occupation')) ?: null,
+            'office_location' => trim((string) $request->input('office_location')) ?: null,
+            'phone'           => trim((string) $request->input('phone')),
+            'kra_pin'         => strtoupper(trim((string) $request->input('kra_pin'))) ?: null,
         ], ['id' => $me['id']]);
 
         ActivityLog::record(

@@ -5041,6 +5041,21 @@ a.portal-list__row:hover { background: var(--surface-2); }
   opacity: .85;
 }
 
+/* The application asks for enough to sign an agreement and pay somebody,
+   which is a long form. Breaking it into three named parts is what keeps
+   it reading as three short asks instead of one daunting one. */
+.apply-group {
+  margin: 26px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+}
+.apply-group:first-of-type { margin-top: 8px; }
+
 /* Anyone who cannot get in needs a way to reach a person. "Contact your
    administrator" means nothing to a customer, so the real details sit
    under the card, on the dark ground rather than inside the white. */

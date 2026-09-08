@@ -292,8 +292,14 @@ class PartnerAdminController extends Controller
         $partner = $this->find($request->paramInt('id'));
 
         $v = new Validator($request->all());
-        $v->require('name', 'Name')
-          ->maxLen('name', 140, 'Name')
+        $v->require('first_name', 'First name')
+          ->maxLen('first_name', 60, 'First name')
+          ->maxLen('middle_name', 60, 'Second name')
+          ->require('last_name', 'Third name')
+          ->maxLen('last_name', 60, 'Third name')
+          ->maxLen('occupation', 120, 'Occupation')
+          ->maxLen('id_number', 30, 'ID number')
+          ->maxLen('office_location', 200, 'Office location')
           ->maxLen('company', 180, 'Business')
           ->email('email', 'Email address', true)
           ->phone('phone', 'Phone number', true)
@@ -301,17 +307,29 @@ class PartnerAdminController extends Controller
           ->numeric('default_rate', 'Commission rate');
 
         if ($v->fails()) {
-            $v->redirectBack('/partners-admin/' . $partner['id']);
+            $v->redirectBack('/partners-admin/' . $partner['id'] . '?tab=details');
         }
 
         Database::update('partners', [
-            'name'         => trim((string) $request->input('name')),
-            'company'      => trim((string) $request->input('company')) ?: null,
-            'email'        => strtolower(trim((string) $request->input('email'))),
-            'phone'        => trim((string) $request->input('phone')),
-            'kra_pin'      => trim((string) $request->input('kra_pin')) ?: null,
-            'default_rate' => max(0, min(100, (float) $request->input('default_rate'))),
-            'notes'        => trim((string) $request->input('notes')) ?: null,
+            'first_name'      => trim((string) $request->input('first_name')),
+            'middle_name'     => trim((string) $request->input('middle_name')) ?: null,
+            'last_name'       => trim((string) $request->input('last_name')),
+            // Written from the parts, never edited on its own, so the two
+            // spellings of a name cannot drift apart.
+            'name'            => full_name(
+                (string) $request->input('first_name'),
+                (string) $request->input('middle_name'),
+                (string) $request->input('last_name')
+            ),
+            'company'         => trim((string) $request->input('company')) ?: null,
+            'occupation'      => trim((string) $request->input('occupation')) ?: null,
+            'email'           => strtolower(trim((string) $request->input('email'))),
+            'phone'           => trim((string) $request->input('phone')),
+            'kra_pin'         => trim((string) $request->input('kra_pin')) ?: null,
+            'id_number'       => trim((string) $request->input('id_number')) ?: null,
+            'office_location' => trim((string) $request->input('office_location')) ?: null,
+            'default_rate'    => max(0, min(100, (float) $request->input('default_rate'))),
+            'notes'           => trim((string) $request->input('notes')) ?: null,
         ], ['id' => $partner['id']]);
 
         ActivityLog::record('partner_updated', 'partner', (int) $partner['id'], 'Updated ' . $partner['name']);
@@ -672,9 +690,19 @@ class PartnerAdminController extends Controller
     {
         $this->authorize('partners.create');
 
+        // The public application requires the lot, because a stranger's
+        // word is all we have. Here somebody has already been met and
+        // vetted, so only the name is compulsory and the rest can be
+        // filled in as it arrives — they cannot be paid until it is.
         $v = new Validator($request->all());
-        $v->require('name', 'Name')
-          ->maxLen('name', 140, 'Name')
+        $v->require('first_name', 'First name')
+          ->maxLen('first_name', 60, 'First name')
+          ->maxLen('middle_name', 60, 'Second name')
+          ->require('last_name', 'Third name')
+          ->maxLen('last_name', 60, 'Third name')
+          ->maxLen('occupation', 120, 'Occupation')
+          ->maxLen('id_number', 30, 'ID number')
+          ->maxLen('office_location', 200, 'Office location')
           ->maxLen('company', 180, 'Business')
           ->email('email', 'Email address', true)
           ->phone('phone', 'Phone number', true)
@@ -689,13 +717,25 @@ class PartnerAdminController extends Controller
         $email   = strtolower(trim((string) $request->input('email')));
         $manager = $this->managerInput($request);
 
+        $name = full_name(
+            (string) $request->input('first_name'),
+            (string) $request->input('middle_name'),
+            (string) $request->input('last_name')
+        );
+
         $id = Database::insert('partners', [
             'partner_code'       => Numbering::next('partner'),
-            'name'               => trim((string) $request->input('name')),
+            'first_name'         => trim((string) $request->input('first_name')),
+            'middle_name'        => trim((string) $request->input('middle_name')) ?: null,
+            'last_name'          => trim((string) $request->input('last_name')),
+            'name'               => $name,
             'company'            => trim((string) $request->input('company')) ?: null,
+            'occupation'         => trim((string) $request->input('occupation')) ?: null,
             'email'              => $email,
             'phone'              => trim((string) $request->input('phone')),
             'kra_pin'            => trim((string) $request->input('kra_pin')) ?: null,
+            'id_number'          => trim((string) $request->input('id_number')) ?: null,
+            'office_location'    => trim((string) $request->input('office_location')) ?: null,
             'pitch'              => trim((string) $request->input('pitch')) ?: null,
             'default_rate'       => max(0, min(100, (float) $request->input('default_rate', 10))),
             // Registered by us, so there is nothing to decide — they are a
@@ -715,7 +755,7 @@ class PartnerAdminController extends Controller
         Notifier::dispatch('partner_approved', [
             'entity_type'  => 'partner',
             'entity_id'    => $id,
-            'contact_name' => trim((string) $request->input('name')),
+            'contact_name' => $name,
             'email'        => $email,
             'phone'        => trim((string) $request->input('phone')),
             'link'         => Notifier::absoluteUrl('/partners/start'),

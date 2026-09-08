@@ -50,8 +50,8 @@ scrub() {
              DELETE FROM documents WHERE doc_number LIKE 'PTEST-%';
              UPDATE clients SET partner_id = NULL WHERE name = 'PTEST Customer';
              DELETE FROM clients WHERE name = 'PTEST Customer';
-             DELETE FROM partner_otps WHERE email = '$PEMAIL';
-             DELETE FROM partners WHERE email = '$PEMAIL';
+             DELETE FROM partner_otps WHERE email LIKE 'ptest%@example.co.ke';
+             DELETE FROM partners WHERE email LIKE 'ptest%@example.co.ke';
              DELETE FROM services WHERE code LIKE 'PTEST-%';"
 }
 
@@ -71,15 +71,32 @@ ne "the portal itself is shut"         "$(code /partners)"        "200"
 
 echo ""
 echo "=== 2. Applying ==="
+# The form asks for enough to sign an agreement and pay somebody: a name
+# in the three parts it appears in on an ID, what they do, where they
+# work from, and where money should go.
 rm -f "$TJ"
-tpost /partners/apply \
+NOTIFIED_BEFORE=$(q "SELECT COUNT(*) FROM staff_notifications WHERE event='partner_applied';")
+
+APPLY_CODE=$(tpost /partners/apply \
   --data-urlencode "_token=$(ttok /partners/apply)" \
-  --data-urlencode "name=Partner Tester" \
+  --data-urlencode "first_name=Partner" \
+  --data-urlencode "middle_name=Kip" \
+  --data-urlencode "last_name=Tester" \
+  --data-urlencode "id_number=PTESTID001" \
+  --data-urlencode "occupation=Supplies dealer" \
   --data-urlencode "company=Tester Agencies" \
   --data-urlencode "email=$PEMAIL" \
   --data-urlencode "phone=0733111222" \
-  --data-urlencode "pitch=Hotels and schools in Westlands." > /dev/null
+  --data-urlencode "office_location=Westlands, Rhapta Road, 2nd floor" \
+  --data-urlencode "kra_pin=A009988776Z" \
+  --data-urlencode "pay_method=mpesa" \
+  --data-urlencode "pay_phone=0755444333" \
+  --data-urlencode "pitch=Hotels and schools in Westlands.")
 
+# This was a 500 for the whole life of the feature: the notification
+# looked for a 'status' column on users, which has is_active instead. The
+# row was written and then the applicant was shown an error page.
+eq "applying does not error"     "$APPLY_CODE" "302"
 eq "the application is recorded" "$(q "SELECT COUNT(*) FROM partners WHERE email='$PEMAIL';")" "1"
 eq "and it is not approved yet"  "$(q "SELECT status FROM partners WHERE email='$PEMAIL';")"  "pending"
 eq "with no password on it"      "$(q "SELECT IF(password_hash IS NULL,'none','set') FROM partners WHERE email='$PEMAIL';")" "none"
@@ -87,15 +104,72 @@ eq "and no code burned"          "$(q "SELECT IF(partner_code IS NULL,'none','se
 
 PID=$(q "SELECT id FROM partners WHERE email='$PEMAIL';")
 
+echo ""
+echo "=== 2b. Everything asked for is kept ==="
+eq "the three names"    "$(q "SELECT CONCAT_WS('/', first_name, middle_name, last_name) FROM partners WHERE id=$PID;")" "Partner/Kip/Tester"
+eq "the display name is written from them" "$(q "SELECT name FROM partners WHERE id=$PID;")" "Partner Kip Tester"
+eq "what they do"       "$(q "SELECT occupation FROM partners WHERE id=$PID;")"      "Supplies dealer"
+eq "their ID number"    "$(q "SELECT id_number FROM partners WHERE id=$PID;")"       "PTESTID001"
+eq "where they work"    "$(q "SELECT office_location FROM partners WHERE id=$PID;")" "Westlands, Rhapta Road, 2nd floor"
+eq "their KRA PIN"      "$(q "SELECT kra_pin FROM partners WHERE id=$PID;")"         "A009988776Z"
+eq "how they want paying" "$(q "SELECT pay_method FROM partners WHERE id=$PID;")"    "mpesa"
+eq "and the number for it" "$(q "SELECT pay_phone FROM partners WHERE id=$PID;")"    "0755444333"
+
+# Whoever decides these has to be told, or an application sits unread.
+eq "an administrator is told" \
+   "$(( $(q "SELECT COUNT(*) FROM staff_notifications WHERE event='partner_applied';") - NOTIFIED_BEFORE ))" "1"
+
+echo ""
+echo "=== 2c. One person, one application ==="
 # An application form that says "you already applied" is a way to find out
-# who our partners are, one address at a time.
+# who our partners are, one guess at a time. A repeat is accepted and
+# quietly ignored, whether it repeats the address or the ID.
 BEFORE=$(q "SELECT COUNT(*) FROM partners WHERE email='$PEMAIL';")
 tpost /partners/apply \
   --data-urlencode "_token=$(ttok /partners/apply)" \
-  --data-urlencode "name=Someone Else" --data-urlencode "email=$PEMAIL" \
-  --data-urlencode "phone=0700000000" --data-urlencode "pitch=Guessing." > /dev/null
+  --data-urlencode "first_name=Someone" --data-urlencode "last_name=Else" \
+  --data-urlencode "id_number=PTESTID999" --data-urlencode "occupation=Guesser" \
+  --data-urlencode "email=$PEMAIL" --data-urlencode "phone=0700000000" \
+  --data-urlencode "office_location=Nowhere" --data-urlencode "pitch=Guessing." > /dev/null
 eq "applying twice makes no second row" "$(q "SELECT COUNT(*) FROM partners WHERE email='$PEMAIL';")" "$BEFORE"
-eq "and does not overwrite the first"   "$(q "SELECT name FROM partners WHERE email='$PEMAIL';")" "Partner Tester"
+eq "and does not overwrite the first"   "$(q "SELECT name FROM partners WHERE email='$PEMAIL';")" "Partner Kip Tester"
+
+TOTAL_BEFORE=$(q "SELECT COUNT(*) FROM partners;")
+tpost /partners/apply \
+  --data-urlencode "_token=$(ttok /partners/apply)" \
+  --data-urlencode "first_name=Same" --data-urlencode "last_name=Id" \
+  --data-urlencode "id_number=PTESTID001" --data-urlencode "occupation=Guesser" \
+  --data-urlencode "email=ptest-other@example.co.ke" --data-urlencode "phone=0700000001" \
+  --data-urlencode "office_location=Nowhere" --data-urlencode "pitch=Guessing." > /dev/null
+eq "the same ID under a new address is the same person" \
+   "$(q "SELECT COUNT(*) FROM partners;")" "$TOTAL_BEFORE"
+
+echo ""
+echo "=== 2d. A payment method with nowhere to send it is refused ==="
+# Choosing a method and giving no account is worse than choosing nothing:
+# it looks answered and only fails on payment day.
+TOTAL_BEFORE=$(q "SELECT COUNT(*) FROM partners;")
+tpost /partners/apply \
+  --data-urlencode "_token=$(ttok /partners/apply)" \
+  --data-urlencode "first_name=Bank" --data-urlencode "last_name=Blank" \
+  --data-urlencode "id_number=PTESTID002" --data-urlencode "occupation=Trader" \
+  --data-urlencode "email=ptest-bank@example.co.ke" --data-urlencode "phone=0700000002" \
+  --data-urlencode "office_location=Nairobi" --data-urlencode "pitch=Some people." \
+  --data-urlencode "pay_method=bank" --data-urlencode "bank_account_no=" > /dev/null
+eq "an empty account number is turned back" "$(q "SELECT COUNT(*) FROM partners;")" "$TOTAL_BEFORE"
+
+tpost /partners/apply \
+  --data-urlencode "_token=$(ttok /partners/apply)" \
+  --data-urlencode "first_name=Bank" --data-urlencode "last_name=Given" \
+  --data-urlencode "id_number=PTESTID003" --data-urlencode "occupation=Trader" \
+  --data-urlencode "email=ptest-bank2@example.co.ke" --data-urlencode "phone=0700000003" \
+  --data-urlencode "office_location=Nairobi" --data-urlencode "pitch=Some people." \
+  --data-urlencode "pay_method=bank" --data-urlencode "bank_account_no=0123456789" \
+  --data-urlencode "bank_name=Equity" > /dev/null
+eq "and one with an account is taken" \
+   "$(q "SELECT COUNT(*) FROM partners WHERE email='ptest-bank2@example.co.ke';")" "1"
+eq "with the account on it" \
+   "$(q "SELECT bank_account_no FROM partners WHERE email='ptest-bank2@example.co.ke';")" "0123456789"
 
 echo ""
 echo "=== 3. Waiting on a decision ==="
@@ -290,7 +364,11 @@ NTOK=$(curl -s -b "$D/jar_admin.txt" "$BASE/partners-admin/new" | grep -o 'name=
 SALESID=$(q "SELECT id FROM users WHERE role='sales' AND is_active=1 ORDER BY id LIMIT 1;")
 curl -s -o /dev/null -b "$D/jar_admin.txt" -X POST "$BASE/partners-admin/new" \
   --data-urlencode "_token=$NTOK" \
-  --data-urlencode "name=Registered Direct" \
+  --data-urlencode "first_name=Registered" \
+  --data-urlencode "last_name=Direct" \
+  --data-urlencode "occupation=Contractor" \
+  --data-urlencode "id_number=PTESTREG01" \
+  --data-urlencode "office_location=Nakuru, Kenyatta Avenue" \
   --data-urlencode "company=Direct Ltd" \
   --data-urlencode "email=$REG" \
   --data-urlencode "phone=0700111333" \
@@ -458,7 +536,9 @@ has "and say what is missing" "$(tget /partners/account)" "before we can pay you
 
 tpost /partners/account \
   --data-urlencode "_token=$(ttok /partners/account)" \
-  --data-urlencode "name=Partner Tester" \
+  --data-urlencode "first_name=Partner" \
+  --data-urlencode "middle_name=Kip" \
+  --data-urlencode "last_name=Tester" \
   --data-urlencode "company=Tester Agencies" \
   --data-urlencode "phone=0733111222" \
   --data-urlencode "kra_pin=a012345678z" > /dev/null
@@ -470,12 +550,22 @@ eq "and it is upper-cased" "$(q "SELECT IF(kra_pin = UPPER(kra_pin),'yes','no') 
 # the rate we agreed to pay. Posting them anyway must do nothing.
 tpost /partners/account \
   --data-urlencode "_token=$(ttok /partners/account)" \
-  --data-urlencode "name=Partner Tester" --data-urlencode "phone=0733111222" \
+  --data-urlencode "first_name=Partner" --data-urlencode "last_name=Tester" \
+  --data-urlencode "phone=0733111222" \
   --data-urlencode "email=hijack@example.co.ke" \
-  --data-urlencode "default_rate=95" > /dev/null
+  --data-urlencode "default_rate=95" \
+  --data-urlencode "pay_method=bank" \
+  --data-urlencode "bank_account_no=9999999999" > /dev/null
 
 eq "they cannot move their own rate"  "$(q "SELECT default_rate FROM partners WHERE id=$PID;")" "10.00"
 eq "nor change what they sign in as"  "$(q "SELECT email FROM partners WHERE id=$PID;")" "$PEMAIL"
+# Where the money goes is finance's to set. Somebody who talked their way
+# into this account must not be able to send it somewhere else.
+eq "nor where their money is sent"    "$(q "SELECT IFNULL(bank_account_no,'none') FROM partners WHERE id=$PID;")" "none"
+
+# The display name is written from the three parts, so the name we pay
+# against cannot drift from the one that has to match their ID.
+eq "their name is rebuilt from its parts" "$(q "SELECT name FROM partners WHERE id=$PID;")" "Partner Tester"
 
 echo ""
 echo "=== 21. And change their own password ==="

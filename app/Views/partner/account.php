@@ -41,15 +41,59 @@ $noPin  = trim((string) $me['kra_pin']) === '';
       <form method="post" action="<?= url('/partners/account') ?>">
         <?= csrf_field() ?>
 
+        <?php // In three parts, as on your ID. We check the name against
+              // it before sending money, so one box that could drift from
+              // the parts would be a name that stops matching. ?>
         <div class="field">
-          <label class="label" for="name">Your name</label>
+          <label class="label" for="first_name">First name</label>
           <div class="input-icon">
             <?= icon('user') ?>
-            <input class="input <?= isset($errors['name']) ? 'has-error' : '' ?>"
-                   type="text" id="name" name="name" required maxlength="140"
-                   value="<?= e(old('name', $me['name'])) ?>">
+            <input class="input <?= isset($errors['first_name']) ? 'has-error' : '' ?>"
+                   type="text" id="first_name" name="first_name" required maxlength="60"
+                   value="<?= e(old('first_name', (string) ($me['first_name'] ?? ''))) ?>">
           </div>
-          <?= error_for($errors ?? [], 'name') ?>
+          <?= error_for($errors ?? [], 'first_name') ?>
+        </div>
+
+        <div class="field">
+          <label class="label" for="middle_name">
+            Second name <span class="text-muted">(if you use one)</span>
+          </label>
+          <input class="input" type="text" id="middle_name" name="middle_name" maxlength="60"
+                 value="<?= e(old('middle_name', (string) ($me['middle_name'] ?? ''))) ?>">
+        </div>
+
+        <div class="field">
+          <label class="label" for="last_name">Third name</label>
+          <div class="input-icon">
+            <?= icon('user') ?>
+            <input class="input <?= isset($errors['last_name']) ? 'has-error' : '' ?>"
+                   type="text" id="last_name" name="last_name" required maxlength="60"
+                   value="<?= e(old('last_name', (string) ($me['last_name'] ?? ''))) ?>">
+          </div>
+          <?= error_for($errors ?? [], 'last_name') ?>
+          <span class="field-hint">
+            As it appears on your ID — it has to match before we can pay you.
+          </span>
+        </div>
+
+        <div class="field">
+          <label class="label" for="occupation">What you do</label>
+          <div class="input-icon">
+            <?= icon('briefcase') ?>
+            <input class="input" type="text" id="occupation" name="occupation" maxlength="120"
+                   value="<?= e(old('occupation', (string) ($me['occupation'] ?? ''))) ?>">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="office_location">Where you work from</label>
+          <div class="input-icon">
+            <?= icon('map-pin') ?>
+            <input class="input" type="text" id="office_location" name="office_location" maxlength="200"
+                   value="<?= e(old('office_location', (string) ($me['office_location'] ?? ''))) ?>"
+                   placeholder="Town, building, floor">
+          </div>
         </div>
 
         <div class="field">

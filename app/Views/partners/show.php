@@ -66,6 +66,20 @@ $noPin = trim((string) $partner['kra_pin']) === '';
         <dt>Contact</dt><dd><?= e($partner['name']) ?></dd>
       <?php endif; ?>
 
+      <?php if (!empty($partner['occupation'])): ?>
+        <dt>Occupation</dt><dd><?= e($partner['occupation']) ?></dd>
+      <?php endif; ?>
+
+      <?php // Shown next to the name on purpose: these are the two things
+            // checked against each other before money is sent. ?>
+      <?php if (!empty($partner['id_number'])): ?>
+        <dt>ID number</dt><dd><?= e($partner['id_number']) ?></dd>
+      <?php endif; ?>
+
+      <?php if (!empty($partner['office_location'])): ?>
+        <dt>Works from</dt><dd><?= e($partner['office_location']) ?></dd>
+      <?php endif; ?>
+
       <dt>Email</dt>
       <dd><a href="mailto:<?= e($partner['email']) ?>"><?= e($partner['email']) ?></a></dd>
 
@@ -734,15 +748,43 @@ $payReady  = $payMethod === 'mpesa'
       <form method="post" action="<?= url('/partners-admin/' . (int) $partner['id']) ?>">
         <?= csrf_field() ?>
         <div class="form-grid">
+          <?php // Three parts rather than one box: this is the name that
+                // has to match an ID and a KRA certificate when money
+                // moves. The display name is written from them. ?>
           <div class="field">
-            <label class="label" for="name">Name</label>
-            <input class="input" type="text" id="name" name="name" required maxlength="140"
-                   value="<?= e($partner['name']) ?>">
+            <label class="label" for="first_name">First name</label>
+            <input class="input" type="text" id="first_name" name="first_name" required maxlength="60"
+                   value="<?= e($partner['first_name'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="middle_name">Second name</label>
+            <input class="input" type="text" id="middle_name" name="middle_name" maxlength="60"
+                   value="<?= e($partner['middle_name'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="last_name">Third name</label>
+            <input class="input" type="text" id="last_name" name="last_name" required maxlength="60"
+                   value="<?= e($partner['last_name'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="id_number">ID number</label>
+            <input class="input" type="text" id="id_number" name="id_number" maxlength="30"
+                   value="<?= e($partner['id_number'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="occupation">Occupation</label>
+            <input class="input" type="text" id="occupation" name="occupation" maxlength="120"
+                   value="<?= e($partner['occupation'] ?? '') ?>">
           </div>
           <div class="field">
             <label class="label" for="company">Business</label>
             <input class="input" type="text" id="company" name="company" maxlength="180"
                    value="<?= e($partner['company']) ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="office_location">Office location</label>
+            <input class="input" type="text" id="office_location" name="office_location" maxlength="200"
+                   value="<?= e($partner['office_location'] ?? '') ?>">
           </div>
           <div class="field">
             <label class="label" for="email">Email address</label>
