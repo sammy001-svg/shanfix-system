@@ -32,7 +32,7 @@ $MYSQL -e "UPDATE settings SET setting_value='1'  WHERE setting_key IN ('backup_
            UPDATE settings SET setting_value='24' WHERE setting_key='backup_every_hours';
            UPDATE settings SET setting_value='7'  WHERE setting_key='backup_keep';
            UPDATE settings SET setting_value='3'  WHERE setting_key='backup_warn_days';
-           DELETE FROM activity_log WHERE action='login_failed';
+           DELETE FROM activity_log WHERE action IN ('login_failed','backup_created');
            DELETE FROM notification_locks WHERE lock_key LIKE 'backup:stale%';
            DELETE FROM staff_notifications WHERE event='backup_stale';
            DELETE FROM notifications WHERE event='backup_stale';"
