@@ -160,6 +160,14 @@ if ($me && can('jobs.view')) {
             <span class="nav-link__badge"><?= $partnersWaiting ?></span>
           <?php endif; ?>
         </a>
+
+        <?php // Its own entry rather than a tab inside Partners: it is a
+              // monthly job with a deadline, done by finance, and it is not
+              // about any one partner. ?>
+        <a class="nav-link <?= is_active_nav('/payouts') ? 'is-active' : '' ?>"
+           href="<?= url('/payouts') ?>">
+          <?= icon('dollar', 'nav-link__icon') ?> Payouts
+        </a>
       <?php endif; ?>
 
       <?php if (can('documents.view')): ?>

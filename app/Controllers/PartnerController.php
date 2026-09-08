@@ -12,6 +12,7 @@ use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
 use App\Services\Commission;
+use App\Services\Payouts;
 use App\Services\StaffNotifier;
 
 /**
@@ -128,6 +129,9 @@ class PartnerController extends Controller
             // The months, so each one can be opened as a statement they can
             // invoice us against — which is what the terms say happens.
             'months'  => Commission::byMonth((int) $me['id'], 12),
+            // What we have actually sent them, and where. They ask this
+            // the moment a figure and their bank statement disagree.
+            'payouts' => Payouts::historyFor((int) $me['id'], 12),
             'page'    => $page,
             'pages'   => $pages,
             'total'   => $total,

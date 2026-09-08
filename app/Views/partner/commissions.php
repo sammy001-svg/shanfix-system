@@ -79,6 +79,64 @@ $tabUrl = static fn(string $k): string =>
     </div>
   <?php endif; ?>
 
+  <?php // ---- What we have actually sent -------------------------------
+        // The months above say what is owed and what has been settled.
+        // This says where the money went and under what reference, which
+        // is what somebody needs when their bank statement and our figure
+        // disagree. A payment that bounced is shown as such rather than
+        // quietly vanishing — they are owed it again, and should know. ?>
+  <?php if (!empty($payouts)): ?>
+    <div class="portal-card portal-card--flush mb-16">
+      <header class="portal-card__head">
+        <h2 class="portal-card__title">Payments to you</h2>
+        <span class="text-xs text-muted">Newest first</span>
+      </header>
+      <ul class="portal-list portal-list--tight">
+        <?php foreach ($payouts as $pay): ?>
+          <?php
+          $pt = strtotime($pay['period'] . '-01');
+          [$payTone, $payLabel] = match ((string) $pay['status']) {
+              'settled' => ['green', 'Sent'],
+              'sent'    => ['amber', 'On its way'],
+              'pending' => ['amber', 'Being paid'],
+              'failed'  => ['red',   'Did not go through'],
+              'held'    => ['navy',  'On hold'],
+              default   => ['grey',  ucfirst((string) $pay['status'])],
+          };
+          ?>
+          <li>
+            <div class="portal-list__row">
+              <span class="portal-list__main">
+                <span class="portal-list__title">
+                  <?= e($pt ? date('F Y', $pt) : $pay['period']) ?> commission
+                </span>
+                <span class="portal-list__meta">
+                  <?php if ($pay['status'] === 'settled' && $pay['settled_at']): ?>
+                    <?= e(fdate($pay['settled_at'])) ?>
+                    <?php if ($pay['method']): ?>
+                      &middot; <?= $pay['method'] === 'mpesa' ? 'M-Pesa' : 'bank transfer' ?>
+                    <?php endif; ?>
+                    <?php if ($pay['ref']): ?>
+                      &middot; ref <?= e($pay['ref']) ?>
+                    <?php endif; ?>
+                  <?php elseif ($pay['status'] === 'failed'): ?>
+                    It did not reach you, so it is owed to you again
+                  <?php else: ?>
+                    <?= (int) $pay['entries'] ?> entr<?= (int) $pay['entries'] === 1 ? 'y' : 'ies' ?>
+                  <?php endif; ?>
+                </span>
+              </span>
+              <span class="portal-list__side">
+                <span class="portal-list__amount"><?= e(money($pay['amount'], false)) ?></span>
+                <span class="badge badge--<?= e($payTone) ?>"><?= e($payLabel) ?></span>
+              </span>
+            </div>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    </div>
+  <?php endif; ?>
+
   <nav class="portal-tabs" aria-label="Filter">
     <?php foreach ($tabs as $key => $label): ?>
       <a class="portal-tab <?= $show === $key ? 'is-active' : '' ?>" href="<?= e($tabUrl($key)) ?>">

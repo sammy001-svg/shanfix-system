@@ -31,6 +31,7 @@ use App\Controllers\NotificationController;
 use App\Controllers\PartnerAuthController;
 use App\Controllers\PartnerAdminController;
 use App\Controllers\PartnerController;
+use App\Controllers\PayoutController;
 use App\Controllers\PaymentController;
 use App\Controllers\PublicDocumentController;
 use App\Controllers\PublicMeetingController;
@@ -269,6 +270,27 @@ $r->group(['auth'], function ($r) {
     $r->post('/partners-admin/{id}/decide', [PartnerAdminController::class, 'decide'],  ['csrf', 'permission:partners.manage']);
     $r->post('/partners-admin/{id}/assign', [PartnerAdminController::class, 'assign'],  ['csrf', 'permission:partners.assign']);
     $r->post('/partners-admin/{id}/payout', [PartnerAdminController::class, 'payout'],  ['csrf', 'permission:partners.pay']);
+
+    // Where their money goes. Not 'partners.manage' like the rest of the
+    // profile: redirecting a payment is finance's call, not a manager's.
+    $r->post('/partners-admin/{id}/pay-details', [PartnerAdminController::class, 'payDetails'], ['csrf', 'permission:partners.pay']);
+
+    // Paying it out. Reading a run is a view right so sales can answer
+    // "have they been paid yet"; everything that moves money is not.
+    $r->get('/payouts',                     [PayoutController::class, 'index'],      ['permission:partners.view']);
+    $r->post('/payouts',                    [PayoutController::class, 'build'],      ['csrf', 'permission:partners.pay']);
+
+    // Before {id}, or "line" is read as a run id.
+    $r->post('/payouts/line/{id}/settle',   [PayoutController::class, 'settleLine'],  ['csrf', 'permission:partners.pay']);
+    $r->post('/payouts/line/{id}/fail',     [PayoutController::class, 'failLine'],    ['csrf', 'permission:partners.pay']);
+    $r->post('/payouts/line/{id}/hold',     [PayoutController::class, 'holdLine'],    ['csrf', 'permission:partners.pay']);
+    $r->post('/payouts/line/{id}/admit',    [PayoutController::class, 'admitLine'],   ['csrf', 'permission:partners.pay']);
+
+    $r->get('/payouts/{id}',                [PayoutController::class, 'show'],        ['permission:partners.view']);
+    $r->post('/payouts/{id}/approve',       [PayoutController::class, 'approve'],     ['csrf', 'permission:partners.pay']);
+    $r->get('/payouts/{id}/export/{kind}',  [PayoutController::class, 'export'],      ['permission:partners.pay']);
+    $r->post('/payouts/{id}/sent',          [PayoutController::class, 'sent'],        ['csrf', 'permission:partners.pay']);
+    $r->post('/payouts/{id}/settle',        [PayoutController::class, 'settleAll'],   ['csrf', 'permission:partners.pay']);
 });
 
 $r->group(['partner_auth'], function ($r) {

@@ -14,6 +14,7 @@ use App\Core\Settings;
 use App\Core\Validator;
 use App\Services\Commission;
 use App\Services\Notifier;
+use App\Services\Payouts;
 
 /**
  * Partners, from our side of the desk.
@@ -193,6 +194,7 @@ class PartnerAdminController extends Controller
                 0
             ),
             'managers'    => $this->salesTeam(),
+            'payouts'     => Payouts::historyFor((int) $partner['id']),
         ]);
     }
 
@@ -322,6 +324,78 @@ class PartnerAdminController extends Controller
     }
 
     /**
+     * Where this partner's money goes.
+     *
+     * Deliberately not part of the form above. Editing a partner is
+     * 'partners.manage', which managers have; changing the account their
+     * commission lands in is 'partners.pay', which is finance and admin.
+     * Redirecting somebody's money is not the same kind of act as
+     * correcting their phone number, and should not ride on the same
+     * permission.
+     *
+     * Not editable by the partner either, for the same reason: whoever
+     * talks their way into a partner login must not be able to move the
+     * destination. They can see what is on file and tell us if it is wrong.
+     */
+    public function payDetails(Request $request): void
+    {
+        $this->authorize('partners.pay');
+
+        $partner = $this->find($request->paramInt('id'));
+
+        $method = (string) $request->input('pay_method');
+        $method = in_array($method, ['mpesa', 'bank'], true) ? $method : null;
+
+        $v = new Validator($request->all());
+        $v->maxLen('pay_phone', 30, 'M-Pesa number')
+          ->maxLen('bank_name', 120, 'Bank')
+          ->maxLen('bank_branch', 120, 'Branch')
+          ->maxLen('bank_account_name', 160, 'Account name')
+          ->maxLen('bank_account_no', 40, 'Account number');
+
+        if ($v->fails()) {
+            $v->redirectBack('/partners-admin/' . $partner['id'] . '?tab=money');
+        }
+
+        $phone   = trim((string) $request->input('pay_phone'));
+        $account = trim((string) $request->input('bank_account_no'));
+
+        // Refuse a method with nothing behind it rather than storing a
+        // half-set destination that only fails on payment day.
+        if ($method === 'mpesa' && $phone === '' && trim((string) $partner['phone']) === '') {
+            Session::error('Give an M-Pesa number, or the payment will have nowhere to go.');
+            Response::to('/partners-admin/' . $partner['id'] . '?tab=money');
+        }
+
+        if ($method === 'bank' && $account === '') {
+            Session::error('Give the account number, or the payment will have nowhere to go.');
+            Response::to('/partners-admin/' . $partner['id'] . '?tab=money');
+        }
+
+        Database::update('partners', [
+            'pay_method'        => $method,
+            'pay_phone'         => $phone ?: null,
+            'bank_name'         => trim((string) $request->input('bank_name')) ?: null,
+            'bank_branch'       => trim((string) $request->input('bank_branch')) ?: null,
+            'bank_account_name' => trim((string) $request->input('bank_account_name')) ?: null,
+            'bank_account_no'   => $account ?: null,
+        ], ['id' => $partner['id']]);
+
+        // Worth a line in the log on its own: this is the setting that
+        // decides who receives the money.
+        ActivityLog::record(
+            'partner_pay_details',
+            'partner',
+            (int) $partner['id'],
+            'Changed how ' . $partner['name'] . ' is paid'
+            . ($method === null ? ' (no method set)' : ' (' . $method . ')')
+        );
+
+        Session::success('Saved. It applies to the next payment we make them.');
+        Response::to('/partners-admin/' . $partner['id'] . '?tab=money');
+    }
+
+    /**
      * Mark commission as paid out.
      *
      * Everything currently owed, in one go, against one reference. Paying
@@ -347,18 +421,18 @@ class PartnerAdminController extends Controller
         $period = trim((string) $request->input('period'));
         $byMonth = $period !== '' && preg_match('/^[0-9]{4}-[0-9]{2}$/', $period) === 1;
 
-        $where  = "partner_id = :p AND status = 'earned'" . ($byMonth ? ' AND period = :period' : '');
-        $params = ['p' => $partner['id']];
-
-        if ($byMonth) {
-            $params['period'] = $period;
-        }
-
-        $due = (float) Database::scalar(
-            'SELECT COALESCE(SUM(amount), 0) FROM commissions WHERE ' . $where,
-            $params,
-            0
+        // Routed through a payout run rather than flipping the rows here.
+        // Two reasons: it leaves a record of where the money went, and it
+        // cannot touch commission already committed to an open run, which
+        // a bare UPDATE could not see and would have paid a second time.
+        $done = Payouts::payDirect(
+            (int) $partner['id'],
+            $byMonth ? $period : null,
+            $ref,
+            Auth::id()
         );
+
+        $due = $done['paid'];
 
         if ($due <= 0.009) {
             Session::warning($byMonth
@@ -367,12 +441,7 @@ class PartnerAdminController extends Controller
             Response::to('/partners-admin/' . $partner['id']);
         }
 
-        $n = Database::run(
-            "UPDATE commissions
-                SET status = 'paid', paid_at = NOW(), payout_ref = :r
-              WHERE " . $where,
-            $params + ['r' => $ref]
-        )->rowCount();
+        $n = $done['months'];
 
         ActivityLog::record(
             'partner_paid',
@@ -397,7 +466,8 @@ class PartnerAdminController extends Controller
 
         Session::success(
             'Marked ' . money($due) . ' as paid'
-            . ($byMonth ? ' for ' . $period : '') . ', across ' . $n . ' entries.'
+            . ($byMonth ? ' for ' . $period : '')
+            . ', across ' . $n . ' month' . ($n === 1 ? '' : 's') . '.'
         );
         Response::to('/partners-admin/' . $partner['id']);
     }

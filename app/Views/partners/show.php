@@ -322,6 +322,106 @@ $noPin = trim((string) $partner['kra_pin']) === '';
 <?php // The money, month by month, and the exception that settles the lot. ?>
 <?php if ($tab === 'money'): ?>
 
+<?php // ---- Where the money goes ----------------------------------------
+      // First on the tab because a payment with nowhere to go is the one
+      // thing that stops a run, and it is invisible until payment day. ?>
+<?php
+$payMethod = (string) ($partner['pay_method'] ?? '');
+$payReady  = $payMethod === 'mpesa'
+    ? (trim((string) ($partner['pay_phone'] ?? '')) !== '' || trim((string) $partner['phone']) !== '')
+    : ($payMethod === 'bank' && trim((string) ($partner['bank_account_no'] ?? '')) !== '');
+?>
+<div class="card">
+  <div class="card__head">
+    <div class="card__title">How they are paid</div>
+    <?php if (!$payReady): ?>
+      <span class="badge badge--red">Cannot be paid yet</span>
+    <?php else: ?>
+      <span class="badge badge--green"><?= $payMethod === 'mpesa' ? 'M-Pesa' : 'Bank transfer' ?></span>
+    <?php endif; ?>
+  </div>
+
+  <?php if (!Auth::can('partners.pay')): ?>
+    <div class="card__body text-sm">
+      <?php if (!$payReady): ?>
+        <span class="text-muted">
+          No payment details on file, so they cannot be included in a run.
+          Finance sets these.
+        </span>
+      <?php elseif ($payMethod === 'mpesa'): ?>
+        M-Pesa &middot; <?= e($partner['pay_phone'] ?: $partner['phone']) ?>
+      <?php else: ?>
+        <?= e($partner['bank_name'] ?: 'Bank') ?>
+        <?= $partner['bank_branch'] ? '&middot; ' . e($partner['bank_branch']) : '' ?>
+        <div class="text-xs text-muted mt-4">
+          <?= e($partner['bank_account_name'] ?: '') ?>
+          <?= $partner['bank_account_no'] ? '&middot; ' . e($partner['bank_account_no']) : '' ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  <?php else: ?>
+    <div class="card__body">
+      <form method="post" action="<?= url('/partners-admin/' . (int) $partner['id'] . '/pay-details') ?>">
+        <?= csrf_field() ?>
+
+        <div class="field">
+          <label class="label" for="pay_method">Method</label>
+          <select class="select" id="pay_method" name="pay_method">
+            <option value=""      <?= $payMethod === ''      ? 'selected' : '' ?>>Not set — cannot be paid</option>
+            <option value="mpesa" <?= $payMethod === 'mpesa' ? 'selected' : '' ?>>M-Pesa</option>
+            <option value="bank"  <?= $payMethod === 'bank'  ? 'selected' : '' ?>>Bank transfer</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="label" for="pay_phone">M-Pesa number</label>
+          <input class="input" type="text" id="pay_phone" name="pay_phone" maxlength="30"
+                 value="<?= e($partner['pay_phone'] ?? '') ?>"
+                 placeholder="<?= e($partner['phone']) ?>">
+          <div class="field-hint">
+            Leave it empty to use their contact number,
+            <?= e($partner['phone']) ?>. Money often goes to a different
+            line from the one they answer.
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label class="label" for="bank_name">Bank</label>
+            <input class="input" type="text" id="bank_name" name="bank_name" maxlength="120"
+                   value="<?= e($partner['bank_name'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="bank_branch">Branch</label>
+            <input class="input" type="text" id="bank_branch" name="bank_branch" maxlength="120"
+                   value="<?= e($partner['bank_branch'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="bank_account_name">Account name</label>
+            <input class="input" type="text" id="bank_account_name" name="bank_account_name" maxlength="160"
+                   value="<?= e($partner['bank_account_name'] ?? '') ?>">
+            <div class="field-hint">As the bank holds it, which is not always the trading name.</div>
+          </div>
+          <div class="field">
+            <label class="label" for="bank_account_no">Account number</label>
+            <input class="input" type="text" id="bank_account_no" name="bank_account_no" maxlength="40"
+                   value="<?= e($partner['bank_account_no'] ?? '') ?>">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn--primary" type="submit">
+            <?= icon('check') ?> Save payment details
+          </button>
+          <span class="text-xs text-muted">
+            The partner cannot change these themselves, on purpose.
+          </span>
+        </div>
+      </form>
+    </div>
+  <?php endif; ?>
+</div>
+
 <?php // Commission is paid monthly, so the ledger is read monthly. Each
       // month is settled on its own, which is what lets both sides
       // reconcile against the same figure afterwards. ?>
@@ -393,6 +493,77 @@ $noPin = trim((string) $partner['kra_pin']) === '';
   <?php endif; ?>
 </div>
 
+<?php // ---- What we have actually sent them -----------------------------
+      // The table above says what is owed and what has been marked paid.
+      // This says where the money went, which is the question asked when
+      // somebody rings to say they have not received it. ?>
+<?php if (!empty($payouts)): ?>
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">Payments to them</div>
+      <a class="btn btn--ghost btn--sm" href="<?= url('/payouts') ?>">
+        <?= icon('dollar') ?> All payouts
+      </a>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:140px">Month</th>
+            <th style="width:140px" class="num">Amount</th>
+            <th style="width:150px">Sent to</th>
+            <th style="width:150px">State</th>
+            <th>Reference</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($payouts as $pay): ?>
+            <?php
+            $t = strtotime($pay['period'] . '-01');
+            [$payCls, $payLabel] = match ((string) $pay['status']) {
+                'pending' => ['badge--grey',  'Waiting'],
+                'sent'    => ['badge--amber', 'With the bank'],
+                'settled' => ['badge--green', 'Paid'],
+                'failed'  => ['badge--red',   'Did not go through'],
+                'held'    => ['badge--navy',  'Held'],
+                default   => ['badge--grey',  ucfirst((string) $pay['status'])],
+            };
+            ?>
+            <tr>
+              <td>
+                <a href="<?= url('/payouts/' . (int) $pay['run_id']) ?>" class="fw-600">
+                  <?= e($t ? date('F Y', $t) : $pay['period']) ?>
+                </a>
+              </td>
+              <td class="num fw-700"><?= e(money($pay['amount'], false)) ?></td>
+              <td class="text-sm text-muted">
+                <?php if ($pay['method']): ?>
+                  <?= $pay['method'] === 'mpesa' ? 'M-Pesa' : 'Bank' ?>
+                  <div class="text-xs"><?= e($pay['destination']) ?></div>
+                <?php else: ?>
+                  —
+                <?php endif; ?>
+              </td>
+              <td>
+                <span class="badge <?= e($payCls) ?>"><?= e($payLabel) ?></span>
+                <?php if (!empty($pay['failure_reason'])): ?>
+                  <div class="text-xs text-muted mt-4"><?= e($pay['failure_reason']) ?></div>
+                <?php endif; ?>
+              </td>
+              <td class="text-xs">
+                <?= e($pay['ref'] ?: '—') ?>
+                <?php if ($pay['settled_at']): ?>
+                  <div class="table__muted"><?= e(fdate($pay['settled_at'])) ?></div>
+                <?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<?php endif; ?>
+
 <?php if (Auth::can('partners.pay') && $summary['due'] > 0.009): ?>
   <div class="card">
     <div class="card__head"><div class="card__title">Settle everything outstanding</div></div>
@@ -410,10 +581,12 @@ $noPin = trim((string) $partner['kra_pin']) === '';
         </button>
       </form>
       <p class="text-xs text-muted mt-8 mb-0">
-        Commission is paid monthly, so this is the exception rather than the
-        rule: every month still owed, in one payment, against one reference.
-        Use the month-by-month table above for a normal run. What has
-        already been paid is never touched.
+        For money that went out some other way — cash in hand, or a transfer
+        made outside the monthly file. It records a payment per month owed,
+        against this one reference, so it reconciles exactly as a run does.
+        Anything already in an open run is left alone, and what has been
+        paid is never touched. The usual route is
+        <a href="<?= url('/payouts') ?>">the monthly payout</a>.
       </p>
     </div>
   </div>

@@ -5113,3 +5113,11 @@ a.portal-list__row:hover { background: var(--surface-2); }
 
 .choose__go { display: flex; color: var(--slate-400); }
 .choose__go svg { width: 17px; height: 17px; }
+
+/* A plain divider inside a card, for separating one step of a job from
+   the next. Flat, because the house rule is no gradients anywhere. */
+.rule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}

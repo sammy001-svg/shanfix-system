@@ -426,6 +426,29 @@ if (!function_exists('initials')) {
     }
 }
 
+if (!function_exists('full_name')) {
+    /**
+     * Join the parts of a name into the one string we display.
+     *
+     * Names are collected in three parts, which is how people here write
+     * them, but almost everything downstream — a letter, an M-Pesa file,
+     * a text message — wants one string. Composing it in one place means
+     * the two can never drift apart.
+     *
+     * Blank parts are dropped rather than leaving a double space, so
+     * somebody with two names does not read as having a missing one.
+     */
+    function full_name(?string ...$parts): string
+    {
+        $given = array_filter(
+            array_map(static fn(?string $p): string => trim((string) $p), $parts),
+            static fn(string $p): bool => $p !== ''
+        );
+
+        return implode(' ', $given);
+    }
+}
+
 if (!function_exists('normalize_phone')) {
     /**
      * Normalise a Kenyan number to the 2547XXXXXXXX form KopoKopo expects.

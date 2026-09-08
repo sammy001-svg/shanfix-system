@@ -22,7 +22,7 @@ if [ $# -gt 0 ]; then
   SUITES=("$@")
 else
   SUITES=(smoke roles approval leads letters jobs meetings services images renewals remember
-          paylink webhook notify whatsapp chat backup brief portal partners deploy)
+          paylink webhook notify whatsapp chat backup brief portal partners payouts deploy)
 fi
 
 TOTAL_PASS=0

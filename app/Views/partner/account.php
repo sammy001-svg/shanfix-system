@@ -107,10 +107,36 @@ $noPin  = trim((string) $me['kra_pin']) === '';
 
           <dt>Paid</dt>
           <dd>Monthly, once your customers have paid us</dd>
+
+          <?php // Shown but not editable, on purpose: anyone who got into
+                // this account could otherwise send the money elsewhere.
+                // Read-only still matters — it is how a wrong digit gets
+                // spotted before payment day rather than after. ?>
+          <dt>Paid into</dt>
+          <dd>
+            <?php if (($me['pay_method'] ?? '') === 'mpesa'): ?>
+              M-Pesa &middot; <?= e($me['pay_phone'] ?: $me['phone']) ?>
+            <?php elseif (($me['pay_method'] ?? '') === 'bank' && !empty($me['bank_account_no'])): ?>
+              <?= e($me['bank_name'] ?: 'Your bank') ?>
+              <?php if (!empty($me['bank_branch'])): ?>
+                &middot; <?= e($me['bank_branch']) ?>
+              <?php endif; ?>
+              <div class="text-xs text-muted">
+                <?= e($me['bank_account_name'] ?: '') ?>
+                &middot; <?= e($me['bank_account_no']) ?>
+              </div>
+            <?php else: ?>
+              <span class="text-muted">
+                Nothing on file yet — tell us where to send it
+              </span>
+            <?php endif; ?>
+          </dd>
         </dl>
         <p class="text-xs text-muted mb-0 mt-12">
-          To change the address you sign in with, or your rate, call us on
-          <?= e($company['phone']) ?>.
+          To change the address you sign in with, your rate, or where your
+          money is paid, call us on <?= e($company['phone']) ?>. We do not
+          let payment details be changed from this screen, so that nobody
+          who got into your account could send your money elsewhere.
         </p>
       </section>
 
