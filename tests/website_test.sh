@@ -356,7 +356,21 @@ echo "=== 16. The site's own database actually opens ==="
 # was wrong three ways over, and every page that opens the database
 # answered "System Maintenance" however carefully .env had been filled
 # in.
-has "the connection reads the env file" "$(cat "$ROOT/site/includes/db_connect.php")" "loadEnv("
+# The root cause of a live outage, and the thing worth defending: a .env
+# written the way people actually write one. The loader took the text
+# after the "=" exactly as given, so DB_USER="root" asked MySQL for a
+# user whose name included the quote marks and was refused — and the
+# site showed the same blank notice it showed for every other cause.
+eq "a .env parses however it is written" \
+   "$($PHP "$ROOT/tests/helpers/site_env_parsing.php" "$ROOT/site" 2>/dev/null)" "ok"
+
+# And when it does fail, it has to say why somewhere. Four quite
+# different faults used to produce one identical ninety-byte page and
+# write nothing anywhere.
+has "a failure is written to the log" "$(cat "$ROOT/site/includes/db_connect.php")" "error_log("
+has "and names which .env was read"   "$(cat "$ROOT/site/includes/db_connect.php")" "NOT FOUND at"
+# The password is reported as present or absent, never written out.
+eq "and never the password itself"    "$(grep -c "pass === '' ? 'none' : 'set'" "$ROOT/site/includes/db_connect.php")" "2"
 
 # The property that matters, and the one that would have caught it: a
 # page that opens the site's database has to come back as a page.
