@@ -95,6 +95,11 @@ $sendSiteFile = static function (string $file): never {
 
 // One origin, one service worker. The system's wins — see the .htaccess
 // for why — so this is checked before the website's files.
+// The conventional address for a sitemap, answered by the generated one.
+if ($path === '/sitemap.xml') {
+    $runSitePage($site . '/sitemap.php');
+}
+
 if ($path !== '/sw.js') {
     if ($path === '/') {
         $runSitePage($site . '/index.php');

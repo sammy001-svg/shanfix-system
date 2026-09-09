@@ -81,6 +81,12 @@
     # which is what a rewrite loop looks like from outside.
     RewriteRule ^site/ - [L]
 
+    # Crawlers look for /sitemap.xml by convention, and the site's was a
+    # static file that went stale the moment a page was added. It is
+    # generated now, so the conventional address answers with the
+    # generated one rather than with nothing.
+    RewriteRule ^sitemap\.xml$ site/sitemap.php [L]
+
     # The front door.
     RewriteRule ^$ site/index.php [L]
 

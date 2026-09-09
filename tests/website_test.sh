@@ -425,6 +425,82 @@ rm -f "$ROOT/site/.env"
 eq "and works again once it is back"    "$(scode /)" "200"
 
 echo ""
+echo "=== 16c. Search engines are told the right things ==="
+# The system shares this domain now. It is a business system, not
+# publishing, and none of it belongs in a search result.
+for p in /login /signin /portal/login /partners/login; do
+  has "$p is not for indexing" "$(get $p)" 'name="robots" content="noindex'
+done
+
+# And the website is, which is the whole point of it.
+case "$(get /)" in
+  *'name="robots" content="noindex'*)
+    bad "but the website is" "noindex" "indexable";;
+  *) ok "but the website is" "indexable";;
+esac
+
+# Every page needs its own title and its own canonical. services.php had
+# neither: it inherited the header's defaults and so told search engines
+# it was a duplicate of the home page and should be dropped.
+TITLES=""
+CANONS=""
+for p in / /who-we-are.php /services.php /contact.php /portfolio.php /blog.php /printing-branding.php; do
+  BODY=$(get "$p")
+  T=$(printf '%s' "$BODY" | grep -oE '<title>[^<]*' | head -1)
+  C=$(printf '%s' "$BODY" | grep -oE 'rel="canonical" href="[^"]*"' | head -1)
+  ne "$p has a title"     "$T" ""
+  ne "$p has a canonical" "$C" ""
+  TITLES="$TITLES
+$T"
+  CANONS="$CANONS
+$C"
+done
+
+# Two pages sharing either is the fault that hides a page from search.
+eq "no two pages share a title"    "$(printf '%s' "$TITLES" | sort | uniq -d | wc -l)" "0"
+eq "nor a canonical"    "$(printf '%s' "$CANONS" | sort | uniq -d | wc -l)" "0"
+
+# robots.txt has one trap in it worth a test: "Disallow: /services" would
+# match /services.php as a prefix and quietly remove a real page,
+# because the system happens to have a /services of its own.
+eq "robots.txt is served" "$(scode /robots.txt)" "200"
+# Only the directives. The file explains in a comment why "Disallow:
+# /services" must never be written, and a test that reads the prose as
+# well as the rules fails on the explanation.
+ROBOTS=$(get /robots.txt | grep -v '^[[:space:]]*#')
+case "$ROBOTS" in
+  *"Disallow: /services"*) bad "and does not block the services page" "blocked" "allowed";;
+  *)                       ok  "and does not block the services page" "allowed";;
+esac
+# Blocking the system here would stop a crawler ever reading its noindex,
+# which is how a URL ends up listed with no description at all.
+case "$ROBOTS" in
+  *"Disallow: /login"*|*"Disallow: /dashboard"*)
+    bad "nor the system, so its noindex is readable" "blocked" "allowed";;
+  *) ok "nor the system, so its noindex is readable" "allowed";;
+esac
+has "and it points at the sitemap" "$ROBOTS" "Sitemap: https://shanfixtechnology.com/sitemap.php"
+
+# One sitemap, generated, answering at both addresses it is looked for.
+eq "the sitemap is generated"       "$(scode /sitemap.php)" "200"
+eq "and answers at the usual name"  "$(scode /sitemap.xml)" "200"
+eq "with the same pages in it"    "$(get /sitemap.php | grep -c '<loc>')" "$(get /sitemap.xml | grep -c '<loc>')"
+has "including the services page"   "$(get /sitemap.xml)" "/services.php"
+# The stale hand-written one is gone; it went out of date the moment a
+# page was added and there is no keeping two in step.
+eq "and there is only one of them"    "$([ -f "$ROOT/site/sitemap.xml" ] && echo two || echo one)" "one"
+
+echo ""
+echo "=== 16d. There is a way back to the website ==="
+# The website is the front door of this domain and the system sits
+# behind it. Somebody who arrives at a sign-in page by mistake has no
+# way back except the browser's button, which does nothing if they
+# typed the address or followed a link from an email.
+for p in /login /signin /portal/login /partners/login; do
+  has "$p offers a way back" "$(get $p)" "login__back"
+done
+
+echo ""
 echo "=== 17. Deployment keeps what the server owns ==="
 # --delete would otherwise take the site's credentials and anything
 # uploaded through its admin with it on the next deployment.

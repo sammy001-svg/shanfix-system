@@ -1,3 +1,17 @@
+<?php
+// Without these the page inherits the header's defaults, which name the
+// home page as canonical — so this one told search engines it was a
+// duplicate of / and asked to be dropped. It was the only page on the
+// site not setting its own.
+$pageSEO = [
+    'title'       => 'Our Services & Prices | Shanfix Technology, Nairobi',
+    'description' => 'What Shanfix Technology does and what it costs: web development, software, hosting, bulk SMS, SEO, networking, printing, branding and event management in Nairobi, Kenya.',
+    'keywords'    => 'IT services Nairobi, service prices Kenya, web development cost, printing and branding Nairobi, bulk SMS Kenya, Shanfix Technology services',
+    'og_title'    => 'Our Services & Prices | Shanfix Technology',
+    'og_desc'     => 'Our full range of services and what they cost today, straight from our own system.',
+    'canonical'   => 'https://shanfixtechnology.com/services.php',
+];
+?>
 <?php include 'includes/header.php'; ?>
 
 <main class="services-modern-page">

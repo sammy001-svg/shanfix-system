@@ -11,6 +11,13 @@ $brand      = \App\Core\Settings::company();
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<?php // The system shares a domain with the company website now, so a
+      // crawler that finds its way in would otherwise index the sign-in
+      // page, the portals and every URL it can reach from them. None of
+      // this belongs in a search result: it is a business system, not
+      // publishing. robots.txt asks crawlers not to fetch these; this
+      // says not to list them even if a URL turns up elsewhere. ?>
+<meta name="robots" content="noindex, nofollow">
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <title><?= e($title ?? 'Your account') ?> · <?= e($brand['name']) ?></title>
 <?php
@@ -97,6 +104,12 @@ $brand      = \App\Core\Settings::company();
         </button>
         <div class="dropdown__menu dropdown__menu--right">
           <div class="dropdown__label"><?= e($portalUser['email']) ?></div>
+          <?php // Out to the company website. It is the front door of this
+                // domain and the portal sits behind it, so without this the
+                // only way across is to edit the address bar. ?>
+          <a class="dropdown__item" href="/" target="_blank" rel="noopener">
+            <?= icon('external-link') ?> Visit our website
+          </a>
           <div class="dropdown__divider"></div>
           <form method="post" action="<?= url('/portal/logout') ?>">
             <?= csrf_field() ?>

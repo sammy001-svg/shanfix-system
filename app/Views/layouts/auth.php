@@ -69,6 +69,13 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<?php // The system shares a domain with the company website now, so a
+      // crawler that finds its way in would otherwise index the sign-in
+      // page, the portals and every URL it can reach from them. None of
+      // this belongs in a search result: it is a business system, not
+      // publishing. robots.txt asks crawlers not to fetch these; this
+      // says not to list them even if a URL turns up elsewhere. ?>
+<meta name="robots" content="noindex, nofollow">
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <meta name="app-base" content="<?= e(base_path()) ?>">
 <title><?= e($title ?? 'Sign in') ?> · <?= e($brand['name']) ?></title>
@@ -162,6 +169,20 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
 
       <?= $content ?>
     </div>
+
+    <?php // The way out.
+          //
+          // The website is the front door of this domain and the sign-in
+          // page is behind it, so somebody who arrived here by mistake —
+          // or who came to sign in and then wanted a phone number — has
+          // no way back except the browser's back button. Which does not
+          // exist if they typed the address, or followed a link from an
+          // email. ?>
+    <p class="login__back">
+      <a href="/">
+        <?= icon('arrow-left') ?> Back to <?= e($brand['name']) ?>
+      </a>
+    </p>
 
     <footer class="login__foot">
       <?php // Somebody who cannot get in needs a way to reach a person.

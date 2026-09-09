@@ -11,6 +11,7 @@ $staticPages = [
     ['loc' => '/',                     'lastmod' => $today,       'changefreq' => 'weekly',  'priority' => '1.0'],
     ['loc' => '/who-we-are.php',       'lastmod' => '2026-05-01', 'changefreq' => 'monthly', 'priority' => '0.8'],
     ['loc' => '/portfolio.php',        'lastmod' => $today,       'changefreq' => 'weekly',  'priority' => '0.8'],
+    ['loc' => '/services.php',        'lastmod' => $today,       'changefreq' => 'weekly',  'priority' => '0.9'],
     ['loc' => '/web-development.php',  'lastmod' => '2026-05-01', 'changefreq' => 'monthly', 'priority' => '0.9'],
     ['loc' => '/app-development.php',  'lastmod' => '2026-05-01', 'changefreq' => 'monthly', 'priority' => '0.8'],
     ['loc' => '/software-solution.php','lastmod' => '2026-05-01', 'changefreq' => 'monthly', 'priority' => '0.9'],
