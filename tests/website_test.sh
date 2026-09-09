@@ -348,7 +348,34 @@ eq "and the versioned address serves" \
    "$(scode "/main.js?v=$STAMP")" "200"
 
 echo ""
-echo "=== 16. Deployment keeps what the server owns ==="
+echo "=== 16. The site's own database actually opens ==="
+# db_connect.php required the env loader and then never called it, so
+# .env was never read and every setting fell through to its default:
+# localhost, shanfix_tech, root, no password. On a developer's machine
+# that is exactly right and nothing looks wrong. On the live server it
+# was wrong three ways over, and every page that opens the database
+# answered "System Maintenance" however carefully .env had been filled
+# in.
+has "the connection reads the env file" "$(cat "$ROOT/site/includes/db_connect.php")" "loadEnv("
+
+# The property that matters, and the one that would have caught it: a
+# page that opens the site's database has to come back as a page.
+for p in / /who-we-are.php /blog.php /portfolio.php; do
+  BODY=$(get "$p")
+  case "$BODY" in
+    *"System Maintenance"*)
+      bad "$p opens the database" "System Maintenance" "the page";;
+    *)
+      if [ "$(printf '%s' "$BODY" | wc -c)" -gt 5000 ]; then
+        ok "$p opens the database" "the page"
+      else
+        bad "$p opens the database" "$(printf '%s' "$BODY" | head -c 60)" "the page"
+      fi;;
+  esac
+done
+
+echo ""
+echo "=== 17. Deployment keeps what the server owns ==="
 # --delete would otherwise take the site's credentials and anything
 # uploaded through its admin with it on the next deployment.
 has "the site's .env survives a deploy" "$(cat "$ROOT/.cpanel.yml")" "site/.env"

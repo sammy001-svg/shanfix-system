@@ -4,7 +4,23 @@
  * Shanfix Technology - Premium Backend Infrastructure
  */
 
-require_once 'env_loader.php';
+require_once __DIR__ . '/env_loader.php';
+
+// Actually read it.
+//
+// This file required the loader and then never called it, so $_ENV was
+// never populated and every value below fell through to its default:
+// localhost, shanfix_tech, root, no password. On a developer's machine
+// that is exactly right and nothing looks wrong. On a real server it is
+// wrong three ways over — cPanel prefixes the database name with the
+// account, the user is not root, and there is a password — so every page
+// that opens the database answered "System Maintenance" no matter what
+// anybody put in .env.
+//
+// api/printing-order.php had been calling loadEnv() itself for the same
+// reason, which is the sort of thing that happens once the connection
+// stops reading it.
+loadEnv(__DIR__ . '/../.env');
 
 $host = $_ENV['DB_HOST'] ?? 'localhost';
 $db   = $_ENV['DB_NAME'] ?? 'shanfix_tech';
