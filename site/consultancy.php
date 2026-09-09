@@ -3,7 +3,7 @@ $pageSEO = [
     'title'       => 'IT Consultancy Services in Nairobi | Technology Advisory - Shanfix Technology',
     'description' => 'Expert IT consultancy in Nairobi, Kenya. Technology strategy, digital transformation, and IT advisory for businesses by Shanfix Technology.',
     'keywords'    => 'IT consultancy Nairobi, technology advisory Kenya, digital transformation, IT strategy',
-    'canonical'   => 'https://shanfixtechnology.com/consultancy.php',
+    'canonical'   => '{{base}}/consultancy.php',
 ];
 include 'includes/header.php'; ?>
     <section class="service-hero hero-consultancy">

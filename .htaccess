@@ -87,6 +87,11 @@
     # generated one rather than with nothing.
     RewriteRule ^sitemap\.xml$ site/sitemap.php [L]
 
+    # robots.txt has to name the sitemap by absolute URL, which is the
+    # one thing in it that changes with the address the site answers at.
+    # It is generated for that line alone; the rules in it are unchanged.
+    RewriteRule ^robots\.txt$ site/robots.php [L]
+
     # The front door.
     RewriteRule ^$ site/index.php [L]
 

@@ -3,8 +3,8 @@ $pageSEO = [
     'title'       => 'Event Management Services in Nairobi | Corporate Events - Shanfix Technology',
     'description' => 'Professional event management and planning in Nairobi, Kenya. Corporate events, conferences, product launches, and exhibitions by Shanfix Technology.',
     'keywords'    => 'event management Nairobi, corporate events Kenya, event planning, conferences',
-    'canonical'   => 'https://shanfixtechnology.com/event-management.php',
-    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Event Management","description":"Professional corporate event management and planning — conferences, product launches, and exhibitions in Nairobi.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"https://shanfixtechnology.com/"},"areaServed":{"@type":"City","name":"Nairobi"},"url":"https://shanfixtechnology.com/event-management.php"}',
+    'canonical'   => '{{base}}/event-management.php',
+    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Event Management","description":"Professional corporate event management and planning — conferences, product launches, and exhibitions in Nairobi.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"{{base}}/"},"areaServed":{"@type":"City","name":"Nairobi"},"url":"{{base}}/event-management.php"}',
 ];
 include 'includes/header.php'; ?>
 

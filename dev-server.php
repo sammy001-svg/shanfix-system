@@ -100,6 +100,11 @@ if ($path === '/sitemap.xml') {
     $runSitePage($site . '/sitemap.php');
 }
 
+// Generated for its Sitemap line, which is an absolute URL.
+if ($path === '/robots.txt') {
+    $runSitePage($site . '/robots.php');
+}
+
 if ($path !== '/sw.js') {
     if ($path === '/') {
         $runSitePage($site . '/index.php');

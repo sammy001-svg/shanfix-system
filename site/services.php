@@ -9,7 +9,7 @@ $pageSEO = [
     'keywords'    => 'IT services Nairobi, service prices Kenya, web development cost, printing and branding Nairobi, bulk SMS Kenya, Shanfix Technology services',
     'og_title'    => 'Our Services & Prices | Shanfix Technology',
     'og_desc'     => 'Our full range of services and what they cost today, straight from our own system.',
-    'canonical'   => 'https://shanfixtechnology.com/services.php',
+    'canonical'   => '{{base}}/services.php',
 ];
 ?>
 <?php include 'includes/header.php'; ?>

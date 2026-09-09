@@ -3,8 +3,8 @@ $pageSEO = [
     'title'       => 'Point of Sale System in Kenya | POS Software - Shanfix Technology',
     'description' => 'Modern POS systems for retail and hospitality in Kenya. Track sales, inventory, and staff in real time with Shanfix Technology\'s POS software.',
     'keywords'    => 'POS system Kenya, point of sale Nairobi, retail POS, restaurant POS',
-    'canonical'   => 'https://shanfixtechnology.com/pos-solution.php',
-    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Point of Sale System","description":"Modern POS software for retail and hospitality in Kenya — real-time sales, inventory, and staff tracking.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"https://shanfixtechnology.com/"},"areaServed":{"@type":"Country","name":"Kenya"},"url":"https://shanfixtechnology.com/pos-solution.php"}',
+    'canonical'   => '{{base}}/pos-solution.php',
+    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Point of Sale System","description":"Modern POS software for retail and hospitality in Kenya — real-time sales, inventory, and staff tracking.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"{{base}}/"},"areaServed":{"@type":"Country","name":"Kenya"},"url":"{{base}}/pos-solution.php"}',
 ];
 include 'includes/header.php'; ?>
 <link rel="stylesheet" href="<?= site_asset('pos-modern.css') ?>">
@@ -175,7 +175,7 @@ include 'includes/header.php'; ?>
                 <p>Join hundreds of businesses in Nairobi that trust Shanfix POS to drive their growth.</p>
                 <div class="hero-btns" style="margin-top: 3rem;">
                     <a href="contact.php" class="btn btn-primary">Request a Custom Quote</a>
-                    <a href="tel:+254751869165" class="btn btn-secondary">Talk to an Expert</a>
+                    <a href="tel:<?= htmlspecialchars($_brand['phone_tel']) ?>" class="btn btn-secondary">Talk to an Expert</a>
                 </div>
             </div>
         </div>

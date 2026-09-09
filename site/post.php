@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/db_connect.php';
+require_once 'includes/brand.php';
 
 $slug = trim($_GET['slug'] ?? '');
 if (!$slug) { header('Location: blog.php'); exit; }
@@ -39,8 +40,8 @@ $dateStr   = $post['published_at'] ? date('d F Y', strtotime($post['published_at
 $readTime  = max(1, (int)ceil(str_word_count(strip_tags($post['content'])) / 200));
 $initial   = strtoupper(substr($post['author_name'] ?? 'S', 0, 1));
 
-$_postUrl    = 'https://shanfixtechnology.com/post.php?slug=' . urlencode($post['slug']);
-$_postImage  = !empty($post['featured_image']) ? $post['featured_image'] : 'https://shanfixtechnology.com/assets/og-image.png';
+$_postUrl    = site_url('post.php?slug=' . urlencode($post['slug']));
+$_postImage  = !empty($post['featured_image']) ? $post['featured_image'] : site_url('assets/og-image.png');
 $_postExcerpt = !empty($post['excerpt']) ? $post['excerpt'] : strip_tags(mb_substr($post['content'], 0, 160));
 $_published  = $post['published_at'] ? date('c', strtotime($post['published_at'])) : '';
 
@@ -67,7 +68,7 @@ $pageSEO = [
         'publisher'        => [
             '@type' => 'Organization',
             'name'  => 'Shanfix Technology',
-            'logo'  => ['@type' => 'ImageObject', 'url' => 'https://shanfixtechnology.com/assets/shanfix-logo.png'],
+            'logo'  => ['@type' => 'ImageObject', 'url' => site_url('assets/shanfix-logo.png')],
         ],
         'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $_postUrl],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),

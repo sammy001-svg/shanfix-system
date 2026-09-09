@@ -3,8 +3,8 @@ $pageSEO = [
     'title'       => 'Mobile App Development in Nairobi | iOS & Android - Shanfix Technology',
     'description' => 'Expert mobile app development in Nairobi, Kenya. We build iOS and Android apps tailored to your business needs with clean design and robust functionality.',
     'keywords'    => 'app development Nairobi, mobile app Kenya, iOS app, Android app development',
-    'canonical'   => 'https://shanfixtechnology.com/app-development.php',
-    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Mobile App Development","description":"Expert iOS and Android app development in Nairobi, Kenya tailored to your business needs.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"https://shanfixtechnology.com/"},"areaServed":{"@type":"City","name":"Nairobi"},"url":"https://shanfixtechnology.com/app-development.php"}',
+    'canonical'   => '{{base}}/app-development.php',
+    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Mobile App Development","description":"Expert iOS and Android app development in Nairobi, Kenya tailored to your business needs.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"{{base}}/"},"areaServed":{"@type":"City","name":"Nairobi"},"url":"{{base}}/app-development.php"}',
 ];
 include 'includes/header.php'; ?>
     <section class="service-hero hero-app-dev">

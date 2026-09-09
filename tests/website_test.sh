@@ -479,7 +479,10 @@ case "$ROBOTS" in
     bad "nor the system, so its noindex is readable" "blocked" "allowed";;
   *) ok "nor the system, so its noindex is readable" "allowed";;
 esac
-has "and it points at the sitemap" "$ROBOTS" "Sitemap: https://shanfixtechnology.com/sitemap.php"
+# It names the conventional address rather than the script behind it,
+# and by absolute URL because a sitemap reference has to be. Which
+# domain it names is checked in 16f, against what the pages say.
+has "and it points at the sitemap" "$ROBOTS" "/sitemap.xml"
 
 # One sitemap, generated, answering at both addresses it is looked for.
 eq "the sitemap is generated"       "$(scode /sitemap.php)" "200"
@@ -499,6 +502,114 @@ echo "=== 16d. There is a way back to the website ==="
 for p in /login /signin /portal/login /partners/login; do
   has "$p offers a way back" "$(get $p)" "login__back"
 done
+
+echo ""
+echo "=== 16e. The company's details are kept in one place ==="
+# The phone number was written into eight files on this site, the e-mail
+# into three and the address into three more — and they had already
+# drifted apart. The top bar gave one number, the contact page gave an
+# e-mail address that appeared nowhere else (info@shanfix.tech), and the
+# system's Settings held something different again. A customer reading
+# the site and a customer reading their invoice were being given
+# different ways to reach us.
+#
+# The system's Settings hold them now, because that is where somebody
+# editing them would look, and the site reads from there.
+SET_PHONE=$($MYSQL -N -B -e "SELECT setting_value FROM settings WHERE setting_key='company_phone'" 2>/dev/null)
+SET_EMAIL=$($MYSQL -N -B -e "SELECT setting_value FROM settings WHERE setting_key='company_email'" 2>/dev/null)
+SET_ADDR=$($MYSQL -N -B -e "SELECT setting_value FROM settings WHERE setting_key='company_address'" 2>/dev/null)
+
+HOME_HTML=$(get /)
+
+# A blank setting is a legitimate state — it means the site keeps showing
+# its own details — so each of these is only asserted when there is a
+# value to assert it against.
+if [ -n "$SET_PHONE" ]; then
+  has "the phone number is the system's" "$HOME_HTML" "$SET_PHONE"
+  # Twice on the page: the bar at the top and the footer at the bottom.
+  # Those were separate copies, and this is what proves they are not now.
+  N=$(printf '%s' "$HOME_HTML" | grep -c -F "$SET_PHONE")
+  if [ "$N" -ge 2 ]; then
+    ok  "and the same at the top and the bottom" "$N places"
+  else
+    bad "and the same at the top and the bottom" "$N places" "at least 2"
+  fi
+else
+  ok "the phone number is the system's" "company_phone unset; site's own stands"
+fi
+
+if [ -n "$SET_EMAIL" ]; then
+  has "so is the e-mail address"    "$HOME_HTML" "$SET_EMAIL"
+  has "and the contact page agrees" "$(get /contact.php)" "$SET_EMAIL"
+else
+  ok "so is the e-mail address" "company_email unset; site's own stands"
+fi
+
+if [ -n "$SET_ADDR" ]; then
+  has "and the address" "$HOME_HTML" "$SET_ADDR"
+fi
+
+# The old values have to be gone from the source, not merely overwritten
+# on one page. A copy left in a file nobody renders today is the same
+# fault waiting to come back.
+eq "no page still spells the old number out" \
+   "$(cd "$ROOT/site" && grep -rl '751869165\|751 869 165' --include='*.php' . | grep -v 'includes/brand.php' | wc -l)" "0"
+eq "nor the old e-mail address" \
+   "$(cd "$ROOT/site" && grep -rl 'info@shanfixtechnology\.com\|info@shanfix\.tech' --include='*.php' . | grep -v 'includes/brand.php' | wc -l)" "0"
+
+# Structured data is the copy a search engine reads aloud, so a stale
+# number in there is worse than one on the page: it reaches people who
+# never opened the site.
+LD=$(printf '%s' "$HOME_HTML" | sed -n '/"@type": "LocalBusiness"/,/<\/script>/p')
+ne "the business card carries a telephone" "$(printf '%s' "$LD" | grep -c '"telephone"')" "0"
+if [ -n "$SET_PHONE" ]; then
+  has "and it is the same number" "$LD" "$(printf '%s' "$SET_PHONE" | tr -d ' ')"
+fi
+# An empty locality is not neutral: it claims the business is nowhere.
+case "$LD" in
+  *'"addressLocality": ""'*) bad "and never an empty town" "empty" "omitted";;
+  *)                         ok  "and never an empty town" "omitted";;
+esac
+
+echo ""
+echo "=== 16f. The site names itself from one setting ==="
+# Every canonical, every og:image and the Sitemap line have to be
+# absolute, so the domain was written out across thirty-one files. Moving
+# the site to another address — or standing a staging copy up beside it —
+# left every page telling search engines it was a duplicate of the live
+# one and asking to be dropped.
+eq "the domain is written once, not in every page" \
+   "$(cd "$ROOT/site" && grep -rl 'https://shanfixtechnology\.com' --include='*.php' . | grep -v 'includes/brand.php\|api/cron-renewals.php' | wc -l)" "0"
+
+# What the pages carry instead has to actually be expanded. A page
+# shipping the raw placeholder is worse than the hard-coded domain was.
+for p in / /services.php /printing-branding.php /blog.php; do
+  case "$(get "$p")" in
+    *'{{base}}'*) bad "$p ships no placeholder" "{{base}}" "expanded";;
+    *)            ok  "$p ships no placeholder" "expanded";;
+  esac
+done
+
+# One base, used by all three of the things that name the site from
+# outside. These disagreeing is how a sitemap ends up listing a domain
+# the pages themselves disown.
+BASE_CANON=$(printf '%s' "$HOME_HTML" | grep -oE 'rel="canonical" href="https?://[^/"]+' | sed 's/.*href="//' | head -1)
+BASE_MAP=$(get /sitemap.xml | grep -oE '<loc>https?://[^/<]+' | sed 's/<loc>//' | head -1)
+BASE_ROBOTS=$(get /robots.txt | grep -E '^Sitemap:' | grep -oE 'https?://[^/]+' | head -1)
+ne "the canonical names a host"    "$BASE_CANON" ""
+eq "the sitemap uses the same one" "$BASE_MAP"    "$BASE_CANON"
+eq "and so does robots.txt"        "$BASE_ROBOTS" "$BASE_CANON"
+
+# robots.txt is generated now, for that one line alone. The rules in it
+# are unchanged, and the assertions above still hold them.
+eq "robots.txt is generated, not a stale file" \
+   "$([ -f "$ROOT/site/robots.txt" ] && echo stale || echo generated)" "generated"
+
+# The site has to survive the system being unreachable: two separate
+# applications, and the system's database has been down in production
+# before. A footer that renders blank is a customer who cannot call.
+eq "and the site falls back to its own details when the system is down" \
+   "$($PHP "$ROOT/tests/helpers/site_brand_fallback.php" "$ROOT/site" 2>/dev/null)" "ok"
 
 echo ""
 echo "=== 17. Deployment keeps what the server owns ==="

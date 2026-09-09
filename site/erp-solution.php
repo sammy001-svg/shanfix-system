@@ -3,8 +3,8 @@ $pageSEO = [
     'title'       => 'Business ERP Solutions in Kenya | Enterprise Software - Shanfix Technology',
     'description' => 'Comprehensive business ERP in Kenya. Manage finance, inventory, HR, procurement, and operations in one integrated system by Shanfix Technology.',
     'keywords'    => 'ERP solutions Kenya, business ERP Nairobi, enterprise software, inventory management',
-    'canonical'   => 'https://shanfixtechnology.com/erp-solution.php',
-    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Business ERP","description":"Comprehensive ERP system in Kenya — finance, inventory, HR, and procurement in one platform.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"https://shanfixtechnology.com/"},"areaServed":{"@type":"Country","name":"Kenya"},"url":"https://shanfixtechnology.com/erp-solution.php"}',
+    'canonical'   => '{{base}}/erp-solution.php',
+    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Business ERP","description":"Comprehensive ERP system in Kenya — finance, inventory, HR, and procurement in one platform.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"{{base}}/"},"areaServed":{"@type":"Country","name":"Kenya"},"url":"{{base}}/erp-solution.php"}',
 ];
 include 'includes/header.php'; ?>
 <link rel="stylesheet" href="<?= site_asset('erp-modern.css') ?>">
@@ -169,7 +169,7 @@ include 'includes/header.php'; ?>
                 <p>Join the ranks of high-performance enterprises across East Africa using Shanfix ERP to dominate their markets.</p>
                 <div class="hero-btns" style="margin-top: 3rem;">
                     <a href="contact.php" class="btn btn-primary">Schedule a Private Demo</a>
-                    <a href="tel:+254751869165" class="btn btn-secondary">Talk to an Architect</a>
+                    <a href="tel:<?= htmlspecialchars($_brand['phone_tel']) ?>" class="btn btn-secondary">Talk to an Architect</a>
                 </div>
             </div>
         </div>

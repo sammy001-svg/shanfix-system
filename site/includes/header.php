@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/asset.php';
+require_once __DIR__ . '/brand.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
+
+// Who we are and where we answer, from the one place that holds them.
+$_brand = site_brand();
 
 // Per-page SEO defaults — pages override by setting $pageSEO before including this file
 $_seo = array_merge([
@@ -9,12 +13,28 @@ $_seo = array_merge([
     'keywords'    => 'web development, system development, bulk SMS, SEO, networking, printing, branding, event management, Nairobi, Kenya, Shanfix Technology',
     'og_title'    => 'Shanfix Technology | Premier IT Solutions & Digital Services',
     'og_desc'     => 'Innovating your digital future with expert Web Development, Software Solutions, and Branding services in Nairobi, Kenya.',
-    'og_image'    => 'https://shanfixtechnology.com/assets/og-image.png',
+    'og_image'    => '{{base}}/assets/og-image.png',
     'og_type'     => 'website',
-    'canonical'   => 'https://shanfixtechnology.com/',
+    'canonical'   => '{{base}}/',
 ], $pageSEO ?? []);
 $_seo['og_title'] = $pageSEO['og_title'] ?? $pageSEO['title'] ?? $_seo['og_title'];
 $_seo['og_desc']  = $pageSEO['og_desc']  ?? $pageSEO['description'] ?? $_seo['og_desc'];
+
+// Pages name themselves from the outside — canonical, Open Graph image,
+// the url in their structured data — and every one of them used to spell
+// the domain out in full. Thirty-one files held a copy, so moving the
+// site to another address, or testing it at one, meant every page still
+// pointed search engines at the old one.
+//
+// They write {{base}} now and it is expanded here, once, from the single
+// setting. Done over the whole array rather than field by field so a page
+// adding an SEO field of its own gets it without anything being changed
+// here.
+foreach ($_seo as $_k => $_v) {
+    if (is_string($_v)) {
+        $_seo[$_k] = str_replace('{{base}}', rtrim(site_url(), '/'), $_v);
+    }
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -26,7 +46,7 @@ $_seo['og_desc']  = $pageSEO['og_desc']  ?? $pageSEO['description'] ?? $_seo['og
     <meta name="title" content="<?= htmlspecialchars($_seo['title']) ?>" />
     <meta name="description" content="<?= htmlspecialchars($_seo['description']) ?>" />
     <meta name="keywords" content="<?= htmlspecialchars($_seo['keywords']) ?>" />
-    <meta name="author" content="Shanfix Technology" />
+    <meta name="author" content="<?= htmlspecialchars($_brand['name']) ?>" />
     <link rel="canonical" href="<?= htmlspecialchars($_seo['canonical']) ?>" />
 
     <!-- Favicon -->
@@ -62,44 +82,51 @@ $_seo['og_desc']  = $pageSEO['og_desc']  ?? $pageSEO['description'] ?? $_seo['og
     <meta property="twitter:image" content="<?= htmlspecialchars($_seo['og_image']) ?>" />
 
     <!-- JSON-LD: Local Business -->
+    <?php // Structured data, so a search result can carry the phone
+          // number and the address rather than only a blue link. Built
+          // from the brand rather than typed out, because a phone number
+          // that is right on the page and stale in here is worse than
+          // having none: this is the copy Google reads aloud. ?>
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      "name": "Shanfix Technology",
-      "url": "https://shanfixtechnology.com/",
-      "logo": "https://shanfixtechnology.com/assets/shanfix-logo.png",
-      "image": "https://shanfixtechnology.com/assets/og-image.png",
-      "description": "Premier IT solutions provider in Nairobi, Kenya — web development, software, networking, digital marketing, printing, and event management.",
-      "telephone": "+254751869165",
-      "email": "info@shanfixtechnology.com",
-      "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "Tana House, Karen",
-        "addressLocality": "Nairobi",
-        "addressCountry": "KE"
-      },
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": -1.3224,
-        "longitude": 36.7092
-      },
-      "openingHoursSpecification": [
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"],
-          "opens": "08:00",
-          "closes": "17:00"
-        }
-      ],
-      "sameAs": [
-        "https://sms.shanfixtechnology.com/",
-        "https://aicoder.shanfixtechnology.com/",
-        "https://automation.shanfixtechnology.com/"
-      ]
-    }
-    </script><?php if (!empty($pageSEO['json_ld'])): ?>
-    <script type="application/ld+json"><?= $pageSEO['json_ld'] ?></script><?php endif; ?>
+    <?= json_encode([
+        '@context'    => 'https://schema.org',
+        '@type'       => 'LocalBusiness',
+        'name'        => $_brand['name'],
+        'url'         => site_url(),
+        'logo'        => site_url('assets/shanfix-logo.png'),
+        'image'       => site_url('assets/og-image.png'),
+        'description' => 'Premier IT solutions provider in Nairobi, Kenya — web development, software, networking, digital marketing, printing, and event management.',
+        'telephone'   => $_brand['phone_tel'],
+        'email'       => $_brand['email'],
+        // The town is only named when the address said which part of
+        // it is the town. An empty addressLocality is not neutral: it is
+        // a claim that the business is in nowhere.
+        'address'     => array_filter([
+            '@type'           => 'PostalAddress',
+            'streetAddress'   => $_brand['street'],
+            'addressLocality' => $_brand['city'],
+            'addressCountry'  => $_brand['country'],
+        ], static fn ($v) => $v !== ''),
+        'geo' => [
+            '@type'     => 'GeoCoordinates',
+            'latitude'  => -1.3224,
+            'longitude' => 36.7092,
+        ],
+        'openingHoursSpecification' => [[
+            '@type'     => 'OpeningHoursSpecification',
+            'dayOfWeek' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+            'opens'     => '08:00',
+            'closes'    => '17:00',
+        ]],
+        'sameAs' => [
+            'https://sms.shanfixtechnology.com/',
+            'https://aicoder.shanfixtechnology.com/',
+            'https://automation.shanfixtechnology.com/',
+        ],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) ?>
+    </script><?php // The page's own structured data, taken from $_seo rather
+                   // than $pageSEO so that {{base}} has been expanded. ?><?php if (!empty($_seo['json_ld'])): ?>
+    <script type="application/ld+json"><?= $_seo['json_ld'] ?></script><?php endif; ?>
     <link rel="stylesheet" href="<?= site_asset('./index.css') ?>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -129,25 +156,25 @@ $_seo['og_desc']  = $pageSEO['og_desc']  ?? $pageSEO['description'] ?? $_seo['og
       <div class="top-header">
       <div class="container top-header-container">
         <div class="top-header-left">
-          <a href="tel:+254751869165" class="top-header-item">
+          <a href="tel:<?= htmlspecialchars($_brand['phone_tel']) ?>" class="top-header-item">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
             </svg>
-            <span>+254 751 869 165</span>
+            <span><?= htmlspecialchars($_brand['phone']) ?></span>
           </a>
-          <a href="mailto:info@shanfixtechnology.com" class="top-header-item">
+          <a href="mailto:<?= htmlspecialchars($_brand['email']) ?>" class="top-header-item">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
               <polyline points="22,6 12,13 2,6"></polyline>
             </svg>
-            <span>info@shanfixtechnology.com</span>
+            <span><?= htmlspecialchars($_brand['email']) ?></span>
           </a>
           <span class="top-header-item">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
             </svg>
-            <span>Tana House, Karen - Nairobi</span>
+            <span><?= htmlspecialchars($_brand['address']) ?></span>
           </span>
         </div>
         <div class="top-header-right">

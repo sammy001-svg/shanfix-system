@@ -33,7 +33,7 @@ if (!$event) {
 $pageSEO = [
     'title'     => 'Buy Tickets — ' . $event['title'] . ' | Shanfix Technology',
     'description' => substr(strip_tags($event['description'] ?? ''), 0, 160),
-    'canonical' => 'https://shanfixtechnology.com/event-book.php?id=' . $event['id'],
+    'canonical' => '{{base}}/event-book.php?id=' . $event['id'],
 ];
 include 'includes/header.php'; ?>
 

@@ -3,8 +3,8 @@ $pageSEO = [
     'title'       => 'SEO Services in Nairobi | Search Engine Optimization - Shanfix Technology',
     'description' => 'Boost your website\'s Google rankings with expert SEO services in Nairobi, Kenya. On-page, off-page, and technical SEO by Shanfix Technology.',
     'keywords'    => 'SEO services Nairobi, search engine optimization Kenya, Google ranking, website SEO',
-    'canonical'   => 'https://shanfixtechnology.com/seo-boost.php',
-    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"SEO Services","description":"Boost your Google rankings with on-page, off-page, and technical SEO services in Nairobi, Kenya.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"https://shanfixtechnology.com/"},"areaServed":{"@type":"City","name":"Nairobi"},"url":"https://shanfixtechnology.com/seo-boost.php"}',
+    'canonical'   => '{{base}}/seo-boost.php',
+    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"SEO Services","description":"Boost your Google rankings with on-page, off-page, and technical SEO services in Nairobi, Kenya.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"{{base}}/"},"areaServed":{"@type":"City","name":"Nairobi"},"url":"{{base}}/seo-boost.php"}',
 ];
 include 'includes/header.php'; ?>
 

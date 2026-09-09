@@ -21,6 +21,8 @@
  *   Mailer::renewalReminder($name, $email, $service, $due_date, $amount);
  */
 
+require_once __DIR__ . '/brand.php';
+
 class Mailer {
 
     // -------------------------------------------------------------------------
@@ -126,6 +128,7 @@ class Mailer {
     }
 
     public static function clientRejected(string $name, string $email, string $reason = ''): bool {
+        $b = site_brand();
         $subject = 'Update on Your Shanfix Portal Access Request';
         $reasonBlock = $reason ? '
             <div style="background:#fef3c7; border-radius:12px; padding:16px 20px; margin:24px 0; border-left:4px solid #f59e0b;">
@@ -138,7 +141,7 @@ class Mailer {
             </p>
             ' . $reasonBlock . '
             <p style="color:#475569; font-size:0.95rem; line-height:1.7;">
-                If you believe this is an error or would like to discuss further, please contact us directly at <a href="mailto:info@shanfixtechnology.com" style="color:#6366f1;">info@shanfixtechnology.com</a> or call <strong>+254 751 869 165</strong>.
+                If you believe this is an error or would like to discuss further, please contact us directly at <a href="mailto:' . htmlspecialchars($b['email']) . '" style="color:#6366f1;">' . htmlspecialchars($b['email']) . '</a> or call <strong>' . htmlspecialchars($b['phone']) . '</strong>.
             </p>
         ');
         return self::send($email, $subject, $html);
@@ -312,6 +315,7 @@ class Mailer {
     }
 
     public static function contactAutoReply(string $name, string $email, string $subject): bool {
+        $b = site_brand();
         $mail_subject = "We received your message — Shanfix Technology";
         $html = self::layout('Thanks for reaching out!', '
             <p style="color:#475569; font-size:1rem; line-height:1.7;">
@@ -320,7 +324,7 @@ class Mailer {
             </p>
             <p style="color:#475569; font-size:1rem; line-height:1.7;">
                 Our team will review your message and get back to you within <strong>24 hours</strong>.
-                In the meantime, feel free to call us directly at <strong>+254 751 869 165</strong>.
+                In the meantime, feel free to call us directly at <strong>' . htmlspecialchars($b['phone']) . '</strong>.
             </p>
             <div style="background:#f8fafc; border-radius:12px; padding:16px; margin:24px 0; border-left:4px solid #22c55e;">
                 <p style="margin:0; font-size:0.9rem; color:#64748b;">
@@ -353,6 +357,7 @@ class Mailer {
     }
 
     public static function contactReply(string $name, string $email, string $original_subject, string $reply): bool {
+        $b = site_brand();
         $mail_subject = "Re: {$original_subject} — Shanfix Technology";
         $html = self::layout('Response from Shanfix Technology', '
             <p style="color:#475569; font-size:1rem; line-height:1.7;">
@@ -363,7 +368,7 @@ class Mailer {
                 <p style="margin:0; color:#1e293b; line-height:1.7;">' . nl2br(htmlspecialchars($reply)) . '</p>
             </div>
             <p style="color:#475569; font-size:0.9rem;">
-                If you have further questions, feel free to reply to this email or call <strong>+254 751 869 165</strong>.
+                If you have further questions, feel free to reply to this email or call <strong>' . htmlspecialchars($b['phone']) . '</strong>.
             </p>
         ');
         return self::send($email, $mail_subject, $html);
@@ -401,7 +406,7 @@ class Mailer {
                     Present this code at the entrance for verification.
                 </p>
             </div>
-        ', 'View Event Details', ($_ENV['APP_URL'] ?? 'https://shanfixtechnology.com') . '/event-ticketing.php');
+        ', 'View Event Details', site_url('event-ticketing.php'));
     }
 
     public static function send(string $to, string $subject, string $html): bool {
@@ -649,7 +654,7 @@ class Mailer {
         <td style="padding:24px 40px; text-align:center;">
           <p style="margin:0; color:#94a3b8; font-size:0.8rem;">
             &copy; ' . date('Y') . ' Shanfix Technology Limited &bull; Nairobi, Kenya<br>
-            <a href="mailto:info@shanfixtechnology.com" style="color:#6366f1; text-decoration:none;">info@shanfixtechnology.com</a>
+            <a href="mailto:' . htmlspecialchars(site_brand()['email']) . '" style="color:#6366f1; text-decoration:none;">' . htmlspecialchars(site_brand()['email']) . '</a>
           </p>
         </td>
       </tr>

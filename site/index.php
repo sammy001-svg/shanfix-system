@@ -36,7 +36,7 @@ $pageSEO = [
     'title'       => 'Shanfix Technology | IT Solutions & Digital Services in Nairobi, Kenya',
     'description' => 'Shanfix Technology offers web development, software solutions, digital marketing, networking, printing & branding, and event management in Nairobi, Kenya.',
     'keywords'    => 'IT solutions Nairobi, web development Kenya, software solutions, digital marketing, networking Nairobi, Shanfix Technology',
-    'canonical'   => 'https://shanfixtechnology.com/',
+    'canonical'   => '{{base}}/',
 ];
 include 'includes/header.php'; ?>
 

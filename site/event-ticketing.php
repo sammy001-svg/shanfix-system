@@ -3,7 +3,7 @@ $pageSEO = [
     'title'       => 'Event Ticketing System in Kenya | Online Ticket Sales - Shanfix Technology',
     'description' => 'Seamless event ticketing solutions in Kenya. Online ticket sales, check-in management, and event analytics for all event sizes by Shanfix Technology.',
     'keywords'    => 'event ticketing Kenya, online tickets, event management system, ticket sales',
-    'canonical'   => 'https://shanfixtechnology.com/event-ticketing.php',
+    'canonical'   => '{{base}}/event-ticketing.php',
 ];
 include 'includes/header.php'; ?>
 

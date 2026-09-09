@@ -1,10 +1,14 @@
 <?php
 require_once 'includes/db_connect.php';
+require_once 'includes/brand.php';
 
 header('Content-Type: application/xml; charset=utf-8');
 echo '<?xml version="1.0" encoding="UTF-8"?>';
 
-$base = 'https://shanfixtechnology.com';
+// Every URL in here is absolute, and a sitemap listing another
+// site's addresses is worse than no sitemap at all. One setting,
+// the same one the pages name themselves with.
+$base = rtrim(site_url(), '/');
 $today = date('Y-m-d');
 
 $staticPages = [

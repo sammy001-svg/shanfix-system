@@ -3,7 +3,7 @@ $pageSEO = [
     'title'       => 'Contact Us | Shanfix Technology - IT Company in Nairobi, Kenya',
     'description' => 'Get in touch with Shanfix Technology in Nairobi, Kenya. Call, email, or visit us at Tana House, Karen. We respond within 24 hours.',
     'keywords'    => 'contact Shanfix Technology, IT company Nairobi contact, Karen Nairobi',
-    'canonical'   => 'https://shanfixtechnology.com/contact.php',
+    'canonical'   => '{{base}}/contact.php',
 ];
 include 'includes/header.php'; ?>
 <link rel="stylesheet" href="<?= site_asset('contact-modern-v2.css') ?>">
@@ -38,7 +38,7 @@ include 'includes/header.php'; ?>
                         <div class="v2-card-icon"><i class="fas fa-phone-alt"></i></div>
                         <div class="v2-card-text">
                             <span>Phone</span>
-                            <p>+254 751 869 165</p>
+                            <p><?= htmlspecialchars($_brand['phone']) ?></p>
                         </div>
                     </div>
 
@@ -46,7 +46,7 @@ include 'includes/header.php'; ?>
                         <div class="v2-card-icon"><i class="fas fa-envelope"></i></div>
                         <div class="v2-card-text">
                             <span>Email</span>
-                            <p>info@shanfix.tech</p>
+                            <p><?= htmlspecialchars($_brand['email']) ?></p>
                         </div>
                     </div>
 
@@ -54,7 +54,7 @@ include 'includes/header.php'; ?>
                         <div class="v2-card-icon"><i class="fas fa-map-marker-alt"></i></div>
                         <div class="v2-card-text">
                             <span>Location</span>
-                            <p>Nairobi, Kenya</p>
+                            <p><?= htmlspecialchars($_brand['address']) ?></p>
                         </div>
                     </div>
                 </div>

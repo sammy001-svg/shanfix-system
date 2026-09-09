@@ -3,8 +3,8 @@ $pageSEO = [
     'title'       => 'Web Development Services in Nairobi | Shanfix Technology',
     'description' => 'Professional web development services in Nairobi, Kenya. Custom websites, e-commerce, and web applications built to grow your business online.',
     'keywords'    => 'web development Nairobi, website design Kenya, custom web applications, e-commerce development',
-    'canonical'   => 'https://shanfixtechnology.com/web-development.php',
-    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Web Development","description":"Professional web development services in Nairobi, Kenya. Custom websites, e-commerce, and web applications.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"https://shanfixtechnology.com/"},"areaServed":{"@type":"City","name":"Nairobi"},"url":"https://shanfixtechnology.com/web-development.php"}',
+    'canonical'   => '{{base}}/web-development.php',
+    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Web Development","description":"Professional web development services in Nairobi, Kenya. Custom websites, e-commerce, and web applications.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"{{base}}/"},"areaServed":{"@type":"City","name":"Nairobi"},"url":"{{base}}/web-development.php"}',
 ];
 include 'includes/header.php'; ?>
     <section class="service-hero hero-web-dev">

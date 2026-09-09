@@ -3,8 +3,8 @@ $pageSEO = [
     'title'       => 'Web Hosting Services in Kenya | Reliable & Affordable - Shanfix Technology',
     'description' => 'Reliable and affordable web hosting in Kenya. Shared, VPS, and dedicated hosting with 99.9% uptime guarantee from Shanfix Technology Nairobi.',
     'keywords'    => 'web hosting Kenya, domain registration, VPS hosting Nairobi, cloud hosting',
-    'canonical'   => 'https://shanfixtechnology.com/web-hosting.php',
-    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Web Hosting","description":"Reliable and affordable web hosting in Kenya. Shared, VPS, and dedicated servers with 99.9% uptime.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"https://shanfixtechnology.com/"},"areaServed":{"@type":"Country","name":"Kenya"},"url":"https://shanfixtechnology.com/web-hosting.php"}',
+    'canonical'   => '{{base}}/web-hosting.php',
+    'json_ld'     => '{"@context":"https://schema.org","@type":"Service","name":"Web Hosting","description":"Reliable and affordable web hosting in Kenya. Shared, VPS, and dedicated servers with 99.9% uptime.","provider":{"@type":"LocalBusiness","name":"Shanfix Technology","url":"{{base}}/"},"areaServed":{"@type":"Country","name":"Kenya"},"url":"{{base}}/web-hosting.php"}',
 ];
 include 'includes/header.php'; ?>
 
@@ -305,7 +305,7 @@ include 'includes/header.php'; ?>
                     <p>Our infrastructure experts are standing by 24/7/365 to help you find the perfect hosting environment for your project.</p>
                     <div class="hero-buttons">
                         <a href="contact.php" class="btn btn-primary">Chit-Chat with Experts</a>
-                        <a href="tel:+254751869165" class="btn btn-secondary">Call Us Directly</a>
+                        <a href="tel:<?= htmlspecialchars($_brand['phone_tel']) ?>" class="btn btn-secondary">Call Us Directly</a>
                     </div>
                 </div>
             </div>

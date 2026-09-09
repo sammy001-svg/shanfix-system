@@ -12,6 +12,9 @@
 // is no site session to ask about and no second "are you logged in?"
 // branch. Everyone gets the same two ways in: ask us for a quote, or
 // sign in to the portal.
+require_once __DIR__ . '/brand.php';
+
+$_brand    = site_brand();
 $_ctaLabel = htmlspecialchars($ctaService ?? 'this service');
 ?>
 
@@ -43,7 +46,7 @@ $_ctaLabel = htmlspecialchars($ctaService ?? 'this service');
                 Existing Client? Log In
             </a>
 
-            <a href="tel:+254751869165" style="display:inline-flex; align-items:center; gap:10px; background:rgba(34,197,94,0.15); color:#22c55e; text-decoration:none; font-weight:600; font-size:0.95rem; padding:16px 28px; border-radius:50px; border:1.5px solid rgba(34,197,94,0.3); transition:all 0.3s;">
+            <a href="tel:<?= htmlspecialchars($_brand['phone_tel']) ?>" style="display:inline-flex; align-items:center; gap:10px; background:rgba(34,197,94,0.15); color:#22c55e; text-decoration:none; font-weight:600; font-size:0.95rem; padding:16px 28px; border-radius:50px; border:1.5px solid rgba(34,197,94,0.3); transition:all 0.3s;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                 Call Us Now
             </a>
