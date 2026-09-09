@@ -14,6 +14,7 @@
 use App\Controllers\ArtworkController;
 use App\Controllers\BackupController;
 use App\Controllers\AuthController;
+use App\Controllers\CatalogueImageController;
 use App\Controllers\ChatController;
 use App\Controllers\ClientController;
 use App\Controllers\DashboardController;
@@ -70,7 +71,12 @@ $r = $app->router();
 // Three kinds of account sign in here and none of them works in the
 // others' form, so the front door asks which you are. Somebody already
 // signed in is sent straight to whichever of the three they are in.
+// The company website sits in front of all this and owns the front door,
+// so the chooser needs a path of its own — /signin is what the site's
+// header points at. The bare / stays registered because it is still the
+// front door wherever the system is deployed without the site beside it.
 $r->get('/',       [AuthController::class, 'choose']);
+$r->get('/signin', [AuthController::class, 'choose']);
 $r->get('/login',  [AuthController::class, 'showLogin'], ['guest']);
 $r->post('/login', [AuthController::class, 'login'],     ['guest', 'csrf']);
 $r->post('/logout', [AuthController::class, 'logout'],   ['csrf']);
@@ -172,49 +178,12 @@ $r->get('/b/{token}', [PublicJobRequestController::class, 'show']);
 //
 // Signed in as any of the three, because the picture should be no more
 // public than the page that shows it.
-$r->get('/catalogue/image/{kind}/{id}', function (Request $request) {
-    if (!\App\Core\Auth::check() && !\App\Core\ClientAuth::check() && !\App\Core\PartnerAuth::check()) {
-        throw new \App\Core\HttpException(404, 'Not found.');
-    }
-
-    $kind  = (string) $request->param('kind');
-    $image = \App\Services\ImageLibrary::catalogueImage($kind, $request->paramInt('id'));
-
-    if (!$image) {
-        throw new \App\Core\HttpException(404, 'Not found.');
-    }
-
-    // A card wants the thumbnail; a lightbox wants the picture.
-    $wantThumb = $request->query('size') === 'thumb' && !empty($image['thumb_path']);
-    $relative  = (string) ($wantThumb ? $image['thumb_path'] : $image['file_path']);
-
-    $full = realpath(STORAGE_PATH . '/' . $relative);
-    $root = realpath(STORAGE_PATH . '/uploads');
-
-    if (!$full || !$root || !str_starts_with($full, $root) || !is_file($full)) {
-        throw new \App\Core\HttpException(404, 'Not found.');
-    }
-
-    $mime = 'image/jpeg';
-
-    if (function_exists('finfo_open')) {
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mime  = finfo_file($finfo, $full) ?: $mime;
-        finfo_close($finfo);
-    }
-
-    // Only ever a picture, whatever ended up on disk under that row.
-    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
-        throw new \App\Core\HttpException(404, 'Not found.');
-    }
-
-    header('Content-Type: ' . $mime);
-    header('Content-Length: ' . filesize($full));
-    header('X-Content-Type-Options: nosniff');
-    header('Cache-Control: private, max-age=86400');
-    readfile($full);
-    exit;
-});
+// The portals ask with a session. The public website has none to offer,
+// so it asks the other one — same lookup, same refusals, same confinement
+// to storage/uploads. What makes these safe is that neither can name a
+// file, not the session one of them requires.
+$r->get('/catalogue/image/{kind}/{id}', [CatalogueImageController::class, 'catalogue']);
+$r->get('/catalogue/photo/{kind}/{id}', [CatalogueImageController::class, 'photo']);
 
 // The client portal
 // ---------------------------------------------------------------------

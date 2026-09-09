@@ -1,0 +1,235 @@
+/* ==========================================================================
+   GRAPHICS DESIGN - MODERN REDESIGN (ULTRA-PREMIUM)
+   ========================================================================== */
+
+:root {
+    --gr-bg: #030816;
+    --gr-bg-rgb: 3, 8, 22;
+    --gr-accent: #59e00a; /* Brand Green */
+    --gr-accent-rgb: 89, 224, 10;
+    --gr-glass: rgba(255, 255, 255, 0.03);
+    --gr-glass-border: rgba(255, 255, 255, 0.1);
+    --gr-text: #e2e8f0;
+}
+
+.graphics-modern-page {
+    background-color: var(--gr-bg);
+    color: var(--gr-text);
+    font-family: 'Inter', sans-serif;
+}
+
+/* --- Hero Section --- */
+.gr-hero {
+    position: relative;
+    padding: 200px 0 150px;
+    background: url('assets/graphics-hero.png') no-repeat center center;
+    background-size: cover;
+    overflow: hidden;
+}
+
+.gr-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(var(--gr-bg-rgb), 0.7) 0%, var(--gr-bg) 90%);
+    z-index: 1;
+}
+
+.gr-hero-content {
+    text-align: center;
+    max-width: 900px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 10;
+}
+
+.gr-hero h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(3rem, 7vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    color: #fff;
+}
+
+.gr-hero h1 span {
+    color: var(--gr-accent);
+}
+
+.gr-hero p {
+    font-size: 1.25rem;
+    color: #94a3b8;
+    margin-bottom: 3rem;
+}
+
+/* --- Pricing Grid --- */
+.pricing-section {
+    padding: 100px 0;
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.price-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--gr-glass-border);
+    border-radius: 2.5rem;
+    padding: 3.5rem 3rem;
+    transition: all 0.5s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.price-card:hover {
+    transform: translateY(-15px);
+    border-color: var(--gr-accent);
+    box-shadow: 0 40px 80px -15px rgba(0, 0, 0, 0.6);
+}
+
+.price-header h3 {
+    font-size: 1.5rem;
+    color: #fff;
+    margin-bottom: 1rem;
+}
+
+.price-amount {
+    font-size: 3rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.price-amount span {
+    font-size: 1rem;
+    color: #64748b;
+}
+
+.price-features {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 3rem;
+    flex-grow: 1;
+}
+
+.price-features li {
+    padding: 0.75rem 0;
+    color: #cbd5e1;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.price-features li svg {
+    color: var(--gr-accent);
+}
+
+/* --- Creative Showcase Grid --- */
+.gr-showcase {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    padding: 80px 0;
+}
+
+.showcase-card {
+    position: relative;
+    border-radius: 2rem;
+    overflow: hidden;
+    aspect-ratio: 1;
+    background: var(--gr-glass);
+    border: 1px solid var(--gr-glass-border);
+}
+
+.showcase-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 2rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.showcase-card:hover .showcase-overlay {
+    opacity: 1;
+}
+
+.showcase-overlay h4 {
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.showcase-overlay p {
+    font-size: 0.85rem;
+    color: var(--gr-accent);
+}
+
+/* --- Shared Utility Styles --- */
+.section-tag {
+    color: var(--gr-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    font-weight: 700;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    display: block;
+    text-align: center;
+}
+
+.section-title-modern {
+    text-align: center;
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 4rem;
+    font-family: 'Outfit', sans-serif;
+    color: #fff;
+}
+
+.section-title-modern span {
+    color: var(--gr-accent);
+}
+
+.hero-btns {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+}
+
+/* Support Box */
+.support-box {
+    background: var(--gr-glass);
+    border-radius: 3rem;
+    padding: 5rem;
+    display: flex;
+    align-items: center;
+    gap: 4rem;
+    border: 1px solid var(--gr-glass-border);
+    margin-top: 80px;
+}
+
+.support-content h2 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    color: #fff;
+}
+
+.support-content h2 span {
+    color: var(--gr-accent);
+}
+
+@media (max-width: 992px) {
+    .support-box {
+        flex-direction: column;
+        text-align: center;
+        padding: 3rem;
+    }
+}

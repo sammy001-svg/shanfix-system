@@ -1,0 +1,20 @@
+{
+  "name": "shanfix-technology",
+  "version": "1.0.0",
+  "description": "Shanfix Technology - Web Development, System Development, Bulk SMS, SEO, Networking, Printing & Branding, Event Management",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "archiver": "^7.0.1",
+    "dotenv": "^17.3.1",
+    "form-data": "^4.0.5"
+  }
+}

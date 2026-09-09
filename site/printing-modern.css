@@ -1,0 +1,551 @@
+:root {
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --brand-green: #59e00a;
+    --brand-dark: #083f0c;
+    --brand-glow: rgba(89, 224, 10, 0.3);
+}
+
+/* .product-grid is no longer used — products live inside .carousel-slide grids */
+
+/* Modern Glass Card */
+.product-card {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer; /* whole card is clickable */
+}
+
+.product-card:hover {
+    transform: translateY(-12px);
+    border-color: var(--brand-green);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1), 0 0 20px var(--brand-glow);
+}
+
+/* Image Showcase — scoped to #dynamicCatalog to win over index.css rules */
+#dynamicCatalog .product-image-wrapper {
+    position: relative;
+    /* No aspect-ratio, no overflow:hidden — let the image define the height */
+    height: 210px;
+    border-radius: 20px;
+    margin: 12px;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+#dynamicCatalog .product-image {
+    /* Natural dimensions constrained to fit — NEVER cropped */
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 190px;
+    object-fit: contain;
+    transition: transform 0.5s ease;
+}
+
+#dynamicCatalog .product-card:hover .product-image {
+    transform: scale(1.05);
+}
+
+/* Keep hover overlay working with new wrapper */
+#dynamicCatalog .product-image-wrapper .product-overlay {
+    border-radius: 12px;
+}
+
+.product-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(8, 63, 12, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.3s ease;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+.product-card:hover .product-overlay {
+    opacity: 1;
+}
+
+.overlay-icon {
+    background: var(--brand-green);
+    color: var(--brand-dark);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(20px);
+    transition: all 0.4s ease;
+}
+
+.product-card:hover .overlay-icon {
+    transform: translateY(0);
+}
+
+/* Product Badges */
+.product-badge {
+    position: absolute;
+    top: 25px;
+    right: 25px;
+    padding: 6px 14px;
+    background: var(--brand-green);
+    color: var(--brand-dark);
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    z-index: 5;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); box-shadow: 0 0 15px var(--brand-glow); }
+    100% { transform: scale(1); }
+}
+
+/* ── Category Section & Carousel ─────────────────────────────────────── */
+
+.catalog-category-section {
+    margin-bottom: 72px;
+}
+
+/* Header row: heading left, controls right */
+.category-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.category-heading {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--brand-dark);
+    margin: 0;
+    padding-left: 15px;
+    border-left: 5px solid var(--brand-green);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    flex-shrink: 0;
+}
+
+/* Carousel controls group */
+.cat-carousel-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cat-slide-counter {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--brand-dark);
+    opacity: 0.55;
+    min-width: 42px;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
+
+.cat-nav-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(8, 63, 12, 0.2);
+    background: #ffffff;
+    color: var(--brand-dark);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.22s, border-color 0.22s, transform 0.22s, box-shadow 0.22s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+}
+.cat-nav-btn:hover {
+    background: var(--brand-green);
+    border-color: var(--brand-green);
+    transform: scale(1.1);
+    box-shadow: 0 4px 16px var(--brand-glow);
+}
+.cat-nav-btn:active {
+    transform: scale(0.96);
+}
+
+/* Carousel viewport — clips the track */
+.product-carousel-wrapper {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+/* Track — all slides in a row, slides via translateX */
+.product-carousel-track {
+    display: flex;
+    will-change: transform;
+    transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* One slide = 4 product cards side-by-side */
+.carousel-slide {
+    flex: 0 0 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+    /* Prevent internal cards from shrinking the slide width */
+    min-width: 0;
+}
+
+/* ── Progress bar ─────────────────────────────────────────────────────── */
+.cat-progress-bar {
+    height: 3px;
+    background: rgba(8, 63, 12, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 20px;
+}
+.cat-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--brand-green), #22c55e);
+    border-radius: 0 0 12px 12px;
+}
+
+/* ── Dot indicators ───────────────────────────────────────────────────── */
+.cat-carousel-dots {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.cat-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(8, 63, 12, 0.2);
+    cursor: pointer;
+    padding: 0;
+    transition: width 0.3s ease, background 0.3s ease, border-radius 0.3s ease;
+    flex-shrink: 0;
+}
+.cat-dot:hover {
+    background: rgba(8, 63, 12, 0.4);
+}
+.cat-dot.active {
+    width: 26px;
+    border-radius: 4px;
+    background: var(--brand-green);
+    box-shadow: 0 2px 8px var(--brand-glow);
+}
+
+/* ── Responsive breakpoints ───────────────────────────────────────────── */
+
+/* Tablet: 2 per row (products stack inside each slide) */
+@media (max-width: 1024px) {
+    .carousel-slide {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.25rem;
+    }
+}
+
+/* Mobile: 1 per row */
+@media (max-width: 600px) {
+    .carousel-slide {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .cat-nav-btn { width: 36px; height: 36px; }
+    .category-heading { font-size: 1.4rem; letter-spacing: 1px; }
+}
+
+/* Empty Catalog State */
+.empty-catalog {
+    text-align: center;
+    padding: 80px 20px;
+    background: var(--glass-bg);
+    border-radius: 24px;
+    border: 1px dashed var(--glass-border);
+    color: var(--text-muted);
+}
+
+.empty-catalog i {
+    font-size: 4rem;
+    color: var(--brand-green);
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.empty-catalog p {
+    font-size: 1.2rem;
+}
+
+/* Loading State */
+.catalog-loading {
+    text-align: center;
+    padding: 100px 0;
+}
+
+.loader {
+    width: 48px;
+    height: 48px;
+    border: 5px solid var(--glass-border);
+    border-bottom-color: var(--brand-green);
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes rotation {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Content Aesthetics */
+.product-content {
+    padding: 1.5rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.product-category {
+    font-size: 0.8rem;
+    color: var(--brand-green);
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    letter-spacing: 2px;
+}
+
+.product-title {
+    font-size: 1.5rem;
+    color: var(--brand-dark);
+    margin-bottom: 1rem;
+    font-weight: 800;
+}
+
+.product-description {
+    color: #4a5568;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+    font-size: 0.95rem;
+}
+
+/* Modern Pricing & Button */
+.product-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    background: rgba(240, 249, 240, 0.5);
+    padding: 0.75rem 1.25rem;
+    margin: 0 -1.5rem -1.5rem;
+    border-top: 1px solid var(--glass-border);
+    gap: 8px;
+}
+
+.product-price {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--brand-dark);
+    display: flex;
+    align-items: baseline;
+}
+
+.product-price span {
+    font-size: 0.72rem;
+    margin-right: 3px;
+    font-weight: 700;
+}
+
+.btn-buy {
+    background: var(--brand-dark);
+    color: white;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.btn-buy:hover {
+    background: var(--brand-green);
+    color: var(--brand-dark);
+    transform: scale(1.05);
+}
+
+/* Dark Mode Context Fix (if body has dark class) */
+.dark-mode .product-card {
+    background: rgba(15, 23, 42, 0.7);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .product-title {
+    color: white;
+}
+
+.dark-mode .product-description {
+    color: #94a3b8;
+}
+
+.dark-mode .product-footer {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.dark-mode .product-price {
+    color: var(--brand-green);
+}
+
+/* ── Order Modal Gallery ──────────────────────────────────────────────── */
+
+/* Gallery wrapper: clean white stage — let the image define its own height */
+.modal-gallery-main {
+    position: relative;
+    width: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #ffffff;
+    /* Subtle border so the white image area reads against a white modal */
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07),
+                0 4px 24px rgba(0, 0, 0, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+}
+
+.modal-gallery-main #modalImage {
+    width: 100%;
+    /* Use contain: entire product is visible, no cropping ever */
+    object-fit: contain;
+    display: block;
+    /* Max height keeps tall portrait images from dominating the modal */
+    max-height: 420px;
+    /* Breathing room so the product never touches the frame edges */
+    padding: 20px;
+    transition: opacity 0.15s ease;
+    box-sizing: border-box;
+}
+
+/* Prev / Next arrow buttons */
+.gallery-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--brand-dark);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+    transition: background 0.2s, transform 0.2s;
+    z-index: 10;
+}
+.gallery-nav-btn:hover {
+    background: var(--brand-green);
+    transform: translateY(-50%) scale(1.1);
+}
+.gallery-prev { left: 10px; }
+.gallery-next { right: 10px; }
+
+/* Image counter pill */
+.gallery-counter {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    pointer-events: none;
+    letter-spacing: 0.5px;
+}
+
+/* Thumbnail strip */
+.modal-thumbnails {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+.modal-thumbnails::-webkit-scrollbar { height: 4px; }
+.modal-thumbnails::-webkit-scrollbar-track { background: transparent; }
+.modal-thumbnails::-webkit-scrollbar-thumb { background: var(--brand-green); border-radius: 4px; }
+
+.gallery-thumb {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    /* contain so the full product is visible in the thumbnail too */
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: #ffffff;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07);
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    padding: 0;
+    outline: none;
+}
+.gallery-thumb:hover {
+    border-color: var(--brand-green);
+    transform: scale(1.06);
+}
+.gallery-thumb.active {
+    border-color: var(--brand-green);
+    box-shadow: 0 0 0 3px rgba(89, 224, 10, 0.25);
+    transform: scale(1.06);
+}
+
+/* Keep the modal image side layout consistent */
+.modal-product-image-side {
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 640px) {
+    .gallery-thumb { width: 52px; height: 52px; }
+    .gallery-nav-btn { width: 32px; height: 32px; }
+}

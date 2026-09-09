@@ -59,6 +59,7 @@ deployment:
         rsync -a --delete
           --exclude '.git/' --exclude 'deploy/' --exclude 'tests/' --exclude 'node_modules/'
           --exclude 'storage/' --exclude 'config/config.php'
+          --exclude 'site/.env' --exclude 'site/uploads/'
           "$SOURCE/" "$DEPLOYPATH/"
         && echo "Copied the site to $DEPLOYPATH";
       else

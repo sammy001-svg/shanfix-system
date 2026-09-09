@@ -63,8 +63,12 @@ $MYSQL -e "UPDATE settings SET setting_value='1'
 
 echo ""
 echo "=== 1. The three doors ==="
-eq "the front door asks which you are" "$(code /)"                "200"
-has "and offers all three"             "$(curl -s "$BASE/")"      "/partners/login"
+# The company website sits in front of the system and owns /, so the
+# chooser lives at /signin and the site's header is what points at it.
+eq "the website answers the front door" "$(code /)"                    "200"
+has "and offers a way in"               "$(curl -s "$BASE/")"          "/signin"
+eq "the chooser asks which you are"     "$(code /signin)"              "200"
+has "and offers all three"              "$(curl -s "$BASE/signin")"    "/partners/login"
 eq "the partner door is open"          "$(code /partners/login)"  "200"
 eq "so is applying"                    "$(code /partners/apply)"  "200"
 ne "the portal itself is shut"         "$(code /partners)"        "200"

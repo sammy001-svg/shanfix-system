@@ -1,0 +1,282 @@
+/* ===================================
+   BULK SMS - MODERN STYLES
+   =================================== */
+
+.sms-hero {
+    position: relative;
+    height: 60vh;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: url('assets/bulk-sms-hero.png') center/cover no-repeat;
+    margin-top: 138px; /* Offset for fixed headers */
+    overflow: hidden;
+}
+
+.sms-hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(8, 63, 12, 0.9) 0%, rgba(0, 0, 0, 0.7) 100%);
+    z-index: 1;
+}
+
+.sms-hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    color: var(--color-white);
+    max-width: 800px;
+    padding: 0 var(--spacing-md);
+}
+
+.sms-hero h1 {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    color: var(--color-white);
+    margin-bottom: var(--spacing-sm);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.sms-hero p {
+    font-size: 1.25rem;
+    color: var(--color-gray-100);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Features Section */
+.sms-features {
+    padding: var(--spacing-3xl) 0;
+    background: var(--color-gray-50);
+}
+
+.section-header {
+    text-align: center;
+    max-width: 700px;
+    margin: 0 auto var(--spacing-3xl);
+}
+
+.section-header h2 {
+    margin-bottom: var(--spacing-sm);
+    position: relative;
+    display: inline-block;
+}
+
+.section-header h2::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 4px;
+    background: var(--color-primary);
+    border-radius: var(--radius-full);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-xl);
+}
+
+.feature-card {
+    background: var(--color-white);
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    transition: var(--transition-base);
+    border: 1px solid var(--color-gray-100);
+    text-align: left;
+}
+
+.feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: var(--shadow-2xl);
+    border-color: var(--color-primary-light);
+}
+
+.feature-icon {
+    width: 60px;
+    height: 60px;
+    background: var(--color-primary);
+    color: var(--color-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.feature-card h3 {
+    margin-bottom: var(--spacing-sm);
+    font-size: 1.5rem;
+}
+
+/* Pricing Section */
+.sms-pricing {
+    padding: var(--spacing-3xl) 0;
+    background: var(--color-white);
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--spacing-xl);
+}
+
+.pricing-card {
+    background: var(--color-white);
+    padding: var(--spacing-2xl);
+    border-radius: var(--radius-2xl);
+    border: 2px solid var(--color-gray-100);
+    transition: var(--transition-base);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+
+.pricing-card.featured {
+    border-color: var(--color-primary);
+    transform: scale(1.05);
+    box-shadow: var(--shadow-2xl);
+    position: relative;
+}
+
+.pricing-card.featured::top {
+    content: 'Most Popular';
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-primary);
+    color: var(--color-white);
+    padding: 4px 16px;
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.pricing-card:hover {
+    border-color: var(--color-primary-light);
+}
+
+.pricing-header h3 {
+    font-size: 1.75rem;
+    margin-bottom: var(--spacing-md);
+}
+
+.price {
+    font-size: 3rem;
+    font-weight: 800;
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.price span {
+    font-size: 1rem;
+    color: var(--color-gray-500);
+    font-weight: 400;
+}
+
+.pricing-features {
+    list-style: none;
+    margin: var(--spacing-xl) 0;
+    flex-grow: 1;
+}
+
+.pricing-features li {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-gray-100);
+    color: var(--color-gray-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.pricing-features li:last-child {
+    border-bottom: none;
+}
+
+.pricing-features li svg {
+    color: var(--color-primary);
+}
+
+/* CTA Section */
+.sms-cta {
+    padding: var(--spacing-3xl) 0;
+    background: var(--gradient-primary);
+    color: var(--color-white);
+    text-align: center;
+}
+
+.sms-cta h2 {
+    color: var(--color-white);
+    margin-bottom: var(--spacing-md);
+}
+
+.sms-cta p {
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: var(--spacing-xl);
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.sms-cta .btn-white {
+    background: var(--color-white);
+    color: var(--color-primary);
+}
+
+.sms-cta .btn-white:hover {
+    background: var(--color-gray-100);
+    transform: translateY(-3px);
+}
+
+@media (max-width: 768px) {
+    .sms-hero {
+        margin-top: 98px; /* Adjusted for mobile header height */
+        height: auto;
+        padding: var(--spacing-3xl) 0;
+    }
+
+    .sms-hero h1 {
+        font-size: 2.5rem;
+    }
+
+    .sms-features, .sms-pricing, .sms-cta {
+        padding: var(--spacing-2xl) 0;
+    }
+
+    .section-header {
+        margin-bottom: var(--spacing-2xl);
+    }
+
+    .pricing-grid {
+        grid-template-columns: 1fr;
+        max-width: 450px;
+        margin: 0 auto;
+    }
+
+    .pricing-card.featured {
+        transform: scale(1);
+    }
+}
+
+@media (max-width: 480px) {
+    .sms-hero h1 {
+        font-size: 2rem;
+    }
+
+    .pricing-card {
+        padding: var(--spacing-xl);
+    }
+
+    .price {
+        font-size: 2.5rem;
+    }
+}

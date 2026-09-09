@@ -1,0 +1,384 @@
+/* ==========================================================================
+   WEB HOSTING - MODERN REDESIGN (ULTRA-PREMIUM)
+   ========================================================================== */
+
+:root {
+    --hosting-bg: #030816;
+    --hosting-bg-rgb: 3, 8, 22;
+    --hosting-accent: #59e00a;
+    --hosting-accent-rgb: 89, 224, 10;
+    --hosting-glass: rgba(255, 255, 255, 0.03);
+    --hosting-glass-border: rgba(255, 255, 255, 0.1);
+    --hosting-text: #e2e8f0;
+}
+
+.hosting-modern-page {
+    background-color: var(--hosting-bg);
+    color: var(--hosting-text);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+}
+
+/* --- Hero Section --- */
+.hosting-hero {
+    position: relative;
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    background: url('assets/hosting-hero.png') no-repeat center center;
+    background-size: cover;
+    padding-top: 100px;
+}
+
+.hosting-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 0%, var(--hosting-bg) 80%);
+}
+
+.hosting-hero-content {
+    position: relative;
+    z-index: 10;
+    max-width: 800px;
+}
+
+.hosting-hero h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(3rem, 8vw, 5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    color: #fff;
+}
+
+.hosting-hero h1 span {
+    color: var(--hosting-accent);
+    display: block;
+}
+
+.hosting-hero p {
+    font-size: 1.25rem;
+    color: #94a3b8;
+    margin-bottom: 2.5rem;
+    max-width: 600px;
+}
+
+/* --- Metrics Grid --- */
+.hosting-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 4rem;
+}
+
+.metric-card {
+    background: var(--hosting-glass);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--hosting-glass-border);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    text-align: center;
+}
+
+.metric-value {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--hosting-accent);
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #64748b;
+}
+
+/* --- Pricing Section --- */
+.pricing-section {
+    padding: 100px 0;
+    position: relative;
+}
+
+.section-tag {
+    color: var(--hosting-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    font-weight: 700;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    display: block;
+    text-align: center;
+}
+
+.section-title-modern {
+    text-align: center;
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 4rem;
+    font-family: 'Outfit', sans-serif;
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.price-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--hosting-glass-border);
+    border-radius: 2.5rem;
+    padding: 3.5rem 3rem;
+    position: relative;
+    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.price-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(var(--hosting-accent-rgb), 0.05) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+}
+
+.price-card:hover {
+    transform: translateY(-20px) scale(1.02);
+    border-color: var(--hosting-accent);
+    box-shadow: 
+        0 40px 80px -15px rgba(0, 0, 0, 0.6),
+        0 0 50px rgba(var(--hosting-accent-rgb), 0.15);
+}
+
+.price-card:hover::after {
+    opacity: 1;
+}
+
+.price-card.featured {
+    border-color: var(--hosting-accent);
+    background: linear-gradient(135deg, rgba(var(--hosting-accent-rgb), 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
+    transform: scale(1.05);
+    z-index: 5;
+}
+
+.price-card.featured:hover {
+    transform: translateY(-25px) scale(1.07);
+}
+
+.price-card.featured::before {
+    content: 'MOST POPULAR';
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: var(--hosting-accent);
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 900;
+    padding: 0.5rem 2rem;
+    transform: rotate(45deg) translate(30%, -20%);
+    width: 150px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.price-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #fff;
+}
+
+.price-amount {
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.price-amount span {
+    font-size: 1rem;
+    color: #64748b;
+    font-weight: 400;
+}
+
+.price-desc {
+    color: #94a3b8;
+    margin-bottom: 2.5rem;
+}
+
+.price-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 3rem 0;
+    flex-grow: 1;
+}
+
+.price-features li {
+    padding: 0.75rem 0;
+    color: #cbd5e1;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.price-features li svg {
+    color: var(--hosting-accent);
+    min-width: 20px;
+}
+
+.price-btn {
+    display: block;
+    text-align: center;
+    background: #fff;
+    color: #000;
+    padding: 1.25rem;
+    border-radius: 1rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.price-btn.accent {
+    background: var(--hosting-accent);
+}
+
+.price-btn:hover {
+    transform: scale(1.02);
+    filter: brightness(1.1);
+}
+
+/* --- Sub Navigation --- */
+.hosting-subnav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(var(--hosting-bg-rgb), 0.8);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--hosting-glass-border);
+    padding: 1rem 0;
+}
+
+.subnav-container {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+}
+
+.subnav-link {
+    color: #94a3b8;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.subnav-link:hover, .subnav-link.active {
+    color: var(--hosting-accent);
+}
+
+/* --- Section Styling --- */
+.hosting-section {
+    padding: 120px 0;
+    position: relative;
+    border-bottom: 1px solid var(--hosting-glass-border);
+}
+
+.section-header-modern {
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto 5rem;
+}
+
+.section-header-modern h2 {
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    font-family: 'Outfit', sans-serif;
+    color: #ffffff;
+}
+
+.section-header-modern h2 span {
+    color: var(--hosting-accent);
+}
+
+.section-header-modern p {
+    font-size: 1.125rem;
+    color: #94a3b8;
+}
+
+/* Background Variations */
+.shared-hosting-bg {
+    background: radial-gradient(circle at 10% 20%, rgba(89, 224, 10, 0.03) 0%, transparent 50%);
+}
+
+.wordpress-hosting-bg {
+    background: radial-gradient(circle at 90% 80%, rgba(33, 117, 155, 0.05) 0%, transparent 50%);
+}
+
+.dedicated-hosting-bg {
+    background: radial-gradient(circle at 50% 50%, rgba(var(--hosting-accent-rgb), 0.02) 0%, transparent 100%);
+}
+
+.email-hosting-bg {
+    background: radial-gradient(circle at 10% 80%, rgba(255, 107, 107, 0.03) 0%, transparent 50%);
+}
+
+/* --- Comparison Blocks --- */
+.email-hosting-section {
+    padding: 100px 0;
+}
+
+/* --- Support Section --- */
+.hosting-support {
+    padding: 100px 0;
+    background: linear-gradient(180deg, var(--hosting-bg) 0%, #06122e 100%);
+}
+
+.support-box {
+    background: var(--hosting-glass);
+    border-radius: 3rem;
+    padding: 5rem;
+    display: flex;
+    align-items: center;
+    gap: 4rem;
+    border: 1px solid var(--hosting-glass-border);
+}
+
+.support-content h2, 
+.support-content h2 span {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    color: #ffffff;
+}
+
+.support-content p {
+    color: #94a3b8;
+    font-size: 1.125rem;
+    margin-bottom: 2.5rem;
+}
+
+@media (max-width: 992px) {
+    .support-box {
+        flex-direction: column;
+        text-align: center;
+        padding: 3rem;
+    }
+}

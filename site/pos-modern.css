@@ -1,0 +1,268 @@
+/* ==========================================================================
+   POINT OF SALES - MODERN REDESIGN (ULTRA-PREMIUM)
+   ========================================================================== */
+
+:root {
+    --pos-bg: #020617;
+    --pos-accent: #59e00a;
+    --pos-accent-rgb: 89, 224, 10;
+    --pos-glass: rgba(255, 255, 255, 0.03);
+    --pos-glass-border: rgba(255, 255, 255, 0.1);
+    --pos-text: #f1f5f9;
+}
+
+.pos-modern-page {
+    background-color: var(--pos-bg);
+    color: var(--pos-text);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+}
+
+/* --- Hero Section --- */
+.pos-hero {
+    position: relative;
+    padding: 220px 0 120px;
+    background: linear-gradient(rgba(2, 6, 23, 0.7), rgba(2, 6, 23, 0.7)), url('assets/pos-hero-new.png') no-repeat center center;
+    background-size: cover;
+    background-attachment: fixed;
+}
+
+.pos-hero-content {
+    text-align: center;
+    max-width: 1000px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 10;
+}
+
+.pos-hero h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(3.5rem, 8vw, 5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 2rem;
+    color: #fff;
+    letter-spacing: -0.02em;
+}
+
+.pos-hero h1 span {
+    background: linear-gradient(135deg, #fff 30%, var(--pos-accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.pos-hero p {
+    font-size: 1.35rem;
+    color: #94a3b8;
+    margin-bottom: 3.5rem;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* --- Stats Grid --- */
+.pos-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 4rem;
+}
+
+.stat-item {
+    padding: 2rem;
+    background: var(--pos-glass);
+    border: 1px solid var(--pos-glass-border);
+    border-radius: 1.5rem;
+    text-align: center;
+}
+
+.stat-item h2 {
+    font-size: 2.5rem;
+    color: var(--pos-accent);
+    margin-bottom: 0.5rem;
+}
+
+.stat-item p {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    margin: 0;
+}
+
+/* --- Feature Cards --- */
+.pos-features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2.5rem;
+    padding: 100px 0;
+}
+
+.pos-feature-card {
+    background: var(--pos-glass);
+    border: 1px solid var(--pos-glass-border);
+    border-radius: 2.5rem;
+    padding: 3.5rem;
+    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.pos-feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--pos-accent);
+    transform: scaleX(0);
+    transition: transform 0.5s ease;
+    transform-origin: left;
+}
+
+.pos-feature-card:hover {
+    transform: translateY(-15px);
+    border-color: rgba(var(--pos-accent-rgb), 0.3);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.pos-feature-card:hover::before {
+    transform: scaleX(1);
+}
+
+.pos-icon-box {
+    width: 70px;
+    height: 70px;
+    background: rgba(var(--pos-accent-rgb), 0.1);
+    border-radius: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pos-accent);
+    margin-bottom: 2.5rem;
+}
+
+.pos-feature-card h3 {
+    font-size: 1.75rem;
+    margin-bottom: 1.25rem;
+    color: #fff;
+}
+
+/* --- Dashboard Preview --- */
+.pos-preview-section {
+    padding: 120px 0;
+    background: rgba(var(--pos-accent-rgb), 0.02);
+}
+
+.pos-dashboard-frame {
+    background: #0f172a;
+    border-radius: 3rem;
+    padding: 1rem;
+    border: 8px solid #1e293b;
+    box-shadow: 0 50px 100px -20px rgba(0,0,0,0.7);
+    position: relative;
+    overflow: hidden;
+}
+
+.pos-dashboard-frame img {
+    width: 100%;
+    border-radius: 2rem;
+    display: block;
+}
+
+/* --- Industry Tabs --- */
+.pos-industries {
+    padding: 100px 0;
+}
+
+.industry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+}
+
+.industry-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 3rem;
+    background: var(--pos-glass);
+    border-radius: 2rem;
+    border: 1px solid var(--pos-glass-border);
+    transition: all 0.3s ease;
+}
+
+.industry-item:hover {
+    background: var(--pos-accent);
+    color: #000;
+}
+
+.industry-item:hover h4, 
+.industry-item:hover p, 
+.industry-item:hover svg {
+    color: #000;
+}
+
+.industry-item svg {
+    margin-bottom: 1.5rem;
+    color: var(--pos-accent);
+    transition: color 0.3s ease;
+}
+
+.industry-item h4 {
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    transition: color 0.3s ease;
+}
+
+.section-title-modern {
+    color: #fff;
+}
+
+.sw-feature-content h2 {
+    color: #fff;
+}
+
+.pos-cta-card h2 {
+    color: #fff;
+}
+
+/* --- CTA Section --- */
+.pos-cta {
+    padding: 150px 0;
+}
+
+.pos-cta-card {
+    background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+    border-radius: 4rem;
+    padding: 6rem;
+    text-align: center;
+    border: 1px solid var(--pos-glass-border);
+    position: relative;
+    overflow: hidden;
+}
+
+.pos-cta-card::after {
+    content: '';
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: var(--pos-accent);
+    filter: blur(150px);
+    opacity: 0.1;
+    top: -150px;
+    right: -150px;
+}
+
+@media (max-width: 768px) {
+    .pos-cta-card {
+        padding: 3rem 1.5rem;
+    }
+    
+    .pos-hero h1 {
+        font-size: 3rem;
+    }
+}

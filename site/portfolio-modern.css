@@ -1,0 +1,308 @@
+/* ===================================
+   MODERN PORTFOLIO PAGE SPECIFIC
+   =================================== */
+
+.page-modern-portfolio {
+  background-color: #0f172a; /* Dark sleek background */
+  color: var(--color-white);
+  overflow-x: hidden;
+}
+
+/* Hero Section */
+.portfolio-hero {
+  position: relative;
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 80px; 
+  background: url('assets/portfolio_hero.png') center/cover no-repeat;
+  text-align: center;
+}
+
+.portfolio-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(180deg, rgba(15,23,42,0.7) 0%, rgba(15,23,42,1) 100%);
+  z-index: 1;
+}
+
+.portfolio-hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 900px;
+  padding: var(--spacing-lg);
+  animation: slideUpFade 1s ease-out;
+}
+
+.portfolio-hero-title {
+  font-size: clamp(3.5rem, 7vw, 6rem);
+  font-weight: 800;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-white);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.portfolio-hero-title .highlight {
+  background: linear-gradient(to right, var(--color-primary-light), var(--color-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.portfolio-hero-subtitle {
+  font-size: 1.25rem;
+  color: var(--color-gray-300);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Featured Work Layout */
+.featured-work-section {
+  padding: var(--spacing-3xl) 0;
+  position: relative;
+  z-index: 2;
+}
+
+.section-label {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.875rem;
+  margin-bottom: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-label::before {
+  content: '';
+  width: 40px;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+.featured-project {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+  margin-bottom: calc(var(--spacing-3xl) * 1.5);
+  align-items: center;
+}
+
+@media (min-width: 992px) {
+  .featured-project {
+    flex-direction: row;
+  }
+  .featured-project.reverse {
+    flex-direction: row-reverse;
+  }
+}
+
+.fp-image {
+  flex: 1;
+  position: relative;
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+  transform: translateY(0);
+  transition: transform var(--transition-slow);
+}
+
+.fp-image:hover {
+  transform: translateY(-10px);
+}
+
+.fp-image img {
+  width: 100%;
+  border-radius: var(--radius-2xl);
+  display: block;
+  object-fit: cover;
+  transition: transform 0.7s ease;
+}
+
+.fp-image:hover img {
+  transform: scale(1.05);
+}
+
+.fp-content {
+  flex: 1;
+  padding: var(--spacing-xl) 0;
+}
+
+@media (min-width: 992px) {
+  .fp-content {
+    padding: 0 var(--spacing-2xl);
+  }
+}
+
+.fp-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--color-primary-light);
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.fp-title {
+  font-size: 2.5rem;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-white);
+}
+
+.fp-desc {
+  font-size: 1.125rem;
+  color: var(--color-gray-400);
+  margin-bottom: var(--spacing-lg);
+  line-height: 1.7;
+}
+
+.fp-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.fp-stat {
+  background: rgba(255,255,255,0.03);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.fp-stat-val {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 0.25rem;
+  font-family: var(--font-heading);
+}
+
+.fp-stat-label {
+  font-size: 0.875rem;
+  color: var(--color-gray-400);
+}
+
+/* Portfolio Grid */
+.projects-grid-section {
+  padding: var(--spacing-3xl) 0;
+  background: #0b1121; /* Slightly darker */
+}
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-2xl);
+}
+
+.grid-project {
+  position: relative;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  height: 380px;
+  cursor: pointer;
+  background: #1e293b;
+}
+
+.grid-project img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+  opacity: 0.8;
+}
+
+.grid-project:hover img {
+  transform: scale(1.1);
+  opacity: 0.4;
+}
+
+.grid-project-overlay {
+  position: absolute;
+  inset: 0;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.4s ease;
+}
+
+.grid-project:hover .grid-project-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.gp-title {
+  font-size: 1.5rem;
+  color: var(--color-white);
+  margin-bottom: 0.5rem;
+}
+
+.gp-category {
+  color: var(--color-primary-light);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Testimonial Ribbon */
+.testimonial-ribbon {
+  padding: var(--spacing-3xl) 0;
+  background: var(--color-primary);
+  color: var(--color-gray-900);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.tr-content {
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.tr-quote {
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  margin-bottom: var(--spacing-lg);
+  line-height: 1.3;
+}
+
+.tr-author {
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.tr-company {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.tr-stars {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: var(--spacing-md);
+}
+.tr-stars svg {
+  width: 24px; height: 24px;
+  fill: #111827;
+}
+
+/* Animations */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}

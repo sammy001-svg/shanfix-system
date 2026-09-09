@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Disallow administrative and private areas
+Disallow: /admin/
+Disallow: /client/
+Disallow: /includes/
+Disallow: /uploads/
+Disallow: /debug.php
+Disallow: /models.json
+Disallow: /database.sql
+Disallow: /seed.sql
+Disallow: /migrate.php
+Disallow: /migrate_users.php
+Disallow: /scratch/
+Disallow: /python/
+Disallow: /api/cron-renewals.php
+
+# Link to sitemap
+Sitemap: https://shanfixtechnology.com/sitemap.php

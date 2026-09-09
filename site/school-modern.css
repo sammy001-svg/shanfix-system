@@ -1,0 +1,254 @@
+/* ==========================================================================
+   SCHOOL MANAGEMENT SYSTEM - PLATFORM-ALIGNED RE-DESIGN
+   ========================================================================== */
+
+:root {
+    --school-brand-green: #22c55e;
+    --school-brand-dark: #083f0c;
+    --school-brand-accent: #59e00a;
+    --school-text-main: #111827;
+    --school-text-muted: #4b5563;
+    --school-bg-light: #ffffff;
+    --school-bg-alt: #f9fafb;
+    --school-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.school-modern-page {
+    background-color: var(--school-bg-light);
+    color: var(--school-text-main);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+}
+
+/* --- Hero Section --- */
+.school-hero {
+    position: relative;
+    padding: 200px 0 120px;
+    background: linear-gradient(rgba(8, 63, 12, 0.85), rgba(8, 63, 12, 0.85)), url('assets/school-hero.png') no-repeat center center;
+    background-size: cover;
+    background-attachment: fixed;
+    color: #fff;
+    text-align: center;
+}
+
+.school-hero h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+    color: #fff;
+}
+
+.school-hero h1 span {
+    color: var(--school-brand-accent);
+}
+
+.school-hero p {
+    font-size: 1.25rem;
+    max-width: 800px;
+    margin: 0 auto 3rem;
+    opacity: 0.95;
+    color: #ffffff;
+}
+
+/* --- Professional Section Headers --- */
+.section-header-modern {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.section-tag {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--school-brand-green);
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+}
+
+.section-title-modern {
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 800;
+    color: var(--school-brand-dark);
+}
+
+.section-title-modern span {
+    color: var(--school-brand-green);
+}
+
+/* --- Importance & Benefits Grid --- */
+.school-grid-section {
+    padding: 100px 0;
+}
+
+.school-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2.5rem;
+}
+
+.school-feature-card {
+    background: var(--school-bg-light);
+    padding: 3rem;
+    border-radius: 1.5rem;
+    border: 1px solid #e5e7eb;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.school-feature-card:hover {
+    transform: translateY(-10px);
+    border-color: var(--school-brand-green);
+    box-shadow: var(--school-shadow);
+}
+
+.card-icon-box {
+    width: 60px;
+    height: 60px;
+    background: var(--school-brand-dark);
+    color: var(--school-brand-accent);
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.school-feature-card h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--school-brand-dark);
+}
+
+.school-feature-card p {
+    color: #374151; /* Darker gray for better readability */
+    font-size: 1.05rem;
+    margin: 0;
+}
+
+/* --- Reseller Banner --- */
+.reseller-banner {
+    padding: 100px 0;
+    background: var(--school-bg-alt);
+}
+
+.reseller-content-box {
+    background: var(--school-brand-dark);
+    border-radius: 2.5rem;
+    padding: 5rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.reseller-content-box::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.reseller-info {
+    flex: 1;
+    position: relative;
+    z-index: 2;
+}
+
+.reseller-info h2 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+}
+
+.reseller-info h2 span {
+    color: var(--school-brand-accent);
+}
+
+.reseller-info p {
+    font-size: 1.2rem;
+    color: #ffffff; /* Pure white for better contrast */
+    margin-bottom: 3rem;
+}
+
+.reseller-features {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 3rem;
+}
+
+.reseller-features li {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+.reseller-features li svg {
+    color: var(--school-brand-accent);
+}
+
+/* --- Buttons --- */
+.btn-brand-green {
+    background: var(--school-brand-green);
+    color: #fff;
+    padding: 1rem 2.5rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+.btn-brand-green:hover {
+    background: var(--school-brand-accent);
+    color: var(--school-brand-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
+}
+
+.btn-brand-outline {
+    border: 2px solid var(--school-brand-accent);
+    color: #fff;
+    padding: 1rem 2.5rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+.btn-brand-outline:hover {
+    background: var(--school-brand-accent);
+    color: var(--school-brand-dark);
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 992px) {
+    .reseller-content-box {
+        flex-direction: column;
+        padding: 3.5rem 2rem;
+        text-align: center;
+    }
+    
+    .reseller-features li {
+        justify-content: center;
+    }
+}

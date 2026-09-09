@@ -32,6 +32,70 @@
     # deployment ends up looking like it did nothing.
     RewriteRule ^(upgrade|check)\.php$ - [L]
 
+    # -----------------------------------------------------------------
+    # The marketing site sits in front of the system
+    # -----------------------------------------------------------------
+    # site/ is the company website, kept as its own application with its
+    # own database. It owns the front door and every path that really
+    # exists inside it; the system owns everything else.
+    #
+    # The site used to run a client portal and an admin of its own. Both
+    # are gone: two client portals meant two passwords and two places a
+    # customer's invoices could disagree, and two admins meant every
+    # price and phone number lived in both. The system's are the ones
+    # that remain.
+    #
+    # These redirects are for everybody holding a bookmark or an old
+    # email pointing at the ones that went. Without them a customer
+    # following "View my portal" would land on a 404 and conclude we had
+    # lost their account.
+    RewriteRule ^client(/.*)?$ /portal/login [R=301,L]
+    RewriteRule ^admin(/.*)?$  /login        [R=301,L]
+    #
+    # One origin can only have one service worker at the root, and a
+    # worker registered at / controls the whole origin — including the
+    # system's pages. The two ship different ones, so this names the
+    # winner rather than leaving it to whichever file Apache reaches
+    # first. The system's is network-first for pages and
+    # stale-while-revalidate for assets; the website's was cache-first on
+    # everything under /assets/, which would have gone on serving the
+    # system's old stylesheet for as long as the cache lived.
+    RewriteRule ^sw\.js$ public/index.php [QSA,L]
+
+    # The site answers at the front door, not at its folder name. Asked
+    # for by folder from outside, it is sent to the real address so one
+    # page does not answer at two URLs.
+    #
+    # REDIRECT_STATUS is what tells the two apart: it is empty on a
+    # request that arrived this way, and set once mod_rewrite has already
+    # pointed something here. Without it the internal rewrite below would
+    # bounce straight back out to the browser.
+    RewriteCond %{ENV:REDIRECT_STATUS} ^$
+    RewriteRule ^site/(.*)$ /$1 [R=301,L]
+
+    # Anything already pointed into site/ is finished with. In .htaccess
+    # context [L] only ends the current pass — mod_rewrite runs the whole
+    # set again over the rewritten path — so without this, site/index.php
+    # comes back round, matches nothing, and is handed to the system as
+    # public/site/index.php. It answered 301 rather than the home page,
+    # which is what a rewrite loop looks like from outside.
+    RewriteRule ^site/ - [L]
+
+    # The front door.
+    RewriteRule ^$ site/index.php [L]
+
+    # Anything that is really a file or a folder in site/ belongs to the
+    # website: its pages, its assets, its admin and client areas, its
+    # API. Tested with -f and -d rather than listed, so nothing has to be
+    # added here when the site gains a page.
+    #
+    # This is also what keeps /assets/ from being a collision: both
+    # applications serve from that prefix, and whichever one actually has
+    # the file answers for it.
+    RewriteCond %{DOCUMENT_ROOT}/site%{REQUEST_URI} -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/site%{REQUEST_URI} -d
+    RewriteRule ^(.+)$ site/$1 [L]
+
     # Anything already inside public/ is left exactly as it is — the
     # .htaccess in there handles real files and the front controller.
     RewriteRule ^public/ - [L]
@@ -63,6 +127,22 @@ RedirectMatch 404 ^(.*)/(composer\.(json|lock)|package(-lock)?\.json|\.cpanel\.y
 # migrate.php and cron.php refuse to run over the web on their own, but
 # there is no reason for them to be reachable at all.
 RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel)\.php$
+
+# ---------------------------------------------------------------------
+# The website's own working files
+# ---------------------------------------------------------------------
+# The site was written to sit at a document root of its own, where these
+# were still reachable and nobody had noticed. Serving it from here puts
+# them one URL away, so they are named.
+#
+# includes/ holds db_connect.php, which carries the database password.
+# database.sql and seed.sql are the schema and its seed data. models.json
+# describes every table. The rest are build and deployment tooling that
+# has no business answering a request.
+RedirectMatch 404 ^(.*)/(includes|migrations)(/|$)
+RedirectMatch 404 ^(.*)/[^/]+\.(sql|py|ps1|md|lock)$
+RedirectMatch 404 ^(.*)/(models|package|package-lock|vite\.config)\.(json|js)$
+RedirectMatch 404 ^(.*)/(migrate_users|debug)\.php$
 
 # ---------------------------------------------------------------------
 # The PHP files that sit beside this one

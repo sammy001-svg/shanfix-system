@@ -39,3 +39,35 @@ Thumbs.db
 # are served from public/, so one left behind is one more thing on the
 # open web that nobody meant to publish.
 public/_*.html
+
+# ---------------------------------------------------------------------
+# The company website that sits in front of the system
+# ---------------------------------------------------------------------
+# Its own application with its own database, so its own credentials.
+# site/.env is where they live on a real server; the example beside it
+# says what belongs in it.
+/site/.env
+/site/.env.*
+!/site/.env.example
+
+# uploads/ is deliberately NOT ignored. It is data rather than code and
+# would normally be left out, but the site references what is in there
+# and a fresh deployment with an empty folder is a page with a missing
+# image on it. Worth revisiting if it ever grows past a handful.
+
+# Build tooling the site does not use at runtime — its CSS is committed
+# already — and a virtualenv that has no business here.
+/site/node_modules/
+/site/dist/
+/site/.venv/
+/site/__pycache__/
+
+# ---------------------------------------------------------------------
+# What a test run leaves behind
+# ---------------------------------------------------------------------
+# The suites write cookie jars and a captured mail queue beside
+# themselves. They are the leavings of a run, not part of it, and one of
+# them turned up in a commit's worth of changes waiting to be staged.
+/tests/*.txt
+/tests/queue.eml*
+/tests/*.log
