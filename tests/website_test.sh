@@ -377,8 +377,8 @@ eq "and never the password itself"    "$(grep -c "pass === '' ? 'none' : 'set'" 
 for p in / /who-we-are.php /blog.php /portfolio.php; do
   BODY=$(get "$p")
   case "$BODY" in
-    *"System Maintenance"*)
-      bad "$p opens the database" "System Maintenance" "the page";;
+    *"currently upgrading our infrastructure"*)
+      bad "$p opens the database" "the maintenance notice" "the page";;
     *)
       if [ "$(printf '%s' "$BODY" | wc -c)" -gt 5000 ]; then
         ok "$p opens the database" "the page"
@@ -387,6 +387,42 @@ for p in / /who-we-are.php /blog.php /portfolio.php; do
       fi;;
   esac
 done
+
+echo ""
+echo "=== 16b. The website survives its database being gone ==="
+# It used to call die() and print a maintenance notice, which took the
+# whole site down — including the home page, which asks for hero slides
+# and banners and already falls back to a written-in set when the query
+# returns nothing. It was perfectly capable of rendering; the connection
+# killed it before it got the chance.
+#
+# $pdo is now a stand-in that throws a PDOException when anything asks it
+# for data, so the pages take the same path they take for an empty table.
+cp -f "$ROOT/site/.env" "$D/env.backup" 2>/dev/null || true
+printf 'DB_NAME=no_such_database_for_this_test
+' > "$ROOT/site/.env"
+
+for p in / /who-we-are.php /blog.php /portfolio.php; do
+  BODY=$(get "$p")
+  case "$BODY" in
+    *"currently upgrading our infrastructure"*)
+      bad "$p still renders without a database" "the maintenance notice" "the page";;
+    *"Call to a member function"*|*"Fatal error"*)
+      bad "$p still renders without a database" "a fatal error" "the page";;
+    *)
+      if [ "$(printf '%s' "$BODY" | wc -c)" -gt 20000 ]; then
+        ok "$p still renders without a database" "the page"
+      else
+        bad "$p still renders without a database" "$(printf '%s' "$BODY" | head -c 50)" "the page"
+      fi;;
+  esac
+done
+
+rm -f "$ROOT/site/.env"
+[ -f "$D/env.backup" ] && mv -f "$D/env.backup" "$ROOT/site/.env"
+
+# And with it back, the pages still work the normal way.
+eq "and works again once it is back"    "$(scode /)" "200"
 
 echo ""
 echo "=== 17. Deployment keeps what the server owns ==="
