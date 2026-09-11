@@ -121,6 +121,49 @@ class ReminderController extends Controller
         Response::back('/reminders');
     }
 
+    /**
+     * Snooze a reminder.
+     *
+     * Marks the current one done (so it does not clutter the list) and
+     * creates a new one with the same content at the chosen future time.
+     * The options match what a person can plausibly mean by "not now":
+     *   1h        → one hour from now
+     *   4h        → four hours from now
+     *   tomorrow  → 09:00 the following morning
+     *   next_week → 09:00 on Monday of the following week
+     */
+    public function snooze(Request $request): void
+    {
+        $reminder = $this->findOrFail($request->paramInt('id'));
+
+        $until = match ((string) $request->input('snooze', '')) {
+            '1h'        => date('Y-m-d H:i:s', strtotime('+1 hour')),
+            '4h'        => date('Y-m-d H:i:s', strtotime('+4 hours')),
+            'next_week' => date('Y-m-d 09:00:00', strtotime('next monday')),
+            default     => date('Y-m-d 09:00:00', strtotime('tomorrow')),   // 'tomorrow'
+        };
+
+        // Mark the current reminder done — it has been seen.
+        Database::update('reminders', [
+            'is_done'      => 1,
+            'completed_at' => date('Y-m-d H:i:s'),
+        ], ['id' => $reminder['id']]);
+
+        // Create a fresh reminder at the snoozed time.
+        Database::insert('reminders', [
+            'user_id'    => $reminder['user_id'],
+            'lead_id'    => $reminder['lead_id'],
+            'client_id'  => $reminder['client_id'],
+            'title'      => $reminder['title'],
+            'notes'      => $reminder['notes'],
+            'remind_at'  => $until,
+            'created_by' => Auth::id(),
+        ]);
+
+        Session::success('Snoozed until ' . date('j M Y \a\t H:i', strtotime($until)) . '.');
+        Response::back('/reminders');
+    }
+
     public function reopen(Request $request): void
     {
         $reminder = $this->findOrFail($request->paramInt('id'));

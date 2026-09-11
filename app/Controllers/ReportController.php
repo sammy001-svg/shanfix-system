@@ -272,4 +272,106 @@ class ReportController extends Controller
             $rows
         );
     }
+
+    /** Detailed Accounts Receivable Ageing Drill-Down Report. */
+    public function ageing(Request $request): void
+    {
+        $this->authorize('reports.view');
+
+        $bucket = (string) $request->query('bucket', 'all');
+
+        $totals = Database::first(
+            "SELECT
+                COALESCE(SUM(CASE WHEN due_date >= CURDATE() THEN balance END), 0) AS not_due,
+                COALESCE(SUM(CASE WHEN due_date < CURDATE() AND due_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN balance END), 0) AS days_0_30,
+                COALESCE(SUM(CASE WHEN due_date < DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND due_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY) THEN balance END), 0) AS days_31_60,
+                COALESCE(SUM(CASE WHEN due_date < DATE_SUB(CURDATE(), INTERVAL 60 DAY) AND due_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) THEN balance END), 0) AS days_61_90,
+                COALESCE(SUM(CASE WHEN due_date < DATE_SUB(CURDATE(), INTERVAL 90 DAY) THEN balance END), 0) AS days_90_plus,
+                COALESCE(SUM(balance), 0) AS total_outstanding
+               FROM documents
+              WHERE doc_type = 'invoice' AND status NOT IN ('cancelled', 'paid', 'draft') AND balance > 0"
+        );
+
+        $clients = Database::all(
+            "SELECT c.id, c.name, c.phone, c.email, c.contact_person,
+                    COUNT(d.id) AS unpaid_invoices,
+                    MIN(d.due_date) AS oldest_due_date,
+                    DATEDIFF(CURDATE(), MIN(d.due_date)) AS max_days_overdue,
+                    COALESCE(SUM(d.balance), 0) AS total_outstanding,
+                    COALESCE(SUM(CASE WHEN d.due_date >= CURDATE() THEN d.balance END), 0) AS not_due,
+                    COALESCE(SUM(CASE WHEN d.due_date < CURDATE() AND d.due_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN d.balance END), 0) AS days_0_30,
+                    COALESCE(SUM(CASE WHEN d.due_date < DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND d.due_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY) THEN d.balance END), 0) AS days_31_60,
+                    COALESCE(SUM(CASE WHEN d.due_date < DATE_SUB(CURDATE(), INTERVAL 60 DAY) AND d.due_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) THEN d.balance END), 0) AS days_61_90,
+                    COALESCE(SUM(CASE WHEN d.due_date < DATE_SUB(CURDATE(), INTERVAL 90 DAY) THEN d.balance END), 0) AS days_90_plus
+               FROM clients c
+               JOIN documents d ON d.client_id = c.id
+              WHERE d.doc_type = 'invoice' AND d.status NOT IN ('cancelled', 'paid', 'draft') AND d.balance > 0
+           GROUP BY c.id, c.name, c.phone, c.email, c.contact_person
+           ORDER BY total_outstanding DESC"
+        );
+
+        if ($bucket !== 'all') {
+            $clients = array_values(array_filter($clients, static function ($c) use ($bucket) {
+                return match ($bucket) {
+                    'not_due'   => (float) $c['not_due'] > 0,
+                    '0_30'      => (float) $c['days_0_30'] > 0,
+                    '31_60'     => (float) $c['days_31_60'] > 0,
+                    '61_90'     => (float) $c['days_61_90'] > 0,
+                    '90_plus'   => (float) $c['days_90_plus'] > 0,
+                    default     => true,
+                };
+            }));
+        }
+
+        $this->view('reports/ageing', [
+            'title'   => 'Receivables Ageing Report',
+            'totals'  => $totals,
+            'clients' => $clients,
+            'bucket'  => $bucket,
+        ]);
+    }
+
+    /** Export Receivables Ageing breakdown to CSV. */
+    public function ageingExport(Request $request): void
+    {
+        $this->authorize('reports.view');
+
+        $clients = Database::all(
+            "SELECT c.name, c.phone, c.email,
+                    COALESCE(SUM(CASE WHEN d.due_date >= CURDATE() THEN d.balance END), 0) AS not_due,
+                    COALESCE(SUM(CASE WHEN d.due_date < CURDATE() AND d.due_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN d.balance END), 0) AS days_0_30,
+                    COALESCE(SUM(CASE WHEN d.due_date < DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND d.due_date >= DATE_SUB(CURDATE(), INTERVAL 60 DAY) THEN d.balance END), 0) AS days_31_60,
+                    COALESCE(SUM(CASE WHEN d.due_date < DATE_SUB(CURDATE(), INTERVAL 60 DAY) AND d.due_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) THEN d.balance END), 0) AS days_61_90,
+                    COALESCE(SUM(CASE WHEN d.due_date < DATE_SUB(CURDATE(), INTERVAL 90 DAY) THEN d.balance END), 0) AS days_90_plus,
+                    COALESCE(SUM(d.balance), 0) AS total_outstanding,
+                    MIN(d.due_date) AS oldest_due_date
+               FROM clients c
+               JOIN documents d ON d.client_id = c.id
+              WHERE d.doc_type = 'invoice' AND d.status NOT IN ('cancelled', 'paid', 'draft') AND d.balance > 0
+           GROUP BY c.id, c.name, c.phone, c.email
+           ORDER BY total_outstanding DESC"
+        );
+
+        $rows = [];
+        foreach ($clients as $c) {
+            $rows[] = [
+                $c['name'],
+                $c['phone'] ?? '',
+                $c['email'] ?? '',
+                number_format((float) $c['not_due'], 2, '.', ''),
+                number_format((float) $c['days_0_30'], 2, '.', ''),
+                number_format((float) $c['days_31_60'], 2, '.', ''),
+                number_format((float) $c['days_61_90'], 2, '.', ''),
+                number_format((float) $c['days_90_plus'], 2, '.', ''),
+                number_format((float) $c['total_outstanding'], 2, '.', ''),
+                $c['oldest_due_date'] ?? '',
+            ];
+        }
+
+        Response::csv(
+            'receivables-ageing-' . date('Y-m-d') . '.csv',
+            ['Client Name', 'Phone', 'Email', 'Not Due', '1-30 Days', '31-60 Days', '61-90 Days', '90+ Days', 'Total Outstanding', 'Oldest Due Date'],
+            $rows
+        );
+    }
 }

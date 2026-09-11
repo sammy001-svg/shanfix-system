@@ -419,7 +419,62 @@ class DashboardController extends Controller
             }
         }
 
-        Response::json(['results' => array_slice($out, 0, 18)]);
+        // Staff — gated by hr.view because employee records carry salary data.
+        if (Auth::can('hr.view')) {
+            foreach (Database::all(
+                "SELECT id, name, employee_number, job_title FROM employees
+                  WHERE name LIKE :q OR employee_number LIKE :q2 OR job_title LIKE :q3
+                    AND status <> 'left'
+               ORDER BY name LIMIT 3",
+                ['q' => $like, 'q2' => $like, 'q3' => $like]
+            ) as $r) {
+                $out[] = [
+                    'kind'  => 'Staff',
+                    'label' => $r['name'],
+                    'meta'  => $r['employee_number'] . ($r['job_title'] ? ' · ' . $r['job_title'] : ''),
+                    'url'   => url('/staff/' . $r['id']),
+                ];
+            }
+        }
+
+        // Equipment — asset codes and names for production staff.
+        if (Auth::can('equipment.view')) {
+            foreach (Database::all(
+                "SELECT id, asset_code, name, status FROM equipment
+                  WHERE asset_code LIKE :q OR name LIKE :q2
+                    AND status <> 'disposed'
+               ORDER BY name LIMIT 3",
+                ['q' => $like, 'q2' => $like]
+            ) as $r) {
+                $out[] = [
+                    'kind'  => 'Equipment',
+                    'label' => $r['name'],
+                    'meta'  => $r['asset_code'],
+                    'url'   => url('/equipment/' . $r['id']),
+                ];
+            }
+        }
+
+        // Purchase orders — PO number and supplier name.
+        if (Auth::can('purchases.view')) {
+            foreach (Database::all(
+                "SELECT po.id, po.po_number, s.name AS supplier_name, po.status
+                   FROM purchase_orders po
+              LEFT JOIN suppliers s ON s.id = po.supplier_id
+                  WHERE po.po_number LIKE :q OR s.name LIKE :q2
+               ORDER BY po.id DESC LIMIT 3",
+                ['q' => $like, 'q2' => $like]
+            ) as $r) {
+                $out[] = [
+                    'kind'  => 'Purchase Order',
+                    'label' => $r['po_number'],
+                    'meta'  => $r['supplier_name'] ?? '',
+                    'url'   => url('/purchase-orders/' . $r['id']),
+                ];
+            }
+        }
+
+        Response::json(['results' => array_slice($out, 0, 24)]);
     }
 
     public function search(Request $request): void
@@ -532,5 +587,63 @@ class DashboardController extends Controller
             'users'   => Database::all('SELECT id, name FROM users ORDER BY name'),
             'filters' => compact('action', 'userId'),
         ]);
+    }
+
+    /**
+     * Download the current filtered view of the audit log as a CSV.
+     *
+     * Respects the same action and user filters as the list page, so what
+     * you see is exactly what you download — nothing hidden, nothing extra.
+     * No pagination: the export is the full filtered result set.
+     */
+    public function auditExport(Request $request): void
+    {
+        $this->authorize('audit.view');
+
+        $action = (string) $request->query('action', '');
+        $userId = (int) $request->query('user', 0);
+
+        $where  = ['1=1'];
+        $params = [];
+
+        if ($action !== '') {
+            $where[] = 'a.action LIKE :action';
+            $params['action'] = '%' . $action . '%';
+        }
+
+        if ($userId > 0) {
+            $where[] = 'a.user_id = :uid';
+            $params['uid'] = $userId;
+        }
+
+        $clause = implode(' AND ', $where);
+
+        $entries = Database::all(
+            "SELECT a.created_at, u.name AS user_name, a.action,
+                    a.description, a.entity_type, a.entity_id, a.ip_address
+               FROM activity_log a
+          LEFT JOIN users u ON u.id = a.user_id
+              WHERE {$clause}
+           ORDER BY a.created_at DESC, a.id DESC",
+            $params
+        );
+
+        $rows = [];
+        foreach ($entries as $e) {
+            $rows[] = [
+                $e['created_at'],
+                $e['user_name'] ?? 'System',
+                $e['action'],
+                $e['description'] ?? '',
+                $e['entity_type'] ? $e['entity_type'] . ' #' . (int) $e['entity_id'] : '',
+                $e['ip_address'] ?? '',
+            ];
+        }
+
+        Response::csv(
+            'audit-trail-' . date('Y-m-d') . '.csv',
+            ['When', 'User', 'Action', 'Detail', 'Record', 'IP Address'],
+            $rows
+        );
     }
 }

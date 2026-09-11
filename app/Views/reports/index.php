@@ -133,11 +133,12 @@ foreach ($pipeline as $p) {
 
 <div class="grid-2">
   <div class="card">
-    <div class="card__head">
+    <div class="card__head" style="display:flex; justify-content:space-between; align-items:center;">
       <div>
         <div class="card__title">Receivables ageing</div>
         <div class="card__sub">Outstanding invoice balances as at today</div>
       </div>
+      <a class="btn btn--sm btn--ghost" href="<?= url('/reports/ageing') ?>">Detailed Drill-Down &rarr;</a>
     </div>
     <div class="card__body">
       <div class="bars">

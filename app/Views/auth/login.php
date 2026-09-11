@@ -11,8 +11,8 @@ $rememberDays = \App\Core\Settings::int('remember_me_days', 30);
 $portalOn     = \App\Core\Settings::bool('portal_enabled', true);
 ?>
 
-<h1 class="login__title">Sign in</h1>
-<p class="login__intro">Welcome back. Enter your details to continue.</p>
+<h1 class="login__title">Welcome back</h1>
+<p class="login__intro">Sign in to your account to continue.</p>
 
 <form method="post" action="<?= url('/login') ?>" id="login-form">
   <?= csrf_field() ?>
@@ -69,7 +69,7 @@ $portalOn     = \App\Core\Settings::bool('portal_enabled', true);
 </form>
 
 <p class="login__help">
-  Trouble signing in? Contact your system administrator.
+  <?= icon('lock') ?> Secure connection &nbsp;&middot;&nbsp; Trouble signing in? Contact your administrator.
 </p>
 
 <?php // A customer arriving here has no account that will work in it and

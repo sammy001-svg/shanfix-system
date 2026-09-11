@@ -127,90 +127,61 @@ if ($me && can('jobs.view')) {
         <?= icon('grid', 'nav-link__icon') ?> Dashboard
       </a>
 
-      <?php if (can('leads.view')): ?>
+      <?php
+        // ── Sales ──────────────────────────────────────────────────────────
+        $showSales = can('leads.view') || can('clients.view') || can('requests.view')
+                  || can('letters.view') || can('partners.view');
+      ?>
+      <?php if ($showSales): ?>
         <div class="nav-group__label">Sales</div>
-        <a class="nav-link <?= is_active_nav('/leads') ? 'is-active' : '' ?>" href="<?= url('/leads') ?>">
-          <?= icon('target', 'nav-link__icon') ?> Leads
-        </a>
+
+        <?php if (can('leads.view')): ?>
+          <a class="nav-link <?= is_active_nav('/leads') ? 'is-active' : '' ?>" href="<?= url('/leads') ?>">
+            <?= icon('target', 'nav-link__icon') ?> Leads
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('clients.view')): ?>
+          <a class="nav-link <?= is_active_nav('/clients') ? 'is-active' : '' ?>" href="<?= url('/clients') ?>">
+            <?= icon('users', 'nav-link__icon') ?> Clients
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('requests.view')): ?>
+          <a class="nav-link <?= is_active_nav('/requests') ? 'is-active' : '' ?>" href="<?= url('/requests') ?>">
+            <?= icon('inbox', 'nav-link__icon') ?> Job Briefs
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('letters.view')): ?>
+          <a class="nav-link <?= is_active_nav('/letters') ? 'is-active' : '' ?>" href="<?= url('/letters') ?>">
+            <?= icon('mail', 'nav-link__icon') ?> Letters
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('partners.view')): ?>
+          <?php $partnersWaiting = (int) \App\Core\Database::scalar(
+              "SELECT COUNT(*) FROM partners WHERE status = 'pending'", [], 0
+          ); ?>
+          <a class="nav-link <?= is_active_nav('/partners-admin') ? 'is-active' : '' ?>"
+             href="<?= url('/partners-admin') ?>">
+            <?= icon('users', 'nav-link__icon') ?> Partners
+            <?php if ($partnersWaiting > 0): ?>
+              <span class="nav-link__badge"><?= $partnersWaiting ?></span>
+            <?php endif; ?>
+          </a>
+          <a class="nav-link <?= is_active_nav('/payouts') ? 'is-active' : '' ?>"
+             href="<?= url('/payouts') ?>">
+            <?= icon('dollar', 'nav-link__icon') ?> Payouts
+          </a>
+        <?php endif; ?>
       <?php endif; ?>
 
-      <?php if (can('clients.view')): ?>
-        <a class="nav-link <?= is_active_nav('/clients') ? 'is-active' : '' ?>" href="<?= url('/clients') ?>">
-          <?= icon('users', 'nav-link__icon') ?> Clients
-        </a>
-
-      <?php endif; ?>
-
-      <?php if (can('requests.view')): ?>
-        <a class="nav-link <?= is_active_nav('/requests') ? 'is-active' : '' ?>" href="<?= url('/requests') ?>">
-          <?= icon('inbox', 'nav-link__icon') ?> Job briefs
-        </a>
-      <?php endif; ?>
-
-      <?php if (can('letters.view')): ?>
-        <a class="nav-link <?= is_active_nav('/letters') ? 'is-active' : '' ?>" href="<?= url('/letters') ?>">
-          <?= icon('mail', 'nav-link__icon') ?> Letters
-        </a>
-      <?php endif; ?>
-
-      <?php if (can('partners.view')): ?>
-        <?php // An application nobody has looked at is the only thing here
-              // that is actually waiting on somebody, so it is the only
-              // thing that gets a count. ?>
-        <?php $partnersWaiting = (int) \App\Core\Database::scalar(
-            "SELECT COUNT(*) FROM partners WHERE status = 'pending'", [], 0
-        ); ?>
-        <a class="nav-link <?= is_active_nav('/partners-admin') ? 'is-active' : '' ?>"
-           href="<?= url('/partners-admin') ?>">
-          <?= icon('users', 'nav-link__icon') ?> Partners
-          <?php if ($partnersWaiting > 0): ?>
-            <span class="nav-link__badge"><?= $partnersWaiting ?></span>
-          <?php endif; ?>
-        </a>
-
-        <?php // Its own entry rather than a tab inside Partners: it is a
-              // monthly job with a deadline, done by finance, and it is not
-              // about any one partner. ?>
-        <a class="nav-link <?= is_active_nav('/payouts') ? 'is-active' : '' ?>"
-           href="<?= url('/payouts') ?>">
-          <?= icon('dollar', 'nav-link__icon') ?> Payouts
-        </a>
-      <?php endif; ?>
-
-      <?php if (can('hr.view')): ?>
-        <a class="nav-link <?= is_active_nav('/staff') ? 'is-active' : '' ?>"
-           href="<?= url('/staff') ?>">
-          <?= icon('user', 'nav-link__icon') ?> Staff
-        </a>
-      <?php endif; ?>
-
-      <?php if (can('payroll.view')): ?>
-        <a class="nav-link <?= is_active_nav('/payroll') ? 'is-active' : '' ?>"
-           href="<?= url('/payroll') ?>">
-          <?= icon('briefcase', 'nav-link__icon') ?> Payroll
-        </a>
-      <?php endif; ?>
-
-      <?php if (can('equipment.view')): ?>
-        <?php // The count is what is falling due, because that is the only
-              // thing on this page anybody has to act on. ?>
-        <?php $equipmentDue = (int) \App\Core\Database::scalar(
-            "SELECT COUNT(*) FROM equipment
-              WHERE status <> 'disposed' AND next_service_on IS NOT NULL
-                AND next_service_on <= :h",
-            ['h' => date('Y-m-d', strtotime('+' . (int) setting('equipment_service_warn_days', 14) . ' days'))],
-            0
-        ); ?>
-        <a class="nav-link <?= is_active_nav('/equipment') ? 'is-active' : '' ?>"
-           href="<?= url('/equipment') ?>">
-          <?= icon('package', 'nav-link__icon') ?> Equipment
-          <?php if ($equipmentDue > 0): ?>
-            <span class="nav-link__badge"><?= $equipmentDue ?></span>
-          <?php endif; ?>
-        </a>
-      <?php endif; ?>
-
+      <?php
+        // ── Documents ──────────────────────────────────────────────────────
+      ?>
       <?php if (can('documents.view')): ?>
+        <div class="nav-group__label">Documents</div>
         <a class="nav-link <?= is_active_nav('/proposals') ? 'is-active' : '' ?>" href="<?= url('/proposals') ?>">
           <?= icon('briefcase', 'nav-link__icon') ?> Proposals
         </a>
@@ -228,62 +199,130 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
-      <?php if (can('jobs.view')): ?>
+      <?php
+        // ── Production ─────────────────────────────────────────────────────
+        $showProduction = can('jobs.view') || can('artwork.view');
+      ?>
+      <?php if ($showProduction): ?>
         <div class="nav-group__label">Production</div>
-      <?php endif; ?>
-      <?php if (can('artwork.view')): ?>
-        <a class="nav-link <?= is_active_nav('/artwork') ? 'is-active' : '' ?>" href="<?= url('/artwork') ?>">
-          <?= icon('image', 'nav-link__icon') ?> Artwork
-        </a>
-      <?php endif; ?>
-      <?php if (can('jobs.view')): ?>
-        <a class="nav-link <?= is_active_nav('/jobs') ? 'is-active' : '' ?>" href="<?= url('/jobs') ?>">
-          <?= icon('printer', 'nav-link__icon') ?> Job Board
-          <?php if (!empty($openJobs)): ?>
-            <span class="nav-link__badge"><?= (int) $openJobs > 99 ? '99+' : (int) $openJobs ?></span>
+
+        <?php if (can('artwork.view')): ?>
+          <a class="nav-link <?= is_active_nav('/artwork') ? 'is-active' : '' ?>" href="<?= url('/artwork') ?>">
+            <?= icon('image', 'nav-link__icon') ?> Artwork
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('jobs.view')): ?>
+          <a class="nav-link <?= is_active_nav('/jobs') ? 'is-active' : '' ?>" href="<?= url('/jobs') ?>">
+            <?= icon('printer', 'nav-link__icon') ?> Job Board
+            <?php if (!empty($openJobs)): ?>
+              <span class="nav-link__badge"><?= (int) $openJobs > 99 ? '99+' : (int) $openJobs ?></span>
+            <?php endif; ?>
+          </a>
+          <?php if (can('delivery.view')): ?>
+            <a class="nav-link <?= is_active_nav('/delivery-notes') ? 'is-active' : '' ?>" href="<?= url('/delivery-notes') ?>">
+              <?= icon('archive', 'nav-link__icon') ?> Delivery Notes
+            </a>
           <?php endif; ?>
-        </a>
-        <?php if (can('delivery.view')): ?>
-          <a class="nav-link <?= is_active_nav('/delivery-notes') ? 'is-active' : '' ?>" href="<?= url('/delivery-notes') ?>">
-            <?= icon('archive', 'nav-link__icon') ?> Delivery Notes
+        <?php endif; ?>
+      <?php endif; ?>
+
+      <?php
+        // ── Catalogue ──────────────────────────────────────────────────────
+        $showCatalogue = can('inventory.view') || can('purchases.view')
+                      || can('services.view') || can('subscriptions.view');
+      ?>
+      <?php if ($showCatalogue): ?>
+        <div class="nav-group__label">Catalogue</div>
+
+        <?php if (can('inventory.view')): ?>
+          <a class="nav-link <?= is_active_nav('/inventory') ? 'is-active' : '' ?>" href="<?= url('/inventory') ?>">
+            <?= icon('package', 'nav-link__icon') ?> Inventory
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('purchases.view')): ?>
+          <a class="nav-link <?= is_active_nav('/purchase-orders') ? 'is-active' : '' ?>" href="<?= url('/purchase-orders') ?>">
+            <?= icon('inbox', 'nav-link__icon') ?> Purchasing
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('services.view')): ?>
+          <a class="nav-link <?= is_active_nav('/services') ? 'is-active' : '' ?>" href="<?= url('/services') ?>">
+            <?= icon('layers', 'nav-link__icon') ?> Services
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('subscriptions.view')): ?>
+          <a class="nav-link <?= is_active_nav('/subscriptions') ? 'is-active' : '' ?>" href="<?= url('/subscriptions') ?>">
+            <?= icon('refresh', 'nav-link__icon') ?> Recurring
           </a>
         <?php endif; ?>
       <?php endif; ?>
 
-      <div class="nav-group__label">Catalogue</div>
-      <?php if (can('inventory.view')): ?>
-        <a class="nav-link <?= is_active_nav('/inventory') ? 'is-active' : '' ?>" href="<?= url('/inventory') ?>">
-          <?= icon('package', 'nav-link__icon') ?> Inventory
+      <?php
+        // ── HR ─────────────────────────────────────────────────────────────
+        $showHr = can('hr.view') || can('payroll.view') || can('equipment.view');
+      ?>
+      <?php if ($showHr): ?>
+        <div class="nav-group__label">Human Resources</div>
+
+        <a class="nav-link <?= is_active_nav('/hr') ? 'is-active' : '' ?>"
+           href="<?= url('/hr') ?>">
+          <?= icon('grid', 'nav-link__icon') ?> HR Overview
         </a>
-      <?php endif; ?>
-      <?php if (can('purchases.view')): ?>
-        <a class="nav-link <?= is_active_nav('/purchase-orders') ? 'is-active' : '' ?>" href="<?= url('/purchase-orders') ?>">
-          <?= icon('inbox', 'nav-link__icon') ?> Purchasing
-        </a>
-      <?php endif; ?>
-      <?php if (can('services.view')): ?>
-        <a class="nav-link <?= is_active_nav('/services') ? 'is-active' : '' ?>" href="<?= url('/services') ?>">
-          <?= icon('layers', 'nav-link__icon') ?> Services
-        </a>
-      <?php endif; ?>
-      <?php if (can('subscriptions.view')): ?>
-        <a class="nav-link <?= is_active_nav('/subscriptions') ? 'is-active' : '' ?>" href="<?= url('/subscriptions') ?>">
-          <?= icon('refresh', 'nav-link__icon') ?> Recurring
-        </a>
+
+        <?php if (can('hr.view')): ?>
+          <a class="nav-link <?= is_active_nav('/staff') ? 'is-active' : '' ?>"
+             href="<?= url('/staff') ?>">
+            <?= icon('user', 'nav-link__icon') ?> Staff
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('payroll.view')): ?>
+          <a class="nav-link <?= is_active_nav('/payroll') ? 'is-active' : '' ?>"
+             href="<?= url('/payroll') ?>">
+            <?= icon('briefcase', 'nav-link__icon') ?> Payroll
+          </a>
+        <?php endif; ?>
+
+        <?php if (can('equipment.view')): ?>
+          <?php $equipmentDue = (int) \App\Core\Database::scalar(
+              "SELECT COUNT(*) FROM equipment
+                WHERE status <> 'disposed' AND next_service_on IS NOT NULL
+                  AND next_service_on <= :h",
+              ['h' => date('Y-m-d', strtotime('+' . (int) setting('equipment_service_warn_days', 14) . ' days'))],
+              0
+          ); ?>
+          <a class="nav-link <?= is_active_nav('/equipment') ? 'is-active' : '' ?>"
+             href="<?= url('/equipment') ?>">
+            <?= icon('package', 'nav-link__icon') ?> Equipment
+            <?php if ($equipmentDue > 0): ?>
+              <span class="nav-link__badge"><?= $equipmentDue ?></span>
+            <?php endif; ?>
+          </a>
+        <?php endif; ?>
       <?php endif; ?>
 
-      <?php if (can('payments.view') || can('expenses.view')): ?>
+      <?php
+        // ── Finance ────────────────────────────────────────────────────────
+        $showFinance = can('payments.view') || can('expenses.view') || can('reports.view');
+      ?>
+      <?php if ($showFinance): ?>
         <div class="nav-group__label">Finance</div>
+
         <?php if (can('payments.view')): ?>
           <a class="nav-link <?= is_active_nav('/payments') ? 'is-active' : '' ?>" href="<?= url('/payments') ?>">
             <?= icon('credit-card', 'nav-link__icon') ?> Payments
           </a>
         <?php endif; ?>
+
         <?php if (can('expenses.view')): ?>
           <a class="nav-link <?= is_active_nav('/expenses') ? 'is-active' : '' ?>" href="<?= url('/expenses') ?>">
             <?= icon('trending-down', 'nav-link__icon') ?> Expenses
           </a>
         <?php endif; ?>
+
         <?php if (can('reports.view')): ?>
           <a class="nav-link <?= is_active_nav('/reports') ? 'is-active' : '' ?>" href="<?= url('/reports') ?>">
             <?= icon('bar-chart', 'nav-link__icon') ?> Reports
@@ -291,7 +330,11 @@ if ($me && can('jobs.view')) {
         <?php endif; ?>
       <?php endif; ?>
 
+      <?php
+        // ── Workspace ──────────────────────────────────────────────────────
+      ?>
       <div class="nav-group__label">Workspace</div>
+
       <?php if (can('whatsapp.view')): ?>
         <a class="nav-link <?= is_active_nav('/whatsapp') ? 'is-active' : '' ?>" href="<?= url('/whatsapp') ?>">
           <?= icon('message', 'nav-link__icon') ?> WhatsApp
@@ -299,11 +342,13 @@ if ($me && can('jobs.view')) {
                 data-url="<?= url('/whatsapp/unread') ?>"></span>
         </a>
       <?php endif; ?>
+
       <?php if (can('meetings.view')): ?>
         <a class="nav-link <?= is_active_nav('/meetings') ? 'is-active' : '' ?>" href="<?= url('/meetings') ?>">
           <?= icon('video', 'nav-link__icon') ?> Meetings
         </a>
       <?php endif; ?>
+
       <?php if (can('chat.use')): ?>
         <a class="nav-link <?= is_active_nav('/chat') ? 'is-active' : '' ?>" href="<?= url('/chat') ?>">
           <?= icon('message', 'nav-link__icon') ?> Team Chat
@@ -312,9 +357,11 @@ if ($me && can('jobs.view')) {
                 data-url="<?= url('/chat/unread-count') ?>"><?= $unread > 99 ? '99+' : $unread ?></span>
         </a>
       <?php endif; ?>
+
       <a class="nav-link <?= is_active_nav('/reminders') ? 'is-active' : '' ?>" href="<?= url('/reminders') ?>">
         <?= icon('bell', 'nav-link__icon') ?> My Reminders
       </a>
+
       <?php if (can('documents.view')): ?>
         <a class="nav-link <?= is_active_nav('/notifications') ? 'is-active' : '' ?>" href="<?= url('/notifications') ?>">
           <?= icon('send', 'nav-link__icon') ?> Messages
@@ -331,18 +378,25 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
-      <?php if (can('users.view') || can('settings.manage')): ?>
+      <?php
+        // ── Administration ─────────────────────────────────────────────────
+        $showAdmin = can('users.view') || can('settings.manage');
+      ?>
+      <?php if ($showAdmin): ?>
         <div class="nav-group__label">Administration</div>
+
         <?php if (can('users.view')): ?>
           <a class="nav-link <?= is_active_nav('/users') ? 'is-active' : '' ?>" href="<?= url('/users') ?>">
             <?= icon('shield', 'nav-link__icon') ?> Users &amp; Roles
           </a>
         <?php endif; ?>
+
         <?php if (can('settings.manage')): ?>
           <a class="nav-link <?= is_active_nav('/settings') ? 'is-active' : '' ?>" href="<?= url('/settings') ?>">
             <?= icon('settings', 'nav-link__icon') ?> Settings
           </a>
         <?php endif; ?>
+
         <?php if (can('audit.view')): ?>
           <a class="nav-link <?= is_active_nav('/audit') ? 'is-active' : '' ?>" href="<?= url('/audit') ?>">
             <?= icon('activity', 'nav-link__icon') ?> Audit Trail

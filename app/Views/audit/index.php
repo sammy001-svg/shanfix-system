@@ -1,9 +1,24 @@
 <?php require_once APP_PATH . '/Views/partials/icons.php'; ?>
 
+<?php
+  // Build the export URL carrying whatever filters are currently active,
+  // so the CSV is always the same set the user is looking at on screen.
+  $exportParams = array_filter([
+      'action' => $filters['action'],
+      'user'   => $filters['userId'] > 0 ? $filters['userId'] : '',
+  ]);
+  $exportUrl = url('/audit/export') . ($exportParams ? '?' . http_build_query($exportParams) : '');
+?>
+
 <div class="page-head">
   <div class="page-head__text">
     <h1>Audit Trail</h1>
     <div class="page-head__sub">Who did what, and when. Useful when a figure looks wrong.</div>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn btn--outline" href="<?= e($exportUrl) ?>">
+      <?= icon('download') ?> Export CSV
+    </a>
   </div>
 </div>
 

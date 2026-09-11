@@ -37,21 +37,40 @@ class SettingsController extends Controller
             $grouped[$c['type']][] = $c;
         }
 
+        $company = Settings::company();
+
+        $checklist = [
+            'company_name'    => !empty($company['company_name']) && $company['company_name'] !== 'My Company',
+            'company_logo'    => !empty($company['company_logo']),
+            'company_contact' => !empty($company['company_email']) && !empty($company['company_phone']),
+            'kra_pin'         => !empty($company['company_kra_pin']),
+            'payments'        => (new KopoKopo())->isConfigured() || !empty($company['mpesa_paybill']) || !empty($company['mpesa_till']),
+            'messaging'       => Settings::hasSecret('smtp_password') || Settings::hasSecret('sms_api_key'),
+        ];
+
+        $completedCount = count(array_filter($checklist));
+        $totalChecklist = count($checklist);
+        $completenessPercent = (int) round(($completedCount / $totalChecklist) * 100);
+
         $this->view('settings/index', [
-            'title'          => 'Settings',
-            'tab'            => $tab,
-            'settings'       => Settings::company(),
-            'categories'     => $grouped,
-            'kopokopoReady'  => (new KopoKopo())->isConfigured(),
-            'hasSecret'      => [
+            'title'               => 'Settings',
+            'tab'                 => $tab,
+            'settings'            => $company,
+            'categories'          => $grouped,
+            'kopokopoReady'       => (new KopoKopo())->isConfigured(),
+            'checklist'           => $checklist,
+            'completenessPercent' => $completenessPercent,
+            'completedCount'      => $completedCount,
+            'totalChecklist'      => $totalChecklist,
+            'hasSecret'           => [
                 'client_secret' => Settings::hasSecret('kopokopo_client_secret'),
                 'api_key'       => Settings::hasSecret('kopokopo_api_key'),
                 'smtp_password' => Settings::hasSecret('smtp_password'),
                 'sms_api_key'   => Settings::hasSecret('sms_api_key'),
             ],
-            'events'         => \App\Services\Notifier::EVENTS,
-            'defaultCallback' => rtrim((string) Config::get('app.url', ''), '/') . base_path() . '/webhooks/kopokopo',
-            'appUrlSet'       => rtrim((string) Config::get('app.url', ''), '/') !== '',
+            'events'              => \App\Services\Notifier::EVENTS,
+            'defaultCallback'     => rtrim((string) Config::get('app.url', ''), '/') . base_path() . '/webhooks/kopokopo',
+            'appUrlSet'           => rtrim((string) Config::get('app.url', ''), '/') !== '',
         ]);
     }
 

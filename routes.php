@@ -497,8 +497,10 @@ $r->group(['auth'], function ($r) {
 
     // -- The people who work here
     //
+    // -- Staff, HR & Payroll
     // Behind hr.* rather than a manager's permission: these records carry
     // what people earn, their ID numbers and their bank accounts.
+    $r->get('/hr',                    [\App\Controllers\HrDashboardController::class, 'index']);
     $r->get('/staff',                 [EmployeeController::class, 'index'],  ['permission:hr.view']);
     // Before {id}, or "new" is read as a person.
     $r->get('/staff/new',             [EmployeeController::class, 'create'], ['permission:hr.manage']);
@@ -785,10 +787,11 @@ $r->group(['auth'], function ($r) {
     // -- Reminders (available to every signed-in user)
     $r->get('/reminders',  [ReminderController::class, 'index']);
     $r->group(['csrf'], function ($r) {
-        $r->post('/reminders',             [ReminderController::class, 'store']);
-        $r->post('/reminders/{id}/done',   [ReminderController::class, 'complete']);
-        $r->post('/reminders/{id}/reopen', [ReminderController::class, 'reopen']);
-        $r->post('/reminders/{id}/delete', [ReminderController::class, 'destroy'], ['permission:records.delete']);
+        $r->post('/reminders',              [ReminderController::class, 'store']);
+        $r->post('/reminders/{id}/done',    [ReminderController::class, 'complete']);
+        $r->post('/reminders/{id}/snooze',  [ReminderController::class, 'snooze']);
+        $r->post('/reminders/{id}/reopen',  [ReminderController::class, 'reopen']);
+        $r->post('/reminders/{id}/delete',  [ReminderController::class, 'destroy'], ['permission:records.delete']);
     });
 
     // -- Payments
@@ -941,8 +944,10 @@ $r->group(['auth'], function ($r) {
     });
 
     // -- Reports
-    $r->get('/reports',           [ReportController::class, 'index'],           ['permission:reports.view']);
-    $r->get('/reports/statement', [ReportController::class, 'exportStatement'], ['permission:reports.view']);
+    $r->get('/reports',               [ReportController::class, 'index'],           ['permission:reports.view']);
+    $r->get('/reports/ageing',        [ReportController::class, 'ageing'],          ['permission:reports.view']);
+    $r->get('/reports/ageing/export', [ReportController::class, 'ageingExport'],    ['permission:reports.view']);
+    $r->get('/reports/statement',     [ReportController::class, 'exportStatement'], ['permission:reports.view']);
 
     // -- Chat
     // Discussion attached to a job, client, document or artwork request.
@@ -994,5 +999,6 @@ $r->group(['auth'], function ($r) {
         $r->post('/settings/categories/{id}/delete', [SettingsController::class, 'destroyCategory'], ['permission:records.delete']);
     });
 
-    $r->get('/audit', [DashboardController::class, 'audit'], ['permission:audit.view']);
+    $r->get('/audit',        [DashboardController::class, 'audit'],       ['permission:audit.view']);
+    $r->get('/audit/export', [DashboardController::class, 'auditExport'], ['permission:audit.view']);
 });

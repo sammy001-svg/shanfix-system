@@ -11,6 +11,58 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
   </div>
 </div>
 
+<!-- Company Setup Completeness Progress Card -->
+<div class="card mb-16" style="border-top:4px solid <?= $completenessPercent === 100 ? 'var(--green-color, #10b981)' : 'var(--amber-color, #f59e0b)' ?>;">
+  <div class="card__body" style="padding:16px 20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div>
+        <div style="font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;">
+          <?= icon('check-circle', $completenessPercent === 100 ? 'text-green' : 'text-amber') ?>
+          System Setup Completeness (<?= (int) $completenessPercent ?>%)
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+          <?= (int) $completedCount ?> of <?= (int) $totalChecklist ?> essential setup steps configured.
+        </div>
+      </div>
+      <span class="badge badge--<?= $completenessPercent === 100 ? 'green' : 'amber' ?>" style="font-size:13px; font-weight:700; padding:4px 12px;">
+        <?= $completenessPercent === 100 ? 'Fully Configured' : 'Setup In Progress' ?>
+      </span>
+    </div>
+
+    <!-- Progress Bar -->
+    <div style="background:var(--bg-subtle, #e2e8f0); height:8px; border-radius:4px; overflow:hidden; margin-bottom:12px;">
+      <div style="background:<?= $completenessPercent === 100 ? 'var(--green-color, #10b981)' : 'var(--amber-color, #f59e0b)' ?>; width:<?= (int) $completenessPercent ?>%; height:100%; transition:width 0.3s ease;"></div>
+    </div>
+
+    <!-- Quick Checklist Pill Items -->
+    <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:12px;">
+      <a href="<?= e($tabUrl('company')) ?>" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px; background:<?= $checklist['company_name'] ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)' ?>; color:<?= $checklist['company_name'] ? '#047857' : '#b45309' ?>;">
+        <?= $checklist['company_name'] ? '✓' : '!' ?> Company Profile
+      </a>
+
+      <a href="<?= e($tabUrl('company')) ?>" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px; background:<?= $checklist['company_logo'] ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)' ?>; color:<?= $checklist['company_logo'] ? '#047857' : '#b45309' ?>;">
+        <?= $checklist['company_logo'] ? '✓' : '!' ?> Logo Uploaded
+      </a>
+
+      <a href="<?= e($tabUrl('company')) ?>" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px; background:<?= $checklist['company_contact'] ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)' ?>; color:<?= $checklist['company_contact'] ? '#047857' : '#b45309' ?>;">
+        <?= $checklist['company_contact'] ? '✓' : '!' ?> Email & Phone
+      </a>
+
+      <a href="<?= e($tabUrl('company')) ?>" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px; background:<?= $checklist['kra_pin'] ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)' ?>; color:<?= $checklist['kra_pin'] ? '#047857' : '#b45309' ?>;">
+        <?= $checklist['kra_pin'] ? '✓' : '!' ?> KRA PIN
+      </a>
+
+      <a href="<?= e($tabUrl('payments')) ?>" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px; background:<?= $checklist['payments'] ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)' ?>; color:<?= $checklist['payments'] ? '#047857' : '#b45309' ?>;">
+        <?= $checklist['payments'] ? '✓' : '!' ?> M-Pesa / Payments
+      </a>
+
+      <a href="<?= e($tabUrl('messaging')) ?>" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px; background:<?= $checklist['messaging'] ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)' ?>; color:<?= $checklist['messaging'] ? '#047857' : '#b45309' ?>;">
+        <?= $checklist['messaging'] ? '✓' : '!' ?> Email / SMS Gateway
+      </a>
+    </div>
+  </div>
+</div>
+
 <div class="card">
   <nav class="tabs">
     <a class="tab <?= $tab === 'company'    ? 'is-active' : '' ?>" href="<?= e($tabUrl('company')) ?>">

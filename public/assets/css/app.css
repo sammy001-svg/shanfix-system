@@ -287,15 +287,30 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 .sidebar__name { font-weight: 650; font-size: 14.5px; color: #fff; line-height: 1.2; }
 .sidebar__sub  { font-size: 11px; color: rgba(255,255,255,.5); letter-spacing: .02em; }
 
-.sidebar__nav { padding: 10px 10px 24px; flex: 1; }
+.sidebar__nav { padding: 10px 10px 28px; flex: 1; }
 
+/* Section group headers — each one gets a hairline above it that reads as
+   a separator between sections. The first one sits directly under the brand
+   so it has a little extra top-room instead of a line. */
 .nav-group__label {
-  font-size: 10.5px;
-  font-weight: 650;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: .08em;
-  color: rgba(255,255,255,.42);
-  padding: 14px 10px 6px;
+  letter-spacing: .10em;
+  color: rgba(255,255,255,.35);
+  padding: 20px 10px 5px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* No separator on the very first group label — it sits right under the brand. */
+.sidebar__nav > .nav-group__label:first-of-type,
+.sidebar__nav > *:first-child.nav-group__label {
+  border-top: 0;
+  padding-top: 10px;
+  margin-top: 0;
 }
 
 .nav-link {
@@ -304,30 +319,38 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
   gap: 10px;
   padding: 8px 10px;
   border-radius: var(--r);
-  color: rgba(255,255,255,.78);
+  color: rgba(255,255,255,.75);
   font-size: 13.5px;
   font-weight: 500;
   margin-bottom: 1px;
   transition: background .12s, color .12s;
   position: relative;
 }
-.nav-link:hover { background: rgba(255,255,255,.08); color: #fff; text-decoration: none; }
-.nav-link.is-active { background: var(--green-600); color: #fff; font-weight: 600; }
-.nav-link.is-active:hover { background: var(--green-600); }
+.nav-link:hover { background: rgba(255,255,255,.09); color: #fff; text-decoration: none; }
+.nav-link.is-active {
+  background: var(--green-600);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+}
+.nav-link.is-active:hover { background: var(--green-500); }
 
-.nav-link__icon { width: 17px; height: 17px; flex: 0 0 17px; opacity: .9; }
+.nav-link__icon { width: 16px; height: 16px; flex: 0 0 16px; opacity: .75; }
+.nav-link.is-active .nav-link__icon { opacity: 1; }
+.nav-link:hover .nav-link__icon { opacity: .95; }
+
 .nav-link__badge {
   margin-left: auto;
   background: var(--green-500);
   color: #fff;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 9px;
   min-width: 18px;
   text-align: center;
 }
-.nav-link.is-active .nav-link__badge { background: rgba(255,255,255,.25); }
+.nav-link.is-active .nav-link__badge { background: rgba(255,255,255,.28); }
 
 /* Main column */
 .main {
@@ -1150,90 +1173,113 @@ fieldset:last-of-type { margin-bottom: 0; }
 .pagination .is-disabled { opacity: .4; pointer-events: none; }
 
 /* ---------------------------------------------------------------------
-   Sign-in screen
+   Sign-in screen  — Professional redesign
 
-   A single centred card floating over a photograph. The navy ground sits
-   beneath the image, so the page still reads correctly while the photo
-   loads — or if it is missing entirely.
+   A split-card layout on wide screens (brand left, form right) and a
+   centred card on mobile. The dark navy ground sits behind the photo so
+   the page is on-brand before the image arrives and after it is gone.
    --------------------------------------------------------------------- */
 .login {
   position: relative;
   min-height: 100vh;
-  min-height: 100dvh;          /* mobile browser chrome */
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px 16px;
+  padding: 28px 16px;
   background: var(--navy-900);
   overflow: hidden;
 }
 
-/* The photograph is texture, not subject matter.
-   Left at full strength it wins: a bright office shot pulled the ground to
-   rgb(73,89,110) — pale slate, not navy — which took the brand colour with
-   it and dropped the tagline to 2.85:1 against its own background. Darkened
-   and drained of most of its colour first, it reads as depth behind a page
-   that is still unmistakably navy, and it does that whatever photograph is
-   uploaded next: the treatment does not depend on the picture being dark to
-   begin with. It also hides the softness in an image being enlarged past
-   its own resolution. */
+/* Background photo — desaturated and dimmed so it reads as atmosphere,
+   not subject matter, and the navy brand colour stays dominant. */
 .login__bg {
   position: absolute;
   inset: 0;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: saturate(.45) brightness(.34);
+  filter: saturate(.35) brightness(.28);
+  transform: scale(1.03); /* hides any edge artefacts from the filter */
 }
 
-/* And a flat navy over the top of that — a colour, never a gradient. */
+/* Layered navy veil — flat colour, no gradient (house rule). */
 .login__veil {
   position: absolute;
   inset: 0;
-  background: rgba(8, 32, 58, .82);
+  background: rgba(8, 32, 58, .78);
 }
 
+/* Subtle diagonal pattern gives the dark ground texture without photos. */
+.login__veil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 28px,
+      rgba(255,255,255,.018) 28px,
+      rgba(255,255,255,.018) 29px
+    );
+  pointer-events: none;
+}
+
+/* ── Layout panel ─────────────────────────────────────────────────── */
 .login__panel {
-  position: relative;          /* above the veil */
+  position: relative; /* above the veil */
   width: 100%;
-  max-width: 424px;
+  max-width: 440px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
-/* Wide enough for two columns: the brand and what is behind the door on
-   the left, the form on the right, the footer across the bottom. Below
-   this the same three blocks simply stack, which is the phone layout. */
-@media (min-width: 940px) {
+/* Two-column grid on wide screens: brand aside + form card. */
+@media (min-width: 960px) {
   .login__panel {
-    max-width: 920px;
+    max-width: 960px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 424px;
+    grid-template-columns: minmax(0, 1fr) 440px;
     grid-template-areas:
       "aside card"
       "foot  foot";
     align-items: center;
-    column-gap: 64px;
-    row-gap: 28px;
+    column-gap: 72px;
+    row-gap: 32px;
   }
   .login__aside { grid-area: aside; }
   .login__card  { grid-area: card; }
   .login__foot  { grid-area: foot; }
 }
 
+/* ── The card ─────────────────────────────────────────────────────── */
 .login__card {
-  /* A step above the ground rather than below it. On the dark theme the
-     card was darker than the navy behind it, which is what made it read as
-     a hole in the page rather than a panel on it; the two are within
-     1.15:1 of each other, so the edge has to do the separating. */
   background: var(--surface-2);
+  /* Top highlight simulates a light source; bottom shadow grounds the card. */
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  padding: 34px 34px 30px;
-  box-shadow: 0 24px 60px rgba(2, 10, 20, .5);
+  border-top-color: rgba(255, 255, 255, .10);
+  border-radius: 20px;
+  padding: 38px 38px 32px;
+  box-shadow:
+    0 2px  0   rgba(255, 255, 255, .06) inset,   /* top rim highlight */
+    0 32px 80px rgba(2, 8, 18, .65),              /* deep drop shadow  */
+    0 8px  24px rgba(2, 8, 18, .40);
+  position: relative;
+  overflow: hidden;
 }
 
-/* The brand, outside the card, sitting on the dark ground. */
+/* Subtle green accent line across the top of the card. */
+.login__card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--green-600);
+  border-radius: 20px 20px 0 0;
+}
+
+/* ── Brand aside (left column on desktop) ─────────────────────────── */
 .login__aside {
   text-align: center;
   color: #fff;
@@ -1242,89 +1288,146 @@ fieldset:last-of-type { margin-bottom: 0; }
 .login__lockup {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
+/* Feature-point list — shown only when there is room. */
 .login__points {
   list-style: none;
-  margin: 26px 0 0;
-  padding: 24px 0 0;
-  border-top: 1px solid rgba(255, 255, 255, .14);
-  display: none;               /* only where there is room for it */
+  margin: 28px 0 0;
+  padding: 26px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, .12);
+  display: none;
 }
 .login__points li {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 7px 0;
-  font-size: 13.5px;
-  color: rgba(255, 255, 255, .82);
+  gap: 13px;
+  padding: 9px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, .84);
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
 }
+.login__points li:last-child { border-bottom: 0; }
 .login__points svg {
   width: 16px; height: 16px;
   flex: 0 0 16px;
-  color: var(--green-400);   /* on the navy ground, not on a tint */
+  color: var(--green-400);
+  opacity: .9;
 }
-/* Two columns: the brand stops being a centred header and becomes the
-   left-hand column, so the lockup, the tagline and the list all start on
-   the same line. */
-@media (min-width: 940px) {
+
+@media (min-width: 960px) {
   .login__points { display: block; }
   .login__aside  { text-align: left; }
   .login__logo   { margin-left: 0; }
 }
 
+/* ── Brand mark & logo ────────────────────────────────────────────── */
 .login__mark {
-  width: 44px; height: 44px;
-  flex: 0 0 44px;
-  border-radius: 9px;
+  width: 48px; height: 48px;
+  flex: 0 0 48px;
+  border-radius: 11px;
   background: var(--green-600);
+  /* Subtle inner shadow makes it look raised from the dark aside. */
+  box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 4px 14px rgba(0,0,0,.4);
   color: #fff;
   display: grid; place-items: center;
-  font-weight: 700;
-  font-size: 17px;
-  letter-spacing: -.02em;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -.03em;
 }
 
-/* Capped on both axes so a very wide or very tall logo cannot push the
-   column out of shape. */
 .login__logo {
-  max-height: 68px;
+  max-height: 72px;
   max-width: 100%;
   width: auto;
   height: auto;
   margin: 0 auto;
   display: block;
   object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,.35));
 }
-.login__company { font-weight: 700; font-size: 21px; color: #fff; line-height: 1.2; letter-spacing: -.01em; }
+
+.login__company {
+  font-weight: 750;
+  font-size: 22px;
+  color: #fff;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+}
+
 .login__tagline {
-  color: var(--green-400);   /* on the navy ground, not on a tint */
+  color: var(--green-400);
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 14px;
   letter-spacing: .01em;
-  margin: 12px 0 0;
-  line-height: 1.45;
+  margin: 14px 0 0;
+  line-height: 1.5;
+  opacity: .92;
 }
 
-.login__title { font-size: 26px; letter-spacing: -.015em; margin-bottom: 5px; }
-.login__intro { color: var(--slate-600); font-size: 13.5px; margin-bottom: 22px; }
+/* ── Card header (title + intro) ──────────────────────────────────── */
+.login__title {
+  font-size: 27px;
+  font-weight: 750;
+  letter-spacing: -.02em;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
 
-.login__card .field { margin-bottom: 16px; }
+.login__intro {
+  color: var(--slate-600);
+  font-size: 13.5px;
+  line-height: 1.55;
+  margin-bottom: 26px;
+}
 
-/* The same, in the two portals. .field is flush by default because most
-   of the staff app lays fields out on a grid that spaces them; a form
-   read straight down a card needs the gap put back. */
+/* ── Form fields ──────────────────────────────────────────────────── */
+.login__card .field { margin-bottom: 18px; }
+
+/* The same gap in the two portals where .field is flush by default. */
 .portal-card .field { margin-bottom: 16px; }
 .portal-card .row-form .field,
 .portal-card .field.mb-0 { margin-bottom: 0; }
 
-.login__remember { margin: 2px 0 20px; }
+/* Slightly taller inputs on the sign-in card feel more premium. */
+.login__card .input {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 14px;
+}
+.login__card .input-icon .input { padding-left: 40px; }
+
+/* ── Remember-me checkbox ─────────────────────────────────────────── */
+.login__remember {
+  margin: 0 0 22px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
 .login__remember .check__text strong { font-size: 13.5px; }
 .login__remember .check__text span { line-height: 1.45; }
 
-.login__submit { margin-top: 2px; }
+/* ── Sign-in button ───────────────────────────────────────────────── */
+.login__submit {
+  margin-top: 4px;
+  height: 46px;
+  font-size: 15px;
+  letter-spacing: .01em;
+  box-shadow: 0 4px 18px rgba(20, 135, 78, .30);
+  transition: background .14s, box-shadow .14s, transform .10s;
+}
+.login__submit:hover {
+  box-shadow: 0 6px 22px rgba(20, 135, 78, .42);
+  transform: translateY(-1px);
+}
+.login__submit:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(20, 135, 78, .22);
+}
 
+/* ── Help text beneath the button ────────────────────────────────────*/
 .login__help {
   margin: 20px 0 0;
   padding-top: 18px;
@@ -1332,22 +1435,24 @@ fieldset:last-of-type { margin-bottom: 0; }
   font-size: 12.5px;
   color: var(--slate-500);
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-wrap: wrap;
 }
+.login__help svg { width: 13px; height: 13px; flex: 0 0 13px; color: var(--green-500); opacity: .8; }
 
+/* ── Footer (copyright + contact) ────────────────────────────────── */
 .login__foot {
   text-align: center;
   font-size: 12px;
-  color: rgba(255, 255, 255, .62);
+  color: rgba(255, 255, 255, .55);
+  line-height: 1.7;
 }
-.login__foot span { margin: 0 5px; opacity: .55; }
+.login__foot span { margin: 0 5px; opacity: .45; }
 
-/* The way back to the website.
-
-   The sign-in page sits behind the company site on the same domain, so
-   somebody who arrived here by mistake needs a way out that is not the
-   browser's back button — which does nothing if they typed the address
-   or followed a link from an email. Quiet until you look for it, and
-   plainly a link when you do. */
+/* ── Back-to-website pill ─────────────────────────────────────────── */
 .login__back {
   margin: 0 0 18px;
   text-align: center;
@@ -1357,12 +1462,13 @@ fieldset:last-of-type { margin-bottom: 0; }
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 16px;
-  border: 1px solid rgba(255, 255, 255, .22);
+  padding: 8px 18px;
+  border: 1px solid rgba(255, 255, 255, .20);
   border-radius: 999px;
-  color: rgba(255, 255, 255, .82);
+  color: rgba(255, 255, 255, .72);
   text-decoration: none;
-  transition: border-color .15s, color .15s, background-color .15s;
+  font-size: 12.5px;
+  transition: border-color .16s, color .16s, background-color .16s;
 }
 .login__back a:hover,
 .login__back a:focus-visible {
@@ -1371,9 +1477,9 @@ fieldset:last-of-type { margin-bottom: 0; }
   color: #fff;
   text-decoration: none;
 }
-.login__back svg { width: 15px; height: 15px; }
+.login__back svg { width: 14px; height: 14px; }
 
-/* Input with a leading icon, and optionally a trailing button */
+/* ── Input-with-icon wrapper ──────────────────────────────────────── */
 .input-icon { position: relative; display: flex; align-items: center; }
 
 .input-icon > svg {
@@ -1382,14 +1488,15 @@ fieldset:last-of-type { margin-bottom: 0; }
   width: 17px; height: 17px;
   color: var(--slate-400);
   pointer-events: none;
+  transition: color .12s;
 }
 
-.input-icon .input { padding-left: 38px; }
-.input-icon:focus-within > svg { color: var(--green-600); }
+.input-icon .input { padding-left: 40px; }
+.input-icon:focus-within > svg { color: var(--green-500); }
 
 .input-icon__toggle {
   position: absolute;
-  right: 6px;
+  right: 7px;
   width: 32px; height: 32px;
   display: grid; place-items: center;
   border: 0;
@@ -1398,23 +1505,29 @@ fieldset:last-of-type { margin-bottom: 0; }
   color: var(--slate-500);
   cursor: pointer;
   padding: 0;
+  transition: background .12s, color .12s;
 }
 .input-icon__toggle:hover { background: var(--surface-2); color: var(--on-navy); }
 .input-icon__toggle svg { width: 17px; height: 17px; display: block; }
 .input-icon__toggle [hidden] { display: none; }
-.input-icon .input:has(+ .input-icon__toggle) { padding-right: 42px; }
+.input-icon .input:has(+ .input-icon__toggle) { padding-right: 44px; }
 
+/* ── Mobile overrides ─────────────────────────────────────────────── */
 @media (max-width: 480px) {
   .login { padding: 16px 12px; }
-  .login__card { padding: 26px 20px 24px; border-radius: 12px; }
-  .login__title { font-size: 21px; }
+  .login__card {
+    padding: 28px 22px 26px;
+    border-radius: 16px;
+  }
+  .login__title { font-size: 23px; }
+  .login__submit { height: 44px; font-size: 14.5px; }
 }
 
-/* The photo is decorative; drop it for anyone who asked for less motion
-   and contrast trouble, leaving the solid navy behind it. */
+/* Accessibility: drop decorative photo for high-contrast mode. */
 @media (prefers-contrast: more) {
   .login__bg { display: none; }
   .login__veil { background: var(--navy-900); }
+  .login__veil::after { display: none; }
 }
 
 /* ---------------------------------------------------------------------

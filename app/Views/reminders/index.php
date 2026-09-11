@@ -111,6 +111,25 @@
                     <?= csrf_field() ?>
                     <button class="btn btn--outline btn--sm" type="submit" title="Reopen"><?= icon('refresh') ?></button>
                   </form>
+                <?php else: ?>
+                  <div class="dropdown">
+                    <button class="btn btn--outline btn--sm" type="button" data-dropdown title="Snooze"><?= icon('clock') ?></button>
+                    <div class="dropdown__menu">
+                      <div class="dropdown__label">Snooze until…</div>
+                      <?php foreach ([
+                          '1h'        => '1 hour from now',
+                          '4h'        => '4 hours from now',
+                          'tomorrow'  => 'Tomorrow at 9 am',
+                          'next_week' => 'Next Monday at 9 am',
+                      ] as $val => $label): ?>
+                        <form method="post" action="<?= url('/reminders/' . $r['id'] . '/snooze') ?>">
+                          <?= csrf_field() ?>
+                          <input type="hidden" name="snooze" value="<?= e($val) ?>">
+                          <button class="dropdown__item" type="submit"><?= e($label) ?></button>
+                        </form>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
                 <?php endif; ?>
                 <form method="post" action="<?= url('/reminders/' . $r['id'] . '/delete') ?>" style="display:inline"
                       data-confirm="Delete this reminder?">
