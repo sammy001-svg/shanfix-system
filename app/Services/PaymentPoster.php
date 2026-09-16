@@ -52,10 +52,32 @@ class PaymentPoster
 
             if ($documentId !== null && $status === 'completed') {
                 self::refreshInvoice($documentId);
+            } elseif ($documentId === null && $status === 'completed') {
+                self::autoAllocateOnAccountPayment($clientId, $amount, $paymentId);
             }
 
             return ['payment_id' => $paymentId, 'payment_number' => $paymentNumber];
         });
+    }
+
+    /**
+     * Auto-allocate an on-account payment to the client's oldest unpaid invoice.
+     */
+    private static function autoAllocateOnAccountPayment(int $clientId, float $amount, int $paymentId): void
+    {
+        $openInvoices = Database::all(
+            "SELECT id, balance FROM documents
+              WHERE client_id = :cid AND doc_type = 'invoice'
+                AND status NOT IN ('cancelled', 'paid', 'draft') AND balance > 0
+           ORDER BY due_date ASC, id ASC",
+            ['cid' => $clientId]
+        );
+
+        if (!empty($openInvoices)) {
+            $targetDocId = (int) $openInvoices[0]['id'];
+            Database::update('payments', ['document_id' => $targetDocId], ['id' => $paymentId]);
+            self::refreshInvoice($targetDocId);
+        }
     }
 
     /**
