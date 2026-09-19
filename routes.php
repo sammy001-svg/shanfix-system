@@ -13,6 +13,8 @@
 
 use App\Controllers\ArtworkController;
 use App\Controllers\BackupController;
+use App\Controllers\BulkSmsAdminController;
+use App\Controllers\BulkSmsTrafficController;
 use App\Controllers\BulkSmsWebhookController;
 use App\Controllers\AuthController;
 use App\Controllers\CatalogueImageController;
@@ -895,6 +897,48 @@ $r->group(['auth'], function ($r) {
              ['permission:sms.campaign', 'csrf']);
     $r->post('/sms-campaigns',         [SmsCampaignController::class, 'send'],
              ['permission:sms.campaign', 'csrf']);
+
+    // -- The SMS platform
+    //
+    // Customers and partners sending their own texts, as the office sees
+    // it. Each action checks its own permission (bulksms.view, .manage,
+    // .approve, .settings); the router only needs to know which are reads.
+    $r->get('/bulk-sms',                        [BulkSmsAdminController::class, 'index'],       ['permission:bulksms.view']);
+    $r->get('/bulk-sms/accounts',               [BulkSmsAdminController::class, 'accounts'],    ['permission:bulksms.view']);
+    $r->get('/bulk-sms/accounts/{id}',          [BulkSmsAdminController::class, 'show'],        ['permission:bulksms.view']);
+    $r->get('/bulk-sms/purchases',              [BulkSmsAdminController::class, 'purchases'],   ['permission:bulksms.view']);
+    $r->get('/bulk-sms/plans',                  [BulkSmsAdminController::class, 'plans'],       ['permission:bulksms.view']);
+    $r->get('/bulk-sms/settings',               [BulkSmsAdminController::class, 'settings'],    ['permission:bulksms.settings']);
+    $r->get('/bulk-sms/campaigns',              [BulkSmsTrafficController::class, 'campaigns'], ['permission:bulksms.view']);
+    $r->get('/bulk-sms/campaigns/{id}',         [BulkSmsTrafficController::class, 'campaign'],  ['permission:bulksms.view']);
+    $r->get('/bulk-sms/messages',               [BulkSmsTrafficController::class, 'messages'],  ['permission:bulksms.view']);
+    $r->get('/bulk-sms/sender-ids',             [BulkSmsTrafficController::class, 'senders'],   ['permission:bulksms.view']);
+    $r->get('/bulk-sms/sender-ids/{id}/{which}', [BulkSmsTrafficController::class, 'senderFile'], ['permission:bulksms.view']);
+
+    $r->group(['permission:bulksms.view', 'csrf'], function ($r) {
+        $r->post('/bulk-sms/sync',                     [BulkSmsAdminController::class, 'sync']);
+        $r->post('/bulk-sms/accounts',                 [BulkSmsAdminController::class, 'open']);
+        $r->post('/bulk-sms/accounts/{id}/units',      [BulkSmsAdminController::class, 'units']);
+        $r->post('/bulk-sms/accounts/{id}/pricing',    [BulkSmsAdminController::class, 'pricing']);
+        $r->post('/bulk-sms/accounts/{id}/status',     [BulkSmsAdminController::class, 'status']);
+        $r->post('/bulk-sms/accounts/{id}/supplier',   [BulkSmsAdminController::class, 'supplier']);
+        $r->post('/bulk-sms/accounts/{id}/api-key',    [BulkSmsAdminController::class, 'apiKey']);
+        $r->post('/bulk-sms/accounts/{id}/api-key/revoke', [BulkSmsAdminController::class, 'revokeKey']);
+        $r->post('/bulk-sms/purchases',                [BulkSmsAdminController::class, 'recordPurchase']);
+        $r->post('/bulk-sms/purchases/{id}/complete',  [BulkSmsAdminController::class, 'completePurchase']);
+        $r->post('/bulk-sms/purchases/{id}/fail',      [BulkSmsAdminController::class, 'failPurchase']);
+        $r->post('/bulk-sms/plans',                    [BulkSmsAdminController::class, 'savePlan']);
+        $r->post('/bulk-sms/plans/{id}',               [BulkSmsAdminController::class, 'savePlan']);
+        $r->post('/bulk-sms/plans/{id}/toggle',        [BulkSmsAdminController::class, 'togglePlan']);
+        $r->post('/bulk-sms/plans/{id}/delete',        [BulkSmsAdminController::class, 'deletePlan']);
+        $r->post('/bulk-sms/settings',                 [BulkSmsAdminController::class, 'saveSettings']);
+        $r->post('/bulk-sms/settings/check',           [BulkSmsAdminController::class, 'check']);
+        $r->post('/bulk-sms/campaigns/{id}/cancel',    [BulkSmsTrafficController::class, 'cancel']);
+        $r->post('/bulk-sms/campaigns/{id}/retry',     [BulkSmsTrafficController::class, 'retry']);
+        $r->post('/bulk-sms/sender-ids',               [BulkSmsTrafficController::class, 'addSender']);
+        $r->post('/bulk-sms/sender-ids/{id}/decide',   [BulkSmsTrafficController::class, 'decideSender']);
+        $r->post('/bulk-sms/sender-ids/{id}/delete',   [BulkSmsTrafficController::class, 'deleteSender']);
+    });
 
     $r->group(['permission:settings.manage', 'csrf'], function ($r) {
         $r->post('/notifications/run',           [NotificationController::class, 'runQueue']);

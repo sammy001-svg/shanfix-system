@@ -172,7 +172,7 @@ final class Accounts
                     "SELECT COALESCE(NULLIF(company, ''), name) FROM partners WHERE id = :id",
                     ['id' => $account['owner_id']]) ?? 'Partner #' . $account['owner_id']),
                 'kind' => 'Partner',
-                'url'  => '/partners/' . $account['owner_id'],
+                'url'  => '/partners-admin/' . $account['owner_id'],
             ],
             default => ['name' => 'Account #' . $account['id'], 'kind' => '', 'url' => null],
         };
