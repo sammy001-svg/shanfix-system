@@ -192,6 +192,16 @@ class Auth
         // a single message to one client.
         'sms.campaign'      => ['admin', 'manager'],
 
+        // The Bulk SMS platform customers and partners send through.
+        // Seeing it answers "why has my client not got their texts",
+        // which sales and finance are asked. Moving units and approving
+        // sender IDs is money and the networks' paperwork. The gateway
+        // keys send as the whole company and are admin's alone.
+        'bulksms.view'      => ['admin', 'manager', 'finance', 'sales'],
+        'bulksms.manage'    => ['admin', 'manager', 'finance'],
+        'bulksms.approve'   => ['admin', 'manager'],
+        'bulksms.settings'  => ['admin'],
+
         // Artwork. A designer works their own queue and sends proofs to a
         // client; allocating the work is for whoever runs the studio.
         'artwork.view'      => ['admin', 'manager', 'designer', 'sales', 'production', 'reception'],

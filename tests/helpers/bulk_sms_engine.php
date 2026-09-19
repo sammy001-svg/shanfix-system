@@ -188,7 +188,7 @@ try {
     check('the units come out of the partner', abs(Wallet::balance((int) $pa['id']) - 1700) < 0.001);
     check('and into their client', abs(Wallet::balance((int) $va['id']) - 300) < 0.001);
 
-    $direct500 = Purchases::create((int) $da['id'], ['units' => 500, 'method' => 'complimentary']);
+    $direct500 = Purchases::create((int) $da['id'], ['units' => 1000, 'method' => 'complimentary']);
     Purchases::complete($direct500['id']);
     check('a complimentary top-up costs nothing', (float) Database::scalar('SELECT amount FROM bulk_purchases WHERE id = :id', ['id' => $direct500['id']]) === 0.0);
 
@@ -252,7 +252,8 @@ try {
     for ($i = 0; $i < 250; $i++) {
         Database::insert('bulk_contacts', [
             'account_id' => $da['id'], 'group_id' => $groupId,
-            'name' => 'Person ' . $i, 'phone' => '0711' . str_pad((string) $i, 6, '0', STR_PAD_LEFT),
+            'name' => 'Person ' . $i, // Every number ends in 1, clear of the fake gateway's 99 and 55 rules.
+            'phone' => '0711' . str_pad((string) ($i * 10 + 1), 6, '0', STR_PAD_LEFT),
             'metadata' => json_encode(['balance' => 'KES ' . $i]),
         ]);
     }
@@ -277,7 +278,7 @@ try {
     check('in batches of twenty', $lineCount() - $calls0 === 13, (string) ($lineCount() - $calls0));
     check('it is paid for exactly', abs($before - Wallet::balance((int) $da['id']) - 250) < 0.001);
     check('each message is personalised',
-        (string) Database::scalar("SELECT message FROM bulk_messages WHERE campaign_id = :c AND recipient = '+254711000007'", ['c' => $q['id']]) === 'Hi Person 7, you owe KES 7');
+        (string) Database::scalar("SELECT message FROM bulk_messages WHERE campaign_id = :c AND recipient = '+254711000071'", ['c' => $q['id']]) === 'Hi Person 7, you owe KES 7');
     check('it has recorded how far it got', (int) $c['resume_contact_id'] > 0);
 
     // A second campaign: the worker "dies" after 100 recipients.

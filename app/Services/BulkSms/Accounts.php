@@ -184,6 +184,73 @@ final class Accounts
             WHEN 'partner' THEN (SELECT COALESCE(NULLIF(p.company, ''), p.name) FROM partners p WHERE p.id = a.owner_id)
             ELSE 'Shanfix (house)' END";
 
+    // -----------------------------------------------------------------
+    // The developer API
+    // -----------------------------------------------------------------
+
+    /**
+     * Issue a fresh client id and key, replacing any before them.
+     *
+     * The same shape as the old platform's — SHX00042AB12 and sk_live_… —
+     * so documentation and code customers already have still describe
+     * what they will see. The key is returned here once and only its hash
+     * is kept: it cannot be shown again, only replaced.
+     *
+     * @return array{client_id:string, api_key:string}
+     */
+    public static function issueApiKey(int $accountId): array
+    {
+        $account = self::find($accountId) ?? throw new RuntimeException('There is no such SMS account.');
+
+        // Keep the client id if there is one: a customer rotating a leaked
+        // key should only have to change the key in their code.
+        $clientId = $account['api_client_id']
+            ?: 'SHX' . str_pad((string) $accountId, 5, '0', STR_PAD_LEFT) . strtoupper(bin2hex(random_bytes(2)));
+        $key = 'sk_live_' . bin2hex(random_bytes(16));
+
+        Database::run(
+            'UPDATE bulk_accounts
+                SET api_client_id = :c, api_key_hash = :h, api_key_hint = :hint,
+                    api_key_created_at = NOW()
+              WHERE id = :id',
+            ['c' => $clientId, 'h' => hash('sha256', $key), 'hint' => substr($key, -4), 'id' => $accountId]
+        );
+
+        return ['client_id' => $clientId, 'api_key' => $key];
+    }
+
+    public static function revokeApiKey(int $accountId): void
+    {
+        Database::run(
+            'UPDATE bulk_accounts SET api_key_hash = NULL, api_key_hint = NULL, api_key_created_at = NULL WHERE id = :id',
+            ['id' => $accountId]
+        );
+    }
+
+    /**
+     * The account a client id and key belong to, or null.
+     *
+     * Compared as hashes with hash_equals, so how long the comparison
+     * takes says nothing about how much of the key was right.
+     */
+    public static function byApiKey(string $clientId, string $key): ?array
+    {
+        if ($clientId === '' || $key === '') {
+            return null;
+        }
+
+        $account = Database::first(
+            "SELECT * FROM bulk_accounts WHERE api_client_id = :c AND api_key_hash IS NOT NULL AND status = 'active'",
+            ['c' => $clientId]
+        );
+
+        if ($account === null || !hash_equals((string) $account['api_key_hash'], hash('sha256', $key))) {
+            return null;
+        }
+
+        return $account;
+    }
+
     /**
      * Is $childId one of $parentId's own accounts?
      *
