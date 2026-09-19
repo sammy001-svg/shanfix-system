@@ -21,6 +21,10 @@ class Settings
         // really came from Meta. Both belong under the same protection.
         'whatsapp_access_token',
         'whatsapp_app_secret',
+        // The Onfon keys send as Shanfix — every customer's messages,
+        // billed to our gateway account.
+        'onfon_api_key',
+        'onfon_access_key',
     ];
 
     private static function load(): array

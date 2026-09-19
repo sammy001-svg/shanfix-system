@@ -13,6 +13,7 @@
 
 use App\Controllers\ArtworkController;
 use App\Controllers\BackupController;
+use App\Controllers\BulkSmsWebhookController;
 use App\Controllers\AuthController;
 use App\Controllers\CatalogueImageController;
 use App\Controllers\ChatController;
@@ -89,6 +90,14 @@ $r->post('/webhooks/kopokopo', [PaymentController::class, 'kopokopoCallback']);
 // is Meta, and what proves it is the signature on the body.
 $r->get('/webhooks/whatsapp',  [WhatsAppWebhookController::class, 'verify']);
 $r->post('/webhooks/whatsapp', [WhatsAppWebhookController::class, 'receive']);
+
+// Bulk SMS delivery reports from Onfon. Public: the caller is Onfon's
+// server, optionally proving itself with ?token=. The .php address is the
+// one the old platform used and is what is typed into the Onfon portal.
+foreach (['/webhooks/sms-dlr', '/webhooks/sms-dlr.php'] as $dlr) {
+    $r->get($dlr,  [BulkSmsWebhookController::class, 'dlr']);
+    $r->post($dlr, [BulkSmsWebhookController::class, 'dlr']);
+}
 
 // ---------------------------------------------------------------------
 // Installable app

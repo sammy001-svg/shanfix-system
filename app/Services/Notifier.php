@@ -71,6 +71,14 @@ class Notifier
         'partner_client_registered' => 'A partner has registered a customer',
         'partner_document'          => 'Quotation or invoice raised for a partner\'s customer',
         'partner_payment'           => 'A partner\'s customer has paid',
+
+        // Bulk SMS — the platform customers and partners send their own
+        // texts through. BulkSms\Alerts is what sends these.
+        'bulk_campaign_done'   => 'SMS campaign finished sending',
+        'bulk_low_balance'     => 'SMS balance running low',
+        'bulk_topup'           => 'SMS units added to an account',
+        'bulk_sender_approved' => 'Sender ID approved',
+        'bulk_sender_rejected' => 'Sender ID not approved',
     ];
 
     /**

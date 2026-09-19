@@ -88,6 +88,27 @@ if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
 
 try {
     // -----------------------------------------------------------------
+    // 0. Bulk SMS campaigns
+    // -----------------------------------------------------------------
+    // Campaigns normally start the moment they are queued. This is the
+    // safety net: campaigns whose scheduled time has come, campaigns on a
+    // host that refused to start a background worker, and campaigns whose
+    // worker died, which are picked up where they stopped. First, because
+    // a customer waiting on a scheduled send is waiting on the clock.
+    try {
+        $sms = \App\Services\BulkSms\Worker::tick();
+
+        if ($sms['started'] !== [] || $sms['rescued'] > 0 || $sms['stale'] > 0) {
+            say(sprintf('Bulk SMS: started %d campaign(s), rescued %d, timed out %d single send(s)',
+                count($sms['started']), $sms['rescued'], $sms['stale']));
+        }
+    } catch (\Throwable $e) {
+        // Before migration 039 there are no tables to look in. Nothing
+        // else in the run depends on this, so it must not stop it.
+        alert('Bulk SMS dispatch failed: ' . $e->getMessage());
+    }
+
+    // -----------------------------------------------------------------
     // 1. Invoice status maintenance
     // -----------------------------------------------------------------
     $overdue = Database::run(
