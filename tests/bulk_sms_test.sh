@@ -675,6 +675,11 @@ eq "the receipt still goes by e-mail" \
 eq "but not by text, because they asked not to be" \
    "$(q "SELECT COUNT(*) FROM notifications WHERE event='bulk_topup' AND channel='sms' AND body LIKE '%SMSTESTQUIET%';")" "0"
 
+# Put it back on, because later sections check that a receipt reaches
+# them both ways. A test that quietly changes a preference and leaves it
+# changed is how a suite starts depending on the order it runs in.
+$MYSQL -e "UPDATE bulk_accounts SET alert_sms = 1 WHERE id = $ACC;"
+
 echo ""
 echo "=== 20. The developer API ==="
 CT=$(ctok /portal/sms/api)
@@ -1013,6 +1018,75 @@ case "$OFFICE" in
   302*"/login"*) ok  "nor open the office's SMS pages" "sent to the staff sign-in";;
   *)             bad "nor open the office's SMS pages" "$OFFICE" "302 to /login";;
 esac
+
+echo ""
+echo "=== 24b. A reseller's own client, in detail ==="
+eq "their client's page opens"      "$(pcode2 /partners/sms/clients/$PCACC)" "200"
+DETAIL=$(pget2 /partners/sms/clients/$PCACC)
+has "it names the client"           "$DETAIL" "SMSTEST Partner Client"
+has "and shows what they hold"      "$DETAIL" "Units they hold"
+has "and what they have paid"       "$DETAIL" "They have paid you"
+
+# The line that matters: a reseller sees the credit, never the messages.
+$MYSQL -e "INSERT INTO bulk_messages (account_id, sender_id, recipient, message, status)
+           VALUES ($PCACC,'SMSTEST','+254700000702','the exact words of a private message','sent');"
+DETAIL=$(pget2 /partners/sms/clients/$PCACC)
+case "$DETAIL" in
+  *"the exact words of a private message"*) bad "but not a word of what they sent" "visible" "hidden";;
+  *)                                        ok  "but not a word of what they sent" "hidden";;
+esac
+
+# Another partner's client is not theirs to open.
+STRANGERACC=$(q "SELECT id FROM bulk_accounts WHERE owner_type='client' AND (parent_id <> $PACC OR parent_id IS NULL) LIMIT 1;")
+if [ -n "$STRANGERACC" ]; then
+  eq "somebody else's client is refused" "$(pcode2 /partners/sms/clients/$STRANGERACC)" "403"
+fi
+
+echo ""
+echo "=== 24c. How their clients see them ==="
+eq "the branding page opens" "$(pcode2 /partners/sms/branding)" "200"
+PT=$(ptok2 /partners/sms/branding)
+ppost2 /partners/sms/branding --data "_token=$PT&brand_name=SMSTEST+Comms&brand_support_phone=0722111333&brand_support_email=hello@smstest.test&brand_pay_instructions=M-Pesa+Till+999888,+then+send+the+code." > /dev/null
+eq "their trading name is saved" "$(q "SELECT brand_name FROM bulk_accounts WHERE id=$PACC;")" "SMSTEST Comms"
+
+# The whole point: their client is told who to pay, and how.
+BUYPAGE=$(curl -s -b "$PCJ" "$BASE/portal/sms/buy")
+has "their client sees the trading name" "$BUYPAGE" "SMSTEST Comms"
+has "and how to pay them"                "$BUYPAGE" "Till 999888"
+has "and where to reach them"            "$BUYPAGE" "hello@smstest.test"
+
+PT=$(ptok2 /partners/sms/branding)
+ppost2 /partners/sms/branding --data "_token=$PT&brand_support_email=not-an-email" > /dev/null
+eq "an e-mail address that is not one is refused" \
+   "$(q "SELECT brand_support_email FROM bulk_accounts WHERE id=$PACC;")" "hello@smstest.test"
+
+echo ""
+echo "=== 24d. A reseller has the same sending tools ==="
+for p in /send-file /scheduled /groups /templates /settings /contacts/import; do
+  eq "partners have $p" "$(pcode2 /partners/sms$p)" "200"
+done
+
+PT=$(ptok2 /partners/sms/groups)
+ppost2 /partners/sms/groups --data "_token=$PT&name=SMSTEST+partner+list" > /dev/null
+PGRP=$(q "SELECT id FROM bulk_contact_groups WHERE account_id=$PACC AND name='SMSTEST partner list';")
+ne "and can make their own lists" "$PGRP" ""
+
+PIMP="$D/smstest-partner.csv"
+printf 'phone,name\n0733000701,Partner Contact\n' > "$PIMP"
+PT=$(ptok2 /partners/sms/contacts/import)
+curl -s -o /dev/null -b "$PJ2" -c "$PJ2" -X POST "$BASE/partners/sms/contacts/import" \
+     -F "_token=$PT" -F "group_id=$PGRP" -F "list=@$PIMP"
+eq "and import into them" "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$PACC AND group_id=$PGRP;")" "1"
+
+# Their client's list is not theirs to import into.
+CLIENTGRP=$(q "SELECT id FROM bulk_contact_groups WHERE account_id=$PCACC LIMIT 1;")
+if [ -n "$CLIENTGRP" ]; then
+  PT=$(ptok2 /partners/sms/contacts/import)
+  curl -s -o /dev/null -b "$PJ2" -c "$PJ2" -X POST "$BASE/partners/sms/contacts/import" \
+       -F "_token=$PT" -F "group_id=$CLIENTGRP" -F "list=@$PIMP"
+  eq "but not into their client's list" \
+     "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE group_id=$CLIENTGRP AND phone='+254733000701';")" "0"
+fi
 
 echo ""
 echo "=== 25. The chain still adds up ==="
