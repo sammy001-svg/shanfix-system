@@ -1439,6 +1439,10 @@
     initStackTables();
     initLightbox();
     initPortalPay();
+    initSmsCounter();
+    initSmsTemplate();
+    initSmsProgress();
+    initSmsTopup();
   });
 
   /* ------------------------------------------------------------------
@@ -1826,6 +1830,155 @@
           say(data.message || 'That payment did not go through. You can try again.', 'bad');
         })
         .catch(() => { setTimeout(tick, 8000); });
+    }
+
+    tick();
+  }
+
+  /* ------------------------------------------------------------------
+     Bulk SMS
+     ------------------------------------------------------------------
+     Three small things the SMS pages need:
+
+     1. What a message will cost, live. The number of parts is the one
+        surprise people hate about SMS — a single emoji drops a message
+        from 160 characters a part to 70 — so it is worked out here with
+        the same rules the server charges by, and shown as they type.
+     2. Filling the box from a saved message.
+     3. Watching something that takes a while: a campaign sending, or an
+        M-Pesa prompt sitting on somebody's phone.
+     ------------------------------------------------------------------ */
+
+  // The GSM-7 alphabet. Anything outside it forces the whole message into
+  // UCS-2, where a part is 70 characters instead of 160. Mirrors
+  // Engine::isUnicode() on the server; if they ever disagree, the server
+  // is right and this is only a warning.
+  const GSM7 = '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?'
+             + '¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
+             + '|^€{}[]~\\';
+
+  function smsSize(text) {
+    let unicode = false;
+
+    for (const ch of text) {
+      if (GSM7.indexOf(ch) === -1) { unicode = true; break; }
+    }
+
+    const per = unicode ? 70 : 160;
+    const len = [...text].length;
+
+    return { length: len, unicode, parts: Math.max(1, Math.ceil(len / per)), per };
+  }
+
+  function initSmsCounter() {
+    $$('[data-sms-counter]').forEach((box) => {
+      const out = $(box.dataset.smsCounter);
+      if (!out) return;
+
+      const people = () => {
+        const field = $('#recipients');
+        if (!field) return 0;
+        return field.value.split(/[\s,;]+/).filter((n) => n.trim() !== '').length;
+      };
+
+      const draw = () => {
+        const s = smsSize(box.value);
+        let text = s.length + ' character' + (s.length === 1 ? '' : 's') + ' · '
+                 + s.parts + ' part' + (s.parts === 1 ? '' : 's') + ' each';
+
+        if (s.unicode) text += ' (special characters — 70 per part)';
+
+        const n = people();
+        if (n > 0) text += ' · about ' + (n * s.parts) + ' units for ' + n + ' recipient' + (n === 1 ? '' : 's');
+
+        out.textContent = text;
+      };
+
+      box.addEventListener('input', draw);
+      const to = $('#recipients');
+      if (to) to.addEventListener('input', draw);
+      draw();
+    });
+  }
+
+  function initSmsTemplate() {
+    $$('[data-sms-template]').forEach((select) => {
+      select.addEventListener('change', () => {
+        const box = $('#message');
+        if (!box || select.value === '') return;
+        box.value = select.value;
+        box.dispatchEvent(new Event('input'));
+        box.focus();
+      });
+    });
+  }
+
+  /* A campaign that is still sending: move its progress bar without the
+     reader pressing refresh. Stops as soon as it finishes. */
+  function initSmsProgress() {
+    const wrap = $('[data-sms-progress]');
+    if (!wrap) return;
+
+    const url  = wrap.dataset.smsProgress;
+    const bar  = $('[data-sms-bar]', wrap);
+    const note = $('[data-sms-note]', wrap);
+    let misses = 0;
+
+    function tick() {
+      fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d) { if (++misses < 5) setTimeout(tick, 6000); return; }
+
+          const done = (d.sent || 0) + (d.failed || 0);
+          const pct  = d.total > 0 ? Math.min(100, Math.round((done / d.total) * 100)) : 0;
+
+          if (bar) bar.style.width = pct + '%';
+          if (note) {
+            note.textContent = done.toLocaleString() + ' of ' + (d.total || 0).toLocaleString()
+                             + ' · ' + (d.failed || 0).toLocaleString() + ' failed';
+          }
+
+          if (d.running) { setTimeout(tick, 4000); return; }
+
+          window.location.reload();
+        })
+        .catch(() => { if (++misses < 5) setTimeout(tick, 8000); });
+    }
+
+    setTimeout(tick, 3000);
+  }
+
+  /* Waiting for an M-Pesa PIN on a units top-up. */
+  function initSmsTopup() {
+    const wrap = $('[data-sms-topup]');
+    if (!wrap) return;
+
+    const url  = wrap.dataset.smsTopup;
+    const note = $('[data-sms-topup-note]', wrap);
+    let tries  = 0;
+
+    function say(message, tone) {
+      if (!note) return;
+      note.textContent = message;
+      note.className = 'field-hint' + (tone ? ' text-' + tone : '');
+    }
+
+    function tick() {
+      if (++tries > 40) { say('Still waiting. If you have paid, your units will appear shortly.', 'muted'); return; }
+
+      fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d) { setTimeout(tick, 5000); return; }
+
+          if (d.status === 'pending') { say(d.message || 'Check your phone…'); setTimeout(tick, 4000); return; }
+
+          say(d.message, d.status === 'success' ? 'good' : 'bad');
+
+          if (d.status === 'success') setTimeout(() => window.location.reload(), 1500);
+        })
+        .catch(() => setTimeout(tick, 8000));
     }
 
     tick();

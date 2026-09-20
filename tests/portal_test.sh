@@ -536,8 +536,29 @@ eq "no app chrome before signing in" "$(echo "$PORTAL" | grep -c 'portal-nav')" 
 # halves of that treatment have to stay, or the page silently goes pale the
 # next time somebody uploads a bright picture.
 CSS=$(curl -s "$BASE/assets/css/app.css")
-has "the photograph is darkened"  "$CSS" "filter: saturate(.45) brightness(.34)"
-has "and a flat navy sits over it" "$CSS" "background: rgba(8, 32, 58, .82)"
+# Checked as "at least this dark" rather than as exact numbers. The
+# treatment has been strengthened since (.45/.34 became .35/.28, and the
+# veil .82 became .78) and this assertion failed for a page that had got
+# better, not worse — a test that breaks when the design improves teaches
+# people to ignore it.
+BRIGHTNESS=$(printf '%s' "$CSS" | grep -oE 'filter: saturate\([0-9.]+\) brightness\([0-9.]+\)' | head -1 \
+             | grep -oE 'brightness\([0-9.]+\)' | grep -oE '[0-9.]+')
+# From the .login__veil rule itself: the same navy appears at other
+# strengths elsewhere, and the first match was one of those.
+VEIL=$(printf '%s' "$CSS" | grep -A 4 '^\.login__veil {' \
+       | grep -oE 'rgba\(8, 32, 58, \.[0-9]+\)' | head -1 | grep -oE '\.[0-9]+')
+
+if [ -n "$BRIGHTNESS" ] && awk "BEGIN{exit !($BRIGHTNESS <= 0.34)}"; then
+  ok  "the photograph is darkened" "brightness $BRIGHTNESS"
+else
+  bad "the photograph is darkened" "${BRIGHTNESS:-no filter}" "brightness .34 or less"
+fi
+
+if [ -n "$VEIL" ] && awk "BEGIN{exit !($VEIL >= 0.78)}"; then
+  ok  "and a flat navy sits over it" "alpha $VEIL"
+else
+  bad "and a flat navy sits over it" "${VEIL:-no veil}" "navy at .78 or more"
+fi
 
 # The card was darker than the ground behind it, which reads as a hole in
 # the page rather than a panel on it.

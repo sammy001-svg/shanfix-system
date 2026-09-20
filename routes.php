@@ -14,6 +14,7 @@
 use App\Controllers\ArtworkController;
 use App\Controllers\BackupController;
 use App\Controllers\BulkSmsAdminController;
+use App\Controllers\BulkSmsApiController;
 use App\Controllers\BulkSmsTrafficController;
 use App\Controllers\BulkSmsWebhookController;
 use App\Controllers\AuthController;
@@ -47,6 +48,7 @@ use App\Controllers\PublicJobRequestController;
 use App\Controllers\PortalAuthController;
 use App\Controllers\PortalController;
 use App\Controllers\PortalRequestController;
+use App\Controllers\PortalSmsController;
 use App\Controllers\PublicProofController;
 use App\Controllers\PublicStatementController;
 use App\Controllers\PurchaseOrderController;
@@ -92,6 +94,24 @@ $r->post('/webhooks/kopokopo', [PaymentController::class, 'kopokopoCallback']);
 // is Meta, and what proves it is the signature on the body.
 $r->get('/webhooks/whatsapp',  [WhatsAppWebhookController::class, 'verify']);
 $r->post('/webhooks/whatsapp', [WhatsAppWebhookController::class, 'receive']);
+
+// The Bulk SMS developer API — customers' own software sending through
+// us. The addresses and the JSON are the old platform's, because live
+// customers have them in their code. No session and no CSRF: the caller
+// is a program holding a key, checked against a stored hash.
+foreach ([
+    ['sendsms',  'send'],
+    ['bulksend', 'bulk'],
+    ['balance',  'balance'],
+    ['status',   'status'],
+    ['messages', 'messages'],
+] as [$endpoint, $action]) {
+    foreach (['/api/v1/' . $endpoint, '/api/v1/' . $endpoint . '.php'] as $path) {
+        $r->get($path,     [BulkSmsApiController::class, $action]);
+        $r->post($path,    [BulkSmsApiController::class, $action]);
+        $r->options($path, [BulkSmsApiController::class, 'preflight']);
+    }
+}
 
 // Bulk SMS delivery reports from Onfon. Public: the caller is Onfon's
 // server, optionally proving itself with ?token=. The .php address is the
@@ -334,6 +354,38 @@ $r->group(['client_auth'], function ($r) {
     $r->get('/portal/uploads',  [PortalController::class, 'uploads']);
     $r->post('/portal/uploads', [PortalController::class, 'upload'], ['csrf']);
 
+    // -- Bulk SMS, the customer's own side of the platform
+    //
+    // No account id appears in any of these addresses: the account is
+    // resolved from the session, so a customer can only ever see and
+    // spend their own.
+    $r->get('/portal/sms',                    [PortalSmsController::class, 'home']);
+    $r->get('/portal/sms/campaigns',          [PortalSmsController::class, 'campaigns']);
+    $r->get('/portal/sms/campaigns/new',      [PortalSmsController::class, 'newCampaign']);
+    $r->get('/portal/sms/campaigns/{id}',     [PortalSmsController::class, 'campaign']);
+    $r->get('/portal/sms/contacts',           [PortalSmsController::class, 'contacts']);
+    $r->get('/portal/sms/senders',            [PortalSmsController::class, 'senders']);
+    $r->get('/portal/sms/buy',                [PortalSmsController::class, 'buy']);
+    $r->get('/portal/sms/buy/{id}/status',    [PortalSmsController::class, 'purchaseStatus']);
+    $r->get('/portal/sms/reports',            [PortalSmsController::class, 'reports']);
+    $r->get('/portal/sms/api',                [PortalSmsController::class, 'api']);
+
+    $r->group(['csrf'], function ($r) {
+        $r->post('/portal/sms/send',                 [PortalSmsController::class, 'send']);
+        $r->post('/portal/sms/campaigns',            [PortalSmsController::class, 'createCampaign']);
+        $r->post('/portal/sms/campaigns/{id}/cancel',[PortalSmsController::class, 'cancelCampaign']);
+        $r->post('/portal/sms/contacts',             [PortalSmsController::class, 'saveContact']);
+        $r->post('/portal/sms/contacts/import',      [PortalSmsController::class, 'importContacts']);
+        $r->post('/portal/sms/contacts/{id}/delete', [PortalSmsController::class, 'deleteContact']);
+        $r->post('/portal/sms/groups',               [PortalSmsController::class, 'saveGroup']);
+        $r->post('/portal/sms/groups/{id}/delete',   [PortalSmsController::class, 'deleteGroup']);
+        $r->post('/portal/sms/templates',            [PortalSmsController::class, 'saveTemplate']);
+        $r->post('/portal/sms/templates/{id}/delete',[PortalSmsController::class, 'deleteTemplate']);
+        $r->post('/portal/sms/senders',              [PortalSmsController::class, 'requestSender']);
+        $r->post('/portal/sms/buy',                  [PortalSmsController::class, 'startPurchase']);
+        $r->post('/portal/sms/api/key',              [PortalSmsController::class, 'issueKey']);
+        $r->post('/portal/sms/api/key/revoke',       [PortalSmsController::class, 'revokeKey']);
+    });
     $r->post('/portal/invoices/{id}/pay', [PortalController::class, 'pay'], ['csrf']);
     $r->get('/portal/invoices/{id}/pay/status', [PortalController::class, 'payStatus']);
 });

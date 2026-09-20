@@ -239,8 +239,12 @@ final class Accounts
             return null;
         }
 
+        // Suspended accounts are found here, not filtered out: the caller
+        // is told their account is suspended rather than that their key is
+        // wrong, which is what the old platform said and what stops
+        // somebody spending an afternoon regenerating a perfectly good key.
         $account = Database::first(
-            "SELECT * FROM bulk_accounts WHERE api_client_id = :c AND api_key_hash IS NOT NULL AND status = 'active'",
+            'SELECT * FROM bulk_accounts WHERE api_client_id = :c AND api_key_hash IS NOT NULL',
             ['c' => $clientId]
         );
 

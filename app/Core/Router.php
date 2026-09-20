@@ -34,6 +34,20 @@ class Router
     }
 
     /**
+     * An OPTIONS route.
+     *
+     * A browser sends one of these before any cross-origin POST that
+     * carries headers — which every call to the SMS API does, since the
+     * key travels in one. Without an answer the real request is never
+     * made, and the page reports a network error rather than anything
+     * useful.
+     */
+    public function options(string $path, array|callable $handler, array $middleware = []): void
+    {
+        $this->add('OPTIONS', $path, $handler, $middleware);
+    }
+
+    /**
      * Apply shared middleware to a batch of routes.
      */
     public function group(array $middleware, callable $fn): void
@@ -64,9 +78,16 @@ class Router
      */
     private function compile(string $path): string
     {
+        // Everything that is not a {placeholder} is matched literally.
+        // Without quoting, a dot in a path — /api/v1/balance.php, which
+        // the SMS API answers because customers' code already calls it —
+        // would be a regex "any character" and the route would also claim
+        // /api/v1/balanceXphp.
         $regex = preg_replace_callback(
-            '#\{([a-zA-Z_][a-zA-Z0-9_]*)(\*?)\}#',
-            static fn(array $m): string => sprintf('(?P<%s>%s)', $m[1], $m[2] === '*' ? '.+' : '[^/]+'),
+            '#\{([a-zA-Z_][a-zA-Z0-9_]*)(\*?)\}|([^{]+)#',
+            static fn(array $m): string => isset($m[3]) && $m[3] !== ''
+                ? preg_quote($m[3], '#')
+                : sprintf('(?P<%s>%s)', $m[1], $m[2] === '*' ? '.+' : '[^/]+'),
             $path
         );
 

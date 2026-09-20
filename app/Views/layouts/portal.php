@@ -87,6 +87,12 @@ $brand      = \App\Core\Settings::company();
          href="<?= url('/portal/requests') ?>">My requests</a>
       <a class="portal-nav__link <?= $on('/portal/uploads') ? 'is-active' : '' ?>"
          href="<?= url('/portal/uploads') ?>">Send artwork</a>
+      <?php // Only when we actually sell SMS. A link to a product that
+            // is switched off is a promise we cannot keep. ?>
+      <?php if (\App\Core\Settings::bool('bulk_sms_enabled', true)): ?>
+        <a class="portal-nav__link <?= str_contains($here, '/portal/sms') ? 'is-active' : '' ?>"
+           href="<?= url('/portal/sms') ?>">Bulk SMS</a>
+      <?php endif; ?>
     </nav>
 
     <div class="portal-top__right">

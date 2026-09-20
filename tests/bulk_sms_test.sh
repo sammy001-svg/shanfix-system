@@ -356,5 +356,193 @@ eq "nothing has been created out of thin air" \
                    THEN 'ok' ELSE 'short' END;")" "ok"
 eq "and the worker is not reachable over the web" "$(code /sms-worker.php)" "404"
 
+echo ""
+echo "=== 15. The customer's own side ==="
+# A real portal login for the client whose account we have been working on.
+CPASS="SmsClient1"
+CHASH=$($PHP -r 'echo password_hash($argv[1], PASSWORD_DEFAULT);' "$CPASS")
+$MYSQL -e "DELETE FROM client_users WHERE email='smstest@example.test';
+           INSERT INTO client_users (client_id, name, email, password_hash, status)
+           VALUES ($CID,'SMSTEST User','smstest@example.test','$CHASH','active');"
+CJ="$D/jar_smsclient.txt"; rm -f "$CJ"
+cget()  { curl -s -b "$CJ" -c "$CJ" "$BASE$1"; }
+ccode() { curl -s -o /dev/null -w '%{http_code}' -b "$CJ" "$BASE$1"; }
+ctok()  { cget "$1" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//'; }
+cpost() { local p="$1"; shift; curl -s -o /dev/null -w '%{http_code}' -b "$CJ" -c "$CJ" -X POST "$BASE$p" "$@"; }
+
+CT=$(curl -s -c "$CJ" "$BASE/portal/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -s -o /dev/null -b "$CJ" -c "$CJ" -X POST "$BASE/portal/login" \
+     --data "_token=$CT&email=smstest@example.test&password=$CPASS"
+
+eq "the customer is signed in"   "$(ccode /portal)" "200"
+eq "the SMS page opens"          "$(ccode /portal/sms)" "200"
+eq "campaigns"                   "$(ccode /portal/sms/campaigns)" "200"
+eq "contacts"                    "$(ccode /portal/sms/contacts)" "200"
+eq "delivery reports"            "$(ccode /portal/sms/reports)" "200"
+eq "sender IDs"                  "$(ccode /portal/sms/senders)" "200"
+eq "buying units"                "$(ccode /portal/sms/buy)" "200"
+eq "the API page"                "$(ccode /portal/sms/api)" "200"
+has "their balance is on the page" "$(cget /portal/sms)" "units"
+
+echo ""
+echo "=== 16. A customer sends, and pays for what went ==="
+BAL_BEFORE=$(q "SELECT ROUND(sms_units,4) FROM bulk_accounts WHERE id=$ACC;")
+CT=$(ctok /portal/sms)
+cpost /portal/sms/send --data "_token=$CT&recipients=0700000301,0700000399&sender_id=SMSTEST&message=Hello+from+the+test" > /dev/null
+eq "the good number went"    "$(q "SELECT COUNT(*) FROM bulk_messages WHERE account_id=$ACC AND recipient='+254700000301' AND status='sent';")" "1"
+eq "the refused one is recorded as failed" \
+   "$(q "SELECT status FROM bulk_messages WHERE account_id=$ACC AND recipient='+254700000399' ORDER BY id DESC LIMIT 1;")" "failed"
+eq "and cost nothing" \
+   "$(q "SELECT units_charged FROM bulk_messages WHERE account_id=$ACC AND recipient='+254700000399' ORDER BY id DESC LIMIT 1;")" "0.0000"
+eq "exactly one unit left the account" \
+   "$(q "SELECT ROUND($BAL_BEFORE - sms_units,4) FROM bulk_accounts WHERE id=$ACC;")" "1.0000"
+
+# A sender ID belonging to somebody else must not work from here.
+OTHERCID=$(q "INSERT INTO clients (client_code, client_type, name, email, status)
+              VALUES ('SMSTEST-2','company','SMSTEST Other','other@example.test','active');
+              SELECT LAST_INSERT_ID();")
+OTHERACC=$(q "INSERT INTO bulk_accounts (owner_type, owner_id, parent_id, sms_units)
+              VALUES ('client', $OTHERCID, $HOUSE, 100); SELECT LAST_INSERT_ID();")
+$MYSQL -e "INSERT INTO bulk_sender_ids (account_id, sender_id, status) VALUES ($OTHERACC,'NOTYOURS','approved');"
+CT=$(ctok /portal/sms)
+cpost /portal/sms/send --data "_token=$CT&recipients=0700000302&sender_id=NOTYOURS&message=Nope" > /dev/null
+eq "another account's sender ID cannot be borrowed" \
+   "$(q "SELECT COUNT(*) FROM bulk_messages WHERE recipient='+254700000302';")" "0"
+
+# Fifty is the line between a quick send and a campaign.
+MANY=$(seq -f "07110000%02g" 1 60 | paste -sd, -)
+CT=$(ctok /portal/sms)
+cpost /portal/sms/send --data "_token=$CT&recipients=$MANY&sender_id=SMSTEST&message=Too+many" > /dev/null
+eq "a huge quick send is turned into a campaign instead" \
+   "$(q "SELECT COUNT(*) FROM bulk_messages WHERE account_id=$ACC AND recipient='+254711000001';")" "0"
+
+echo ""
+echo "=== 17. Their contacts, lists and campaigns ==="
+CT=$(ctok /portal/sms/contacts)
+cpost /portal/sms/groups --data "_token=$CT&name=SMSTEST+list" > /dev/null
+GRP=$(q "SELECT id FROM bulk_contact_groups WHERE account_id=$ACC AND name='SMSTEST list';")
+ne "a list is made" "$GRP" ""
+CT=$(ctok /portal/sms/contacts)
+cpost /portal/sms/contacts --data "_token=$CT&name=Amina&phone=0722000501&group_id=$GRP" > /dev/null
+eq "a contact is added and normalised" \
+   "$(q "SELECT phone FROM bulk_contacts WHERE account_id=$ACC AND name='Amina';")" "+254722000501"
+CT=$(ctok /portal/sms/contacts)
+cpost /portal/sms/contacts --data "_token=$CT&name=Bad&phone=12345&group_id=$GRP" > /dev/null
+eq "a number that is not a number is refused" \
+   "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND name='Bad';")" "0"
+
+# Importing a file, including the duplicate it already has.
+IMPORT="$D/smstest-contacts.csv"
+printf 'Name,Phone,Town\nBrian,0722000502,Nakuru\nAmina,0722000501,Nairobi\nJunk,notaphone,\n' > "$IMPORT"
+CT=$(ctok /portal/sms/contacts)
+curl -s -o /dev/null -b "$CJ" -c "$CJ" -X POST "$BASE/portal/sms/contacts/import" \
+     -F "_token=$CT" -F "group_id=$GRP" -F "list=@$IMPORT"
+eq "the new contact is imported"      "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND phone='+254722000502';")" "1"
+eq "the duplicate is not doubled"     "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND phone='+254722000501';")" "1"
+has "the other columns are kept for personalising" \
+   "$(q "SELECT metadata FROM bulk_contacts WHERE account_id=$ACC AND phone='+254722000502';")" "Nakuru"
+
+CT=$(ctok /portal/sms/campaigns/new)
+cpost /portal/sms/campaigns --data "_token=$CT&name=SMSTEST+blast&sender_id=SMSTEST&audience=group&group_id=$GRP&message=Hi+%7Bname%7D+in+%7Btown%7D" > /dev/null
+CAMP2=$(q "SELECT id FROM bulk_campaigns WHERE account_id=$ACC AND name='SMSTEST blast';")
+ne "a campaign is queued" "$CAMP2" ""
+$PHP "$ROOT/sms-worker.php" "$CAMP2" > /dev/null 2>&1
+eq "and sends to the list"  "$(q "SELECT sent_count FROM bulk_campaigns WHERE id=$CAMP2;")" "2"
+eq "with each person's own details filled in" \
+   "$(q "SELECT message FROM bulk_messages WHERE campaign_id=$CAMP2 AND recipient='+254722000502';")" "Hi Brian in Nakuru"
+
+echo ""
+echo "=== 18. Asking for a sender ID reaches the office ==="
+CT=$(ctok /portal/sms/senders)
+cpost /portal/sms/senders --data "_token=$CT&sender_id=SMSTEST3&purpose=Order+updates" > /dev/null
+eq "the request is recorded" "$(q "SELECT status FROM bulk_sender_ids WHERE account_id=$ACC AND sender_id='SMSTEST3';")" "pending"
+ne "and somebody is told"    "$(q "SELECT COUNT(*) FROM staff_notifications WHERE event='bulk_sender_requested';")" "0"
+CT=$(ctok /portal/sms/senders)
+cpost /portal/sms/senders --data "_token=$CT&sender_id=not+valid+at+all&purpose=x" > /dev/null
+eq "a sender ID the networks would refuse is refused here" \
+   "$(q "SELECT COUNT(*) FROM bulk_sender_ids WHERE account_id=$ACC AND sender_id LIKE 'not %';")" "0"
+
+echo ""
+echo "=== 19. One customer cannot reach another's ==="
+OTHERCAMP=$(q "INSERT INTO bulk_campaigns (account_id, name, sender_id, message, status)
+               VALUES ($OTHERACC,'SMSTEST other campaign','NOTYOURS','x','completed'); SELECT LAST_INSERT_ID();")
+eq "another account's campaign is not found" "$(ccode /portal/sms/campaigns/$OTHERCAMP)" "404"
+CT=$(ctok /portal/sms)
+eq "nor can it be cancelled"   "$(cpost /portal/sms/campaigns/$OTHERCAMP/cancel --data "_token=$CT")" "404"
+OTHERGRP=$(q "INSERT INTO bulk_contact_groups (account_id, name) VALUES ($OTHERACC,'SMSTEST theirs'); SELECT LAST_INSERT_ID();")
+CT=$(ctok /portal/sms/contacts)
+eq "nor their list deleted"    "$(cpost /portal/sms/groups/$OTHERGRP/delete --data "_token=$CT")" "403"
+eq "and it is still there"     "$(q "SELECT COUNT(*) FROM bulk_contact_groups WHERE id=$OTHERGRP;")" "1"
+case "$(cget /portal/sms/reports)" in
+  *NOTYOURS*) bad "nor see their messages" "visible" "hidden";;
+  *)          ok  "nor see their messages" "hidden";;
+esac
+
+echo ""
+echo "=== 20. The developer API ==="
+CT=$(ctok /portal/sms/api)
+cpost /portal/sms/api/key --data "_token=$CT" > /dev/null
+APIKEY=$(cget /portal/sms/api | grep -o 'sk_live_[a-f0-9]\{32\}' | head -1)
+APICID=$(q "SELECT api_client_id FROM bulk_accounts WHERE id=$ACC;")
+ne "a customer can issue their own key" "$APIKEY" ""
+eq "and only its fingerprint is kept"   "$(q "SELECT CHAR_LENGTH(api_key_hash) FROM bulk_accounts WHERE id=$ACC;")" "64"
+
+api() { curl -s -X POST "$BASE$1" -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY" "${@:2}"; }
+
+BALJSON=$(curl -s "$BASE/api/v1/balance.php" -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY")
+has "balance answers"            "$BALJSON" '"success":true'
+has "with the units on it"       "$BALJSON" '"sms_units"'
+SENDJSON=$(api /api/v1/sendsms.php --data "to=0700000401&sender_id=SMSTEST&message=API+test")
+has "a message can be sent"      "$SENDJSON" '"success":true'
+has "and it says what it cost"   "$SENDJSON" '"units_charged"'
+eq  "the message is really there" "$(q "SELECT COUNT(*) FROM bulk_messages WHERE account_id=$ACC AND recipient='+254700000401' AND source='api';")" "1"
+
+BULKJSON=$(api /api/v1/bulksend.php -H "Content-Type: application/json" \
+  --data '{"to":["0700000402","0700000403"],"sender_id":"SMSTEST","message":"Bulk API"}')
+has "many at once works"         "$BULKJSON" '"total_submitted":2'
+MSGID=$(q "SELECT id FROM bulk_messages WHERE account_id=$ACC AND recipient='+254700000401' ORDER BY id DESC LIMIT 1;")
+has "one message can be looked up" \
+   "$(curl -s "$BASE/api/v1/status.php?message_id=$MSGID" -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY")" '"success":true'
+has "the log can be read"        "$(curl -s "$BASE/api/v1/messages.php?per_page=5" -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY")" '"messages"'
+eq  "the address answers without .php too" \
+   "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/v1/balance" -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY")" "200"
+
+# Someone else's message, looked up with our key.
+OTHERMSG=$(q "INSERT INTO bulk_messages (account_id, sender_id, recipient, message, status)
+              VALUES ($OTHERACC,'NOTYOURS','+254700000999','secret','sent'); SELECT LAST_INSERT_ID();")
+eq "another account's message is not ours to read" \
+   "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/v1/status.php?message_id=$OTHERMSG" -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY")" "404"
+
+eq "a wrong key is refused" \
+   "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/v1/balance.php" -H "X-Client-Id: $APICID" -H "X-Api-Key: sk_live_wrong")" "401"
+eq "and no key at all"     "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/v1/balance.php")" "401"
+eq "a browser's preflight is answered" \
+   "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS "$BASE/api/v1/sendsms.php")" "204"
+
+# A suspended account cannot send through the API either.
+$MYSQL -e "UPDATE bulk_accounts SET status='suspended' WHERE id=$ACC;"
+eq "a suspended account is refused" \
+   "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/v1/balance.php" -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY")" "403"
+$MYSQL -e "UPDATE bulk_accounts SET status='active' WHERE id=$ACC;"
+
+# The rate limit, proved rather than assumed.
+$MYSQL -e "DELETE FROM bulk_rate_counters;"
+LIMITED=0
+for i in $(seq 1 11); do
+  RC=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/bulksend.php" \
+       -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY" \
+       --data "to=0700000404&sender_id=SMSTEST&message=rate")
+  if [ "$RC" = "429" ]; then LIMITED=1; break; fi
+done
+eq "too many bulk calls a minute are refused" "$LIMITED" "1"
+$MYSQL -e "DELETE FROM bulk_rate_counters;"
+
+$MYSQL -e "DELETE FROM bulk_messages WHERE account_id=$OTHERACC;
+           DELETE FROM bulk_campaigns WHERE account_id=$OTHERACC;
+           DELETE FROM bulk_contact_groups WHERE account_id=$OTHERACC;
+           DELETE FROM bulk_accounts WHERE id=$OTHERACC;
+           DELETE FROM clients WHERE id=$OTHERCID;
+           DELETE FROM client_users WHERE email='smstest@example.test';"
+
 scrub_sms
 report

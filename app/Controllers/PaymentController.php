@@ -546,6 +546,28 @@ class PaymentController extends Controller
         // Trust the amount M-Pesa actually moved over the amount we requested.
         $amount = $parsed['amount'] ?? (float) $stk['amount'];
 
+        // A prompt raised to buy SMS units settles by handing the units
+        // over, not by posting a payment against an invoice — there is no
+        // invoice, and for a partner there is not even a client. Same
+        // M-Pesa integration, same callback, different thing bought.
+        if (($stk['purpose'] ?? 'invoice') === 'bulk_sms') {
+            \App\Services\BulkSms\Topup::settle((int) $stk['bulk_purchase_id'], $parsed['receipt']);
+
+            Database::update('stk_requests', [
+                'status'           => 'success',
+                'mpesa_receipt'    => $parsed['receipt'],
+                'result_desc'      => 'SMS units paid for',
+                'callback_payload' => mb_substr($rawPayload, 0, 6000),
+                'callback_at'      => date('Y-m-d H:i:s'),
+            ], ['id' => $stk['id']]);
+
+            ActivityLog::record('stk_success', 'stk_request', (int) $stk['id'],
+                'M-Pesa payment of ' . money($amount) . ' for SMS units'
+                . ($parsed['receipt'] ? ' (ref ' . $parsed['receipt'] . ')' : ''));
+
+            return;
+        }
+
         $result = PaymentPoster::post(
             clientId:   (int) $stk['client_id'],
             amount:     $amount,
