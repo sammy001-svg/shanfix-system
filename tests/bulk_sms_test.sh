@@ -25,6 +25,25 @@ SAVED_KEY=$(q "SELECT setting_value FROM settings WHERE setting_key='onfon_api_k
 SAVED_ACC=$(q "SELECT setting_value FROM settings WHERE setting_key='onfon_access_key';")
 SAVED_DLR=$(q "SELECT setting_value FROM settings WHERE setting_key='bulk_sms_dlr_token';")
 
+# Several checks here are about a customer being told something, and a
+# notice is only queued when its channel is switched on. Those switches
+# are global and another suite leaves them off, which made four checks in
+# here fail in a full run and pass on their own — the most misleading
+# shape a test can take. So this suite sets what it needs and puts it
+# back, rather than inheriting whatever ran before it.
+SAVED_SMTP=$(q "SELECT setting_value FROM settings WHERE setting_key='smtp_enabled';")
+SAVED_SMSEN=$(q "SELECT setting_value FROM settings WHERE setting_key='sms_enabled';")
+SAVED_SMSHOST=$(q "SELECT setting_value FROM settings WHERE setting_key='sms_base_url';")
+
+$MYSQL -e "INSERT INTO settings (setting_key, setting_value) VALUES ('smtp_enabled','1'),('sms_enabled','1')
+           ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value);"
+
+# Nothing here runs the outbox, but this database holds a real SMS key
+# and the live gateway address. The sender is pointed at a dead local
+# port so that even if something did run it, no text could reach a phone.
+$MYSQL -e "INSERT INTO settings (setting_key, setting_value) VALUES ('sms_base_url','http://127.0.0.1:9')
+           ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value);"
+
 restore() {
   [ -n "$FAKE_PID" ] && kill "$FAKE_PID" 2>/dev/null
 
@@ -32,7 +51,8 @@ restore() {
   # developer's own database — never points at the fake gateway.
   for pair in "onfon_base_url=$SAVED_BASE" "onfon_client_id=$SAVED_CID" \
               "onfon_api_key=$SAVED_KEY" "onfon_access_key=$SAVED_ACC" \
-              "bulk_sms_dlr_token=$SAVED_DLR"; do
+              "bulk_sms_dlr_token=$SAVED_DLR" "smtp_enabled=$SAVED_SMTP" \
+              "sms_enabled=$SAVED_SMSEN" "sms_base_url=$SAVED_SMSHOST"; do
     k="${pair%%=*}"; v="${pair#*=}"
     if [ -z "$v" ]; then
       $MYSQL -e "DELETE FROM settings WHERE setting_key='$k';"
@@ -45,6 +65,21 @@ restore() {
   scrub_sms
 }
 trap restore EXIT
+
+# Queuing a campaign starts a worker at once, so a second worker started
+# by hand can find it already claimed and return while the first is still
+# sending. Waiting for a terminal state is not papering over that — it is
+# what any observer of an asynchronous job has to do.
+wait_campaign() {
+  local id="$1" n=0 st
+  while [ "$n" -lt 60 ]; do
+    st=$(q "SELECT status FROM bulk_campaigns WHERE id=$id;")
+    case "$st" in completed|failed|cancelled) echo "$st"; return;; esac
+    sleep 0.5
+    n=$((n+1))
+  done
+  echo "$st"
+}
 
 scrub_sms() {
   # Everything this suite makes is tagged SMSTEST.
@@ -466,6 +501,7 @@ cpost /portal/sms/campaigns --data "_token=$CT&name=SMSTEST+blast&sender_id=SMST
 CAMP2=$(q "SELECT id FROM bulk_campaigns WHERE account_id=$ACC AND name='SMSTEST blast';")
 ne "a campaign is queued" "$CAMP2" ""
 $PHP "$ROOT/sms-worker.php" "$CAMP2" > /dev/null 2>&1
+wait_campaign "$CAMP2" > /dev/null
 eq "and sends to the list"  "$(q "SELECT sent_count FROM bulk_campaigns WHERE id=$CAMP2;")" "2"
 eq "with each person's own details filled in" \
    "$(q "SELECT message FROM bulk_messages WHERE campaign_id=$CAMP2 AND recipient='+254722000502';")" "Hi Brian in Nakuru"

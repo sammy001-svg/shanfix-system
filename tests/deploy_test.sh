@@ -87,7 +87,9 @@ has "check.php is denied"       "$HT" '<Files "check.php">'
 has "the private folders are refused here as well" \
     "$HT" 'RedirectMatch 404 ^(.*)/(app|config|database|storage|tests|deploy)(/|$)'
 has "and the git folder"  "$HT" 'RedirectMatch 404 ^(.*)/\.(git|github|env)(/|$)'
-has "and the CLI scripts" "$HT" 'RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel)\.php$'
+# sms-worker.php joined this list when Bulk SMS came in: it sends
+# campaigns in the background and has no business answering a request.
+has "and the CLI scripts" "$HT" 'RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel|sms-worker)\.php$'
 
 echo ""
 echo "=== 3. The deployment file ==="
