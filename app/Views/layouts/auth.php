@@ -100,6 +100,10 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
 </head>
 <body class="auth-body">
 
+<?php // Keyboard users should not have to tab through a decorative
+      // photograph and a brand panel to reach the form. ?>
+<a class="skip-link" href="#main">Skip to the form</a>
+
 <div class="auth">
 
   <?php // ── The photograph, and what we say over it ───────────────────
