@@ -193,9 +193,29 @@ final class Alerts
             return;
         }
 
+        $account = Accounts::find($accountId);
+
+        // The account's own choice of how it wants to hear. The system
+        // switches still decide whether an event goes out at all; this
+        // only narrows it. A text about texts costs the customer a unit,
+        // so it is off unless they asked for it.
+        $channels = [];
+
+        if ($account === null || (int) $account['alert_email'] === 1) {
+            $channels[] = 'email';
+        }
+
+        if ($account !== null && (int) $account['alert_sms'] === 1) {
+            $channels[] = 'sms';
+        }
+
+        if ($channels === []) {
+            return;
+        }
+
         Notifier::dispatch($event, $context + $to + [
             'company' => (string) Settings::get('company_name', 'Shanfix Technology'),
-        ]);
+        ], false, $channels);
     }
 
     private static function safely(callable $fn): void

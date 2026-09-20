@@ -72,6 +72,76 @@ use App\Services\BulkSms\Present;
     </div>
   <?php endif; ?>
 
+  <?php if ($bySender || $byCampaign || $whyFailed): ?>
+    <div class="portal-cols">
+      <?php if ($bySender): ?>
+        <div class="portal-card">
+          <div class="portal-card__head"><div class="portal-card__title">Where the units went</div></div>
+          <div class="table-wrap">
+            <table class="table table--compact">
+              <thead><tr><th>Sent as</th><th class="num">Messages</th><th class="num">Units</th><th class="num">Delivered</th></tr></thead>
+              <tbody>
+                <?php foreach ($bySender as $r): ?>
+                  <tr>
+                    <td class="code text-sm"><?= e($r['sender_id']) ?></td>
+                    <td class="num"><?= number_format((int) $r['messages']) ?></td>
+                    <td class="num fw-600"><?= e(Present::units($r['units'])) ?></td>
+                    <td class="num text-muted">
+                      <?= (int) $r['messages'] > 0 ? round(100 * (int) $r['delivered'] / (int) $r['messages']) . '%' : '—' ?>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <div>
+        <?php if ($byCampaign): ?>
+          <div class="portal-card">
+            <div class="portal-card__head"><div class="portal-card__title">Busiest campaigns</div></div>
+            <div class="table-wrap">
+              <table class="table table--compact">
+                <thead><tr><th>Campaign</th><th class="num">Units</th><th class="num">Delivered</th></tr></thead>
+                <tbody>
+                  <?php foreach ($byCampaign as $r): ?>
+                    <tr>
+                      <td class="text-sm"><a href="<?= url($base . '/campaigns/' . (int) $r['id']) ?>"><?= e($r['name']) ?></a></td>
+                      <td class="num"><?= e(Present::units($r['units'])) ?></td>
+                      <td class="num text-muted">
+                        <?= (int) $r['messages'] > 0 ? round(100 * (int) $r['delivered'] / (int) $r['messages']) . '%' : '—' ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($whyFailed): ?>
+          <div class="portal-card">
+            <div class="portal-card__head">
+              <div>
+                <div class="portal-card__title">Why messages did not arrive</div>
+                <div class="text-sm text-muted">Most of these are the handset, not the message</div>
+              </div>
+            </div>
+            <ul class="portal-list portal-list--tight">
+              <?php foreach ($whyFailed as $r): ?>
+                <li class="portal-list__row">
+                  <span class="portal-list__main"><span class="portal-list__meta"><?= e($r['reason']) ?></span></span>
+                  <span class="portal-list__side fw-600"><?= number_format((int) $r['n']) ?></span>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+
   <div class="portal-card">
     <div class="portal-card__head"><div class="portal-card__title">Messages</div></div>
 

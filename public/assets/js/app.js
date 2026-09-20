@@ -1443,6 +1443,7 @@
     initSmsTemplate();
     initSmsProgress();
     initSmsTopup();
+    initSmsFilePreview();
   });
 
   /* ------------------------------------------------------------------
@@ -1982,6 +1983,196 @@
     }
 
     tick();
+  }
+
+  /* ------------------------------------------------------------------
+     Looking inside a chosen file before it is uploaded
+     ------------------------------------------------------------------
+     Shows what the file holds — the columns found, the first few rows,
+     how many numbers there are — and offers each column as a
+     {placeholder} to drop into the message.
+
+     This is a courtesy, not a check. The file is read again on the
+     server when the campaign actually sends, and nothing here is sent
+     with the form. An .xlsx is a zip, which cannot be read this way, so
+     it says so rather than guessing.
+     ------------------------------------------------------------------ */
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function csvRows(text) {
+    // A small CSV reader: quoted fields, doubled quotes inside them, and
+    // commas or semicolons as the separator — which is what a European
+    // Excel produces and what trips up a naive split().
+    const head = text.slice(0, 2000);
+    const sep = (head.split(';').length > head.split(',').length) ? ';' : ',';
+
+    const rows = [];
+    let row = [], field = '', quoted = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+
+      if (quoted) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; } else { quoted = false; }
+        } else { field += ch; }
+        continue;
+      }
+
+      if (ch === '"') { quoted = true; continue; }
+      if (ch === sep) { row.push(field); field = ''; continue; }
+
+      if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); field = '';
+        if (row.some((c) => c.trim() !== '')) rows.push(row);
+        row = [];
+        continue;
+      }
+
+      field += ch;
+    }
+
+    row.push(field);
+    if (row.some((c) => c.trim() !== '')) rows.push(row);
+
+    return rows;
+  }
+
+  function looksLikePhone(value) {
+    const digits = String(value === undefined ? '' : value).replace(/\D+/g, '');
+    if (!digits) return false;
+    if (digits.length === 9 && (digits[0] === '7' || digits[0] === '1')) return true;
+    if (digits.length === 10 && digits[0] === '0') return true;
+    if (digits.length === 12 && digits.slice(0, 3) === '254') return true;
+    return false;
+  }
+
+  function initSmsFilePreview() {
+    $$('[data-sms-preview]').forEach((input) => {
+      const box = $(input.dataset.smsPreview);
+      if (!box) return;
+
+      const holder = input.dataset.smsPlaceholders ? $(input.dataset.smsPlaceholders) : null;
+
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+
+        box.hidden = false;
+        if (holder) holder.hidden = true;
+
+        if (!file) { box.innerHTML = ''; return; }
+
+        if (file.name.toLowerCase().endsWith('.xlsx')) {
+          box.innerHTML = '<div class="alert alert--info" style="margin:0"><div class="alert__body">'
+            + 'Excel file chosen. We read it when the send starts — it cannot be previewed here. '
+            + 'To see it first, save it as CSV.</div></div>';
+          return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = () => {
+          const rows = csvRows(String(reader.result || ''));
+
+          if (!rows.length) {
+            box.innerHTML = '<p class="text-sm text-muted">That file looks empty.</p>';
+            return;
+          }
+
+          const headers = rows[0].map((h) => h.trim());
+          const lower = headers.map((h) => h.toLowerCase());
+
+          let phoneAt = lower.findIndex((h) =>
+            h.includes('phone') || h.includes('mobile') || ['number', 'contact', 'msisdn'].indexOf(h) !== -1);
+
+          // No headings at all: a bare list of numbers is common.
+          const bare = phoneAt === -1 && looksLikePhone(rows[0][0]);
+          const body = bare ? rows : rows.slice(1);
+          if (bare) phoneAt = 0;
+
+          const valid = body.filter((r) => looksLikePhone(r[phoneAt === -1 ? 0 : phoneAt])).length;
+
+          let html = '';
+
+          if (phoneAt === -1) {
+            html += '<div class="alert alert--warning" style="margin:0 0 10px"><div class="alert__body">'
+              + 'No column of phone numbers found. One heading should be '
+              + '<span class="code">phone</span>, <span class="code">mobile</span> or '
+              + '<span class="code">number</span>.</div></div>';
+          } else {
+            html += '<p class="text-sm">Found <strong>' + valid.toLocaleString() + '</strong> phone number'
+              + (valid === 1 ? '' : 's') + ' in <strong>' + body.length.toLocaleString() + '</strong> row'
+              + (body.length === 1 ? '' : 's')
+              + (bare ? ', with no headings — the first column is taken as the number.' : '.') + '</p>';
+
+            if (valid < body.length) {
+              html += '<p class="text-sm text-muted">' + (body.length - valid).toLocaleString()
+                + ' row(s) hold nothing we recognise as a Kenyan mobile number. '
+                + 'They are counted and reported, never sent to.</p>';
+            }
+          }
+
+          const show = body.slice(0, 3);
+
+          if (show.length) {
+            const cols = bare ? ['phone'] : headers;
+            html += '<div class="table-wrap"><table class="table table--compact"><thead><tr>';
+            cols.forEach((h) => { html += '<th>' + escapeHtml(h) + '</th>'; });
+            html += '</tr></thead><tbody>';
+            show.forEach((r) => {
+              html += '<tr>';
+              cols.forEach((_, i) => {
+                html += '<td class="text-sm">' + escapeHtml(r[i] === undefined ? '' : r[i]) + '</td>';
+              });
+              html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+          }
+
+          box.innerHTML = html;
+
+          // Each column becomes a button that drops {column} into the
+          // message at the cursor.
+          if (holder && !bare) {
+            const usable = headers.filter((h, i) => h !== '' && i !== phoneAt);
+
+            if (usable.length) {
+              holder.hidden = false;
+              holder.innerHTML = '<span class="text-sm text-muted">Put their own details in: </span>'
+                + usable.map((h) => '<button type="button" class="btn btn--ghost btn--sm" data-ph="{'
+                  + escapeHtml(h.toLowerCase()) + '}">{' + escapeHtml(h.toLowerCase()) + '}</button>').join(' ');
+            }
+          }
+        };
+
+        // Enough to show a few rows and count what is there, without
+        // pulling a 40MB file into the page.
+        reader.readAsText(file.slice(0, 2 * 1024 * 1024));
+      });
+    });
+
+    // Dropping a placeholder into the message, where the cursor is.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-ph]');
+      if (!btn) return;
+
+      const box = $('#message');
+      if (!box) return;
+
+      const at = box.selectionStart || box.value.length;
+      const end = box.selectionEnd || at;
+
+      box.value = box.value.slice(0, at) + btn.dataset.ph + box.value.slice(end);
+      box.dispatchEvent(new Event('input'));
+      box.focus();
+      box.selectionStart = box.selectionEnd = at + btn.dataset.ph.length;
+    });
   }
 
   window.Shanfix = { toast, openModal };

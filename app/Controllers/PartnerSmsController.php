@@ -147,6 +147,100 @@ class PartnerSmsController extends SmsPortalBase
         Response::to($this->base() . '/clients');
     }
 
+    /**
+     * One client of theirs: what they hold, what they have bought, and
+     * every unit that has passed between the two of them.
+     *
+     * What that client has actually sent is not here, and not anywhere a
+     * partner can reach. A reseller supplies credit.
+     */
+    public function clientDetail(Request $request): void
+    {
+        $account = $this->account();
+        $child   = $this->childAccount($request->paramInt('id'), (int) $account['id']);
+        $who     = Accounts::describe($child);
+
+        $this->render('reseller_client', [
+            'title'     => $who['name'],
+            'account'   => $account,
+            'client'    => $child,
+            'who'       => $who,
+            'price'     => Accounts::unitPrice($child),
+            'contact'   => Database::first(
+                'SELECT name, contact_person, email, phone FROM clients WHERE id = :id',
+                ['id' => $child['owner_id']]),
+            // Units between the two of them, both directions.
+            'ledger'    => Database::all(
+                "SELECT l.* FROM bulk_ledger l
+                  WHERE l.account_id = :c AND l.kind IN ('purchase','transfer_in','transfer_out','adjustment')
+                  ORDER BY l.id DESC LIMIT 30",
+                ['c' => $child['id']]),
+            'purchases' => Database::all(
+                'SELECT * FROM bulk_purchases WHERE account_id = :c ORDER BY id DESC LIMIT 20',
+                ['c' => $child['id']]),
+            // How much of their own sending this client does, without a
+            // word of what it says.
+            'usage'     => Reports::totals([(int) $child['id']], date('Y-m-d', strtotime('-29 days')), date('Y-m-d')),
+            'sold'      => (float) Database::scalar(
+                "SELECT COALESCE(SUM(amount), 0) FROM bulk_purchases
+                  WHERE account_id = :c AND seller_account_id = :p AND status = 'completed'",
+                ['c' => $child['id'], 'p' => $account['id']]),
+            'senders'   => Database::all(
+                'SELECT sender_id, status FROM bulk_sender_ids WHERE account_id = :c ORDER BY sender_id',
+                ['c' => $child['id']]),
+        ]);
+    }
+
+    // =================================================================
+    // How they appear to their own clients
+    // =================================================================
+
+    /**
+     * A reseller's own name and contact details.
+     *
+     * Their clients buy units from them and pay them directly, so the
+     * Buy page has to say who to pay and how. "Contact us" is no use
+     * when "us" is the wrong company.
+     *
+     * This is not white-labelling the system: one domain, one login
+     * page, and a customer always knows whose system they are in. What
+     * it does is stop us standing between a reseller and their own
+     * customer at the one moment money changes hands.
+     */
+    public function branding(Request $request): void
+    {
+        $account = $this->account();
+
+        $this->render('reseller_branding', [
+            'title'   => 'How my clients see me',
+            'account' => $account,
+            'clients' => (int) Database::scalar(
+                'SELECT COUNT(*) FROM bulk_accounts WHERE parent_id = :p', ['p' => $account['id']]),
+        ]);
+    }
+
+    public function saveBranding(Request $request): void
+    {
+        $account = $this->account();
+
+        $email = trim((string) $request->input('brand_support_email', ''));
+
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            Session::error('That e-mail address does not look right.');
+            Response::to($this->base() . '/branding');
+        }
+
+        Database::update('bulk_accounts', [
+            'brand_name'             => mb_substr(trim((string) $request->input('brand_name', '')), 0, 120) ?: null,
+            'brand_support_email'    => $email ?: null,
+            'brand_support_phone'    => mb_substr(trim((string) $request->input('brand_support_phone', '')), 0, 30) ?: null,
+            'brand_pay_instructions' => mb_substr(trim((string) $request->input('brand_pay_instructions', '')), 0, 2000) ?: null,
+        ], ['id' => $account['id']]);
+
+        Session::success('Saved. Your clients see this when they buy units from you.');
+        Response::to($this->base() . '/branding');
+    }
+
     /** Move units from the partner's balance to one of their clients. */
     public function giveUnits(Request $request): void
     {

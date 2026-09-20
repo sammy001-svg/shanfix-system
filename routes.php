@@ -342,6 +342,16 @@ $r->group(['partner_auth'], function ($r) {
     $r->get('/partners/sms/clients',         [PartnerSmsController::class, 'clients']);
     $r->get('/partners/sms/sales',           [PartnerSmsController::class, 'sales']);
     $r->get('/partners/sms/pricing',         [PartnerSmsController::class, 'pricing']);
+    $r->get('/partners/sms/contacts/import',     [PartnerSmsController::class, 'importPage']);
+    $r->get('/partners/sms/contacts/export',     [PartnerSmsController::class, 'exportContacts']);
+    $r->get('/partners/sms/contacts/template',   [PartnerSmsController::class, 'contactTemplate']);
+    $r->get('/partners/sms/groups',              [PartnerSmsController::class, 'groupsPage']);
+    $r->get('/partners/sms/templates',           [PartnerSmsController::class, 'templates']);
+    $r->get('/partners/sms/scheduled',           [PartnerSmsController::class, 'scheduled']);
+    $r->get('/partners/sms/send-file',           [PartnerSmsController::class, 'fileSend']);
+    $r->get('/partners/sms/settings',            [PartnerSmsController::class, 'settings']);
+    $r->get('/partners/sms/clients/{id}',    [PartnerSmsController::class, 'clientDetail']);
+    $r->get('/partners/sms/branding',        [PartnerSmsController::class, 'branding']);
 
     $r->group(['csrf'], function ($r) {
         $r->post('/partners/sms/send',                  [PartnerSmsController::class, 'send']);
@@ -358,6 +368,11 @@ $r->group(['partner_auth'], function ($r) {
         $r->post('/partners/sms/buy',                   [PartnerSmsController::class, 'startPurchase']);
         $r->post('/partners/sms/api/key',               [PartnerSmsController::class, 'issueKey']);
         $r->post('/partners/sms/api/key/revoke',        [PartnerSmsController::class, 'revokeKey']);
+        $r->post('/partners/sms/contacts/move',         [PartnerSmsController::class, 'moveContacts']);
+        $r->post('/partners/sms/groups/{id}/empty',     [PartnerSmsController::class, 'emptyGroup']);
+        $r->post('/partners/sms/campaigns/{id}/reschedule', [PartnerSmsController::class, 'reschedule']);
+        $r->post('/partners/sms/settings',              [PartnerSmsController::class, 'saveSettings']);
+        $r->post('/partners/sms/branding',              [PartnerSmsController::class, 'saveBranding']);
 
         // Reselling.
         $r->post('/partners/sms/clients',                   [PartnerSmsController::class, 'openClient']);
@@ -418,6 +433,14 @@ $r->group(['client_auth'], function ($r) {
     $r->get('/portal/sms/buy/{id}/status',    [PortalSmsController::class, 'purchaseStatus']);
     $r->get('/portal/sms/reports',            [PortalSmsController::class, 'reports']);
     $r->get('/portal/sms/api',                [PortalSmsController::class, 'api']);
+    $r->get('/portal/sms/contacts/import',       [PortalSmsController::class, 'importPage']);
+    $r->get('/portal/sms/contacts/export',       [PortalSmsController::class, 'exportContacts']);
+    $r->get('/portal/sms/contacts/template',     [PortalSmsController::class, 'contactTemplate']);
+    $r->get('/portal/sms/groups',                [PortalSmsController::class, 'groupsPage']);
+    $r->get('/portal/sms/templates',             [PortalSmsController::class, 'templates']);
+    $r->get('/portal/sms/scheduled',             [PortalSmsController::class, 'scheduled']);
+    $r->get('/portal/sms/send-file',             [PortalSmsController::class, 'fileSend']);
+    $r->get('/portal/sms/settings',              [PortalSmsController::class, 'settings']);
 
     $r->group(['csrf'], function ($r) {
         $r->post('/portal/sms/send',                 [PortalSmsController::class, 'send']);
@@ -434,6 +457,10 @@ $r->group(['client_auth'], function ($r) {
         $r->post('/portal/sms/buy',                  [PortalSmsController::class, 'startPurchase']);
         $r->post('/portal/sms/api/key',              [PortalSmsController::class, 'issueKey']);
         $r->post('/portal/sms/api/key/revoke',       [PortalSmsController::class, 'revokeKey']);
+        $r->post('/portal/sms/contacts/move',           [PortalSmsController::class, 'moveContacts']);
+        $r->post('/portal/sms/groups/{id}/empty',       [PortalSmsController::class, 'emptyGroup']);
+        $r->post('/portal/sms/campaigns/{id}/reschedule', [PortalSmsController::class, 'reschedule']);
+        $r->post('/portal/sms/settings',                [PortalSmsController::class, 'saveSettings']);
     });
     $r->post('/portal/invoices/{id}/pay', [PortalController::class, 'pay'], ['csrf']);
     $r->get('/portal/invoices/{id}/pay/status', [PortalController::class, 'payStatus']);

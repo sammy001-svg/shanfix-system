@@ -402,15 +402,149 @@ abstract class SmsPortalBase extends Controller
         Response::to($this->base() . '/contacts');
     }
 
+    /** The lists on their own, with what is in each. */
+    public function groupsPage(Request $request): void
+    {
+        $account = $this->account();
+
+        $this->render('groups', [
+            'title'    => 'Contact lists',
+            'account'  => $account,
+            'groups'   => $this->groups($account),
+            'loose'    => (int) Database::scalar(
+                'SELECT COUNT(*) FROM bulk_contacts WHERE account_id = :a AND group_id IS NULL',
+                ['a' => $account['id']]),
+            'contacts' => (int) Database::scalar(
+                'SELECT COUNT(*) FROM bulk_contacts WHERE account_id = :a', ['a' => $account['id']]),
+        ]);
+    }
+
+    /**
+     * Move contacts from one list to another, or out of all of them.
+     *
+     * Tidying an address book is the job people actually do with lists,
+     * and doing it one contact at a time is what makes them give up and
+     * re-import everything instead.
+     */
+    public function moveContacts(Request $request): void
+    {
+        $account = $this->account();
+        $from    = $request->int('from_group') ?: null;
+        $to      = $request->int('to_group') ?: null;
+
+        foreach ([$from, $to] as $g) {
+            if ($g !== null && !$this->ownsGroup($g, (int) $account['id'])) {
+                throw new HttpException(403, 'That list is not yours.');
+            }
+        }
+
+        $moved = Database::run(
+            'UPDATE bulk_contacts SET group_id = :to WHERE account_id = :a AND (group_id <=> :from)',
+            ['to' => $to, 'a' => $account['id'], 'from' => $from]
+        )->rowCount();
+
+        Session::success($moved === 0
+            ? 'There was nothing to move.'
+            : $moved . ' contact' . ($moved === 1 ? '' : 's') . ' moved.');
+
+        Response::to($this->base() . '/groups');
+    }
+
+    /** Empty a list — the contacts in it, not the list itself. */
+    public function emptyGroup(Request $request): void
+    {
+        $account = $this->account();
+        $id      = $request->paramInt('id');
+
+        if (!$this->ownsGroup($id, (int) $account['id'])) {
+            throw new HttpException(403, 'That list is not yours.');
+        }
+
+        $gone = Database::run(
+            'DELETE FROM bulk_contacts WHERE account_id = :a AND group_id = :g',
+            ['a' => $account['id'], 'g' => $id]
+        )->rowCount();
+
+        Session::success($gone . ' contact' . ($gone === 1 ? '' : 's') . ' deleted. The list is still here.');
+        Response::to($this->base() . '/groups');
+    }
+
+    /**
+     * Their address book as a spreadsheet.
+     *
+     * The list somebody uploaded is theirs, and they should be able to
+     * get it back out — not least to check what we think it says.
+     */
+    public function exportContacts(Request $request): never
+    {
+        $account = $this->account();
+        $groupId = $request->int('group') ?: null;
+
+        if ($groupId !== null && !$this->ownsGroup($groupId, (int) $account['id'])) {
+            throw new HttpException(403, 'That list is not yours.');
+        }
+
+        $rows = Database::all(
+            'SELECT c.name, c.phone, c.email, g.name AS group_name, c.metadata
+               FROM bulk_contacts c
+               LEFT JOIN bulk_contact_groups g ON g.id = c.group_id
+              WHERE c.account_id = :a' . ($groupId !== null ? ' AND c.group_id = :g' : '') . '
+              ORDER BY c.id LIMIT 100000',
+            $groupId !== null ? ['a' => $account['id'], 'g' => $groupId] : ['a' => $account['id']]
+        );
+
+        Response::csv(
+            'sms-contacts-' . date('Y-m-d') . '.csv',
+            ['name', 'phone', 'email', 'list', 'other'],
+            array_map(static fn(array $c): array => [
+                $c['name'], $c['phone'], $c['email'], $c['group_name'],
+                $c['metadata'] ? (string) $c['metadata'] : '',
+            ], $rows)
+        );
+    }
+
+    /**
+     * A spreadsheet somebody can fill in.
+     *
+     * Two example rows, because "phone,name,email" on its own leaves
+     * people guessing whether the number needs a country code.
+     */
+    public function contactTemplate(Request $request): never
+    {
+        Response::csv('sms-contacts-template.csv',
+            ['phone', 'name', 'email', 'town'],
+            [
+                ['0712345678',   'Amina Wanjiru', 'amina@example.co.ke', 'Nairobi'],
+                ['254733000111', 'Brian Otieno',  '',                    'Nakuru'],
+            ]);
+    }
+
+    /** The import page: what the file needs, and what to do with duplicates. */
+    public function importPage(Request $request): void
+    {
+        $account = $this->account();
+
+        $this->render('import', [
+            'title'   => 'Import contacts',
+            'account' => $account,
+            'groups'  => $this->groups($account),
+            'groupId' => $request->int('group') ?: null,
+            'result'  => Session::get('sms_import_result'),
+        ]);
+
+        Session::forget('sms_import_result');
+    }
+
     /** A spreadsheet or CSV of numbers, straight into a list. */
     public function importContacts(Request $request): void
     {
         $account = $this->account();
         $file    = $request->file('list');
+        $back    = $this->base() . '/contacts/import';
 
         if ($file === null || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             Session::error('Choose a file to import.');
-            Response::to($this->base() . '/contacts');
+            Response::to($back);
         }
 
         $groupId = $request->int('group_id') ?: null;
@@ -425,17 +559,30 @@ abstract class SmsPortalBase extends Controller
             throw new HttpException(403, 'That group is not yours.');
         }
 
+        // What to do about a number already in this list. The old platform
+        // offered these three and people chose deliberately between them:
+        // a second import of a longer list is "skip", a corrected list is
+        // "update", and a genuinely separate campaign list is "allow".
+        $duplicates = (string) $request->input('duplicates', 'skip');
+
+        if (!in_array($duplicates, ['skip', 'update', 'allow'], true)) {
+            $duplicates = 'skip';
+        }
+
         $path = $this->storeList($file);
 
         try {
-            $result = $this->readContacts($path, (int) $account['id'], $groupId);
+            $result = $this->readContacts($path, (int) $account['id'], $groupId, $duplicates);
         } finally {
             @unlink($path);
             @unlink((string) preg_replace('/\.xlsx$/i', '.csv', $path));
         }
 
-        Session::success(sprintf('%d contact%s imported%s%s.',
+        Session::put('sms_import_result', $result + ['group_id' => $groupId]);
+
+        Session::success(sprintf('%d contact%s imported%s%s%s.',
             $result['added'], $result['added'] === 1 ? '' : 's',
+            $result['updated'] > 0 ? ', ' . $result['updated'] . ' updated' : '',
             $result['skipped'] > 0 ? ', ' . $result['skipped'] . ' already there' : '',
             $result['bad'] > 0 ? ', ' . $result['bad'] . ' not valid numbers' : ''));
 
@@ -445,6 +592,21 @@ abstract class SmsPortalBase extends Controller
     // =================================================================
     // Templates
     // =================================================================
+
+    /** The messages they send often, kept so they are typed once. */
+    public function templates(Request $request): void
+    {
+        $account = $this->account();
+
+        $this->render('templates', [
+            'title'     => 'Saved messages',
+            'account'   => $account,
+            'templates' => Database::all(
+                'SELECT * FROM bulk_templates WHERE account_id = :a ORDER BY title',
+                ['a' => $account['id']]),
+            'senders'   => $this->senderList($account),
+        ]);
+    }
 
     public function saveTemplate(Request $request): void
     {
@@ -482,6 +644,93 @@ abstract class SmsPortalBase extends Controller
 
         Session::success('Deleted.');
         Response::back($this->base() . '');
+    }
+
+    /**
+     * What is waiting to go out, and when.
+     *
+     * A scheduled campaign is the one thing in here that happens while
+     * nobody is looking, so it gets a page of its own rather than being a
+     * filter on a list of things that already went.
+     */
+    public function scheduled(Request $request): void
+    {
+        $account = $this->account();
+
+        $this->render('scheduled', [
+            'title'   => 'Scheduled messages',
+            'account' => $account,
+            'rows'    => Database::all(
+                "SELECT c.*, g.name AS group_name
+                   FROM bulk_campaigns c
+                   LEFT JOIN bulk_contact_groups g ON g.id = c.group_id
+                  WHERE c.account_id = :a AND c.status IN ('scheduled','queued','sending')
+                  ORDER BY c.scheduled_at IS NULL, c.scheduled_at, c.id",
+                ['a' => $account['id']]),
+            'recent'  => Database::all(
+                "SELECT * FROM bulk_campaigns
+                  WHERE account_id = :a AND status = 'completed' AND scheduled_at IS NOT NULL
+                  ORDER BY id DESC LIMIT 10",
+                ['a' => $account['id']]),
+        ]);
+    }
+
+    /** Move a scheduled campaign to a different time. */
+    public function reschedule(Request $request): void
+    {
+        $account = $this->account();
+        $c       = $this->findCampaign($request->paramInt('id'), (int) $account['id']);
+
+        if ($c['status'] !== 'scheduled') {
+            Session::error('Only something still waiting can be moved.');
+            Response::to($this->base() . '/scheduled');
+        }
+
+        $when = strtotime((string) $request->input('scheduled_at', ''));
+
+        if ($when === false) {
+            Session::error('That is not a date and time we can read.');
+            Response::to($this->base() . '/scheduled');
+        }
+
+        if ($when < time() - 60) {
+            Session::error('That time has already passed.');
+            Response::to($this->base() . '/scheduled');
+        }
+
+        Database::run(
+            "UPDATE bulk_campaigns SET scheduled_at = :w WHERE id = :id AND account_id = :a AND status = 'scheduled'",
+            ['w' => date('Y-m-d H:i:s', $when), 'id' => $c['id'], 'a' => $account['id']]
+        );
+
+        Session::success('Moved to ' . date('j M Y, H:i', $when) . '.');
+        Response::to($this->base() . '/scheduled');
+    }
+
+    // =================================================================
+    // Sending from a file
+    // =================================================================
+
+    /**
+     * Send straight from a spreadsheet, without saving anybody first.
+     *
+     * The list people are given is usually a file, and most of the time
+     * they do not want it in their address book — they want this one
+     * message to go to these people, with each person's own details in
+     * it. The page reads the file in the browser to show what it found
+     * and which {columns} can be used; the sending itself still reads
+     * the file server-side, in the worker, exactly like any campaign.
+     */
+    public function fileSend(Request $request): void
+    {
+        $account = $this->account();
+
+        $this->render('file_send', [
+            'title'   => 'Send from a file',
+            'account' => $account,
+            'balance' => (float) $account['sms_units'],
+            'senders' => $this->senderList($account),
+        ]);
     }
 
     // =================================================================
@@ -577,7 +826,18 @@ abstract class SmsPortalBase extends Controller
                 'SELECT * FROM bulk_plans WHERE owner_account_id = :o AND is_active = 1 ORDER BY sort_order, units',
                 ['o' => $account['parent_id']]),
             'seller'   => $seller,
-            'sellerName' => $seller ? Accounts::describe($seller)['name'] : 'Shanfix',
+            // A reseller's own trading name if they have set one, so a
+            // client paying their partner is told whose money it is.
+            'sellerName' => $seller
+                ? (($seller['owner_type'] === 'partner' && !empty($seller['brand_name']))
+                    ? (string) $seller['brand_name']
+                    : Accounts::describe($seller)['name'])
+                : 'Shanfix',
+            'sellerHelp' => $seller && $seller['owner_type'] === 'partner' ? [
+                'email'        => (string) ($seller['brand_support_email'] ?? ''),
+                'phone'        => (string) ($seller['brand_support_phone'] ?? ''),
+                'instructions' => (string) ($seller['brand_pay_instructions'] ?? ''),
+            ] : null,
             'byMpesa'  => Topup::available() && $seller !== null && $seller['owner_type'] === 'house',
             'phone'    => $this->defaultPhone($account),
             'history'  => Database::all(
@@ -686,7 +946,78 @@ abstract class SmsPortalBase extends Controller
             'filters'  => $filters,
             'totals'   => Reports::totals($scope, $from, $to),
             'byStatus' => Reports::byCarrierStatus($scope, $from, $to),
+            'daily'    => Reports::daily($scope, $from, $to),
+            // Where the units went, which is the question behind "why is
+            // my balance down" — by the name it was sent under, and by
+            // the campaign it belonged to.
+            'bySender' => Database::all(
+                "SELECT m.sender_id, COUNT(*) AS messages,
+                        COALESCE(SUM(m.units_charged), 0) AS units,
+                        SUM(m.status = 'delivered') AS delivered
+                   FROM bulk_messages m
+                  WHERE m.account_id = :a AND m.created_at >= :from AND m.created_at < :to
+                  GROUP BY m.sender_id ORDER BY units DESC LIMIT 10",
+                ['a' => $account['id'], 'from' => $from . ' 00:00:00',
+                 'to' => date('Y-m-d', strtotime($to . ' +1 day')) . ' 00:00:00']),
+            'byCampaign' => Database::all(
+                "SELECT c.id, c.name, COUNT(m.id) AS messages,
+                        COALESCE(SUM(m.units_charged), 0) AS units,
+                        SUM(m.status = 'delivered') AS delivered
+                   FROM bulk_messages m JOIN bulk_campaigns c ON c.id = m.campaign_id
+                  WHERE m.account_id = :a AND m.created_at >= :from AND m.created_at < :to
+                  GROUP BY c.id ORDER BY units DESC LIMIT 10",
+                ['a' => $account['id'], 'from' => $from . ' 00:00:00',
+                 'to' => date('Y-m-d', strtotime($to . ' +1 day')) . ' 00:00:00']),
+            'whyFailed' => Database::all(
+                "SELECT m.failed_reason AS reason, COUNT(*) AS n
+                   FROM bulk_messages m
+                  WHERE m.account_id = :a AND m.created_at >= :from AND m.created_at < :to
+                    AND m.failed_reason IS NOT NULL AND m.failed_reason <> ''
+                  GROUP BY m.failed_reason ORDER BY n DESC LIMIT 8",
+                ['a' => $account['id'], 'from' => $from . ' 00:00:00',
+                 'to' => date('Y-m-d', strtotime($to . ' +1 day')) . ' 00:00:00']),
         ]);
+    }
+
+    /**
+     * Their own preferences: which name to send under by default, when
+     * to be warned about the balance, and how they want to be told.
+     */
+    public function settings(Request $request): void
+    {
+        $account = $this->account();
+
+        $this->render('settings', [
+            'title'    => 'SMS settings',
+            'account'  => $account,
+            'senders'  => $this->senderList($account),
+            'systemLow' => (float) Settings::get('bulk_sms_low_balance', '0'),
+        ]);
+    }
+
+    public function saveSettings(Request $request): void
+    {
+        $account = $this->account();
+        $sender  = trim((string) $request->input('default_sender_id', ''));
+
+        // A default they are not allowed to use would fail at the moment
+        // of sending, which is the worst time to find out.
+        if ($sender !== '' && Engine::approvedSender((int) $account['id'], $sender) === null) {
+            Session::error('That sender ID is not approved for your account.');
+            Response::to($this->base() . '/settings');
+        }
+
+        $threshold = trim((string) $request->input('low_balance_threshold', ''));
+
+        Database::update('bulk_accounts', [
+            'default_sender_id'     => $sender === '' ? null : $sender,
+            'low_balance_threshold' => $threshold === '' ? null : max(0, (float) $threshold),
+            'alert_email'           => $request->bool('alert_email') ? 1 : 0,
+            'alert_sms'             => $request->bool('alert_sms') ? 1 : 0,
+        ], ['id' => $account['id']]);
+
+        Session::success('Saved.');
+        Response::to($this->base() . '/settings');
     }
 
     public function api(Request $request): void
@@ -853,9 +1184,9 @@ abstract class SmsPortalBase extends Controller
     /**
      * Read a contact file into the address book.
      *
-     * @return array{added:int, skipped:int, bad:int}
+     * @return array{added:int, updated:int, skipped:int, bad:int}
      */
-    private function readContacts(string $path, int $accountId, ?int $groupId): array
+    private function readContacts(string $path, int $accountId, ?int $groupId, string $duplicates = 'skip'): array
     {
         if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'xlsx') {
             $csv = (string) preg_replace('/\.xlsx$/i', '.csv', $path);
@@ -892,16 +1223,18 @@ abstract class SmsPortalBase extends Controller
         }
 
         $added = 0;
+        $updated = 0;
         $skipped = 0;
         $bad = 0;
         $seen = [];
 
-        // What is already in this list, so a re-import adds only the new.
+        // What is already in this list, so a re-import can tell the new
+        // rows from the ones it has seen before.
         foreach (Database::all(
-            'SELECT phone FROM bulk_contacts WHERE account_id = :a AND (group_id <=> :g)',
+            'SELECT id, phone FROM bulk_contacts WHERE account_id = :a AND (group_id <=> :g)',
             ['a' => $accountId, 'g' => $groupId]
         ) as $row) {
-            $seen[$row['phone']] = true;
+            $seen[$row['phone']] = (int) $row['id'];
         }
 
         while (($cells = fgetcsv($fh)) !== false) {
@@ -914,8 +1247,31 @@ abstract class SmsPortalBase extends Controller
                 continue;
             }
 
-            if (isset($seen[$phone])) {
-                $skipped++;
+            if (isset($seen[$phone]) && $duplicates !== 'allow') {
+                if ($duplicates === 'skip') {
+                    $skipped++;
+                    continue;
+                }
+
+                // update: the file is the newer truth, so the name and the
+                // extra columns are replaced rather than the row doubled.
+                $meta = [];
+                foreach ($headers as $i => $h) {
+                    if ($h !== '' && $i !== $phoneAt && isset($cells[$i]) && trim((string) $cells[$i]) !== '') {
+                        $meta[$h] = trim((string) $cells[$i]);
+                    }
+                }
+
+                Database::run(
+                    'UPDATE bulk_contacts SET name = COALESCE(:n, name), metadata = :m WHERE id = :id',
+                    [
+                        'n'  => $nameAt >= 0 ? (mb_substr(trim((string) ($cells[$nameAt] ?? '')), 0, 120) ?: null) : null,
+                        'm'  => $meta === [] ? null : json_encode($meta, JSON_UNESCAPED_UNICODE),
+                        'id' => $seen[$phone],
+                    ]
+                );
+
+                $updated++;
                 continue;
             }
 
@@ -943,6 +1299,6 @@ abstract class SmsPortalBase extends Controller
 
         fclose($fh);
 
-        return ['added' => $added, 'skipped' => $skipped, 'bad' => $bad];
+        return ['added' => $added, 'updated' => $updated, 'skipped' => $skipped, 'bad' => $bad];
     }
 }

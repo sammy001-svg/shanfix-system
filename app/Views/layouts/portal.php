@@ -146,8 +146,20 @@ $smsOn = Settings::bool('bulk_sms_enabled', true);
         <a class="nav-link <?= $in('/portal/sms/campaigns') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/campaigns') ?>">
           <?= icon('layers', 'nav-link__icon') ?> Campaigns
         </a>
+        <a class="nav-link <?= $on('/portal/sms/send-file') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/send-file') ?>">
+          <?= icon('file-text', 'nav-link__icon') ?> Send from a file
+        </a>
+        <a class="nav-link <?= $on('/portal/sms/scheduled') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/scheduled') ?>">
+          <?= icon('clock', 'nav-link__icon') ?> Scheduled
+        </a>
         <a class="nav-link <?= $in('/portal/sms/contacts') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/contacts') ?>">
           <?= icon('users', 'nav-link__icon') ?> Contacts
+        </a>
+        <a class="nav-link <?= $on('/portal/sms/groups') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/groups') ?>">
+          <?= icon('list', 'nav-link__icon') ?> Contact lists
+        </a>
+        <a class="nav-link <?= $on('/portal/sms/templates') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/templates') ?>">
+          <?= icon('file-text', 'nav-link__icon') ?> Saved messages
         </a>
         <a class="nav-link <?= $on('/portal/sms/reports') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/reports') ?>">
           <?= icon('activity', 'nav-link__icon') ?> Delivery reports
@@ -160,6 +172,9 @@ $smsOn = Settings::bool('bulk_sms_enabled', true);
         </a>
         <a class="nav-link <?= $in('/portal/sms/api') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/api') ?>">
           <?= icon('code', 'nav-link__icon') ?> Developer API
+        </a>
+        <a class="nav-link <?= $on('/portal/sms/settings') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/settings') ?>">
+          <?= icon('sliders', 'nav-link__icon') ?> SMS settings
         </a>
       <?php endif; ?>
     </nav>

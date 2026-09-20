@@ -148,8 +148,20 @@ if ($partner && $smsOn) {
         <a class="nav-link <?= $in('/partners/sms/campaigns') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/campaigns') ?>">
           <?= icon('layers', 'nav-link__icon') ?> Campaigns
         </a>
+        <a class="nav-link <?= $on('/partners/sms/send-file') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/send-file') ?>">
+          <?= icon('file-text', 'nav-link__icon') ?> Send from a file
+        </a>
+        <a class="nav-link <?= $on('/partners/sms/scheduled') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/scheduled') ?>">
+          <?= icon('clock', 'nav-link__icon') ?> Scheduled
+        </a>
         <a class="nav-link <?= $in('/partners/sms/contacts') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/contacts') ?>">
           <?= icon('users', 'nav-link__icon') ?> Contacts
+        </a>
+        <a class="nav-link <?= $on('/partners/sms/groups') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/groups') ?>">
+          <?= icon('list', 'nav-link__icon') ?> Contact lists
+        </a>
+        <a class="nav-link <?= $on('/partners/sms/templates') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/templates') ?>">
+          <?= icon('file-text', 'nav-link__icon') ?> Saved messages
         </a>
         <a class="nav-link <?= $on('/partners/sms/reports') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/reports') ?>">
           <?= icon('activity', 'nav-link__icon') ?> Delivery reports
@@ -163,6 +175,9 @@ if ($partner && $smsOn) {
         <a class="nav-link <?= $in('/partners/sms/api') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/api') ?>">
           <?= icon('code', 'nav-link__icon') ?> Developer API
         </a>
+        <a class="nav-link <?= $on('/partners/sms/settings') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/settings') ?>">
+          <?= icon('sliders', 'nav-link__icon') ?> SMS settings
+        </a>
 
         <?php // Their reselling. ?>
         <div class="nav-group__label">Reselling SMS</div>
@@ -175,6 +190,9 @@ if ($partner && $smsOn) {
         </a>
         <a class="nav-link <?= $in('/partners/sms/pricing') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/pricing') ?>">
           <?= icon('dollar', 'nav-link__icon') ?> My prices
+        </a>
+        <a class="nav-link <?= $in('/partners/sms/branding') ? 'is-active' : '' ?>" href="<?= url('/partners/sms/branding') ?>">
+          <?= icon('star', 'nav-link__icon') ?> How clients see me
         </a>
       <?php endif; ?>
     </nav>

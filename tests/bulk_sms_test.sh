@@ -99,6 +99,8 @@ scrub_sms() {
     DELETE FROM clients WHERE name LIKE 'SMSTEST%';
     DELETE FROM bulk_sender_ids WHERE sender_id LIKE 'SMSTESTP%';
     DELETE FROM stk_requests WHERE kopokopo_id LIKE 'smstest-kk-%';
+    DELETE FROM bulk_templates WHERE title LIKE 'SMSTEST%';
+    DELETE FROM bulk_contact_groups WHERE name LIKE 'SMSTEST%';
     DELETE FROM bulk_plans WHERE name LIKE 'SMSTEST%';
     DELETE l FROM bulk_ledger l JOIN bulk_accounts a ON a.id = l.account_id
       JOIN partners p ON a.owner_type='partner' AND p.id = a.owner_id WHERE p.name LIKE 'SMSTEST%';
@@ -532,6 +534,146 @@ case "$(cget /portal/sms/reports)" in
   *NOTYOURS*) bad "nor see their messages" "visible" "hidden";;
   *)          ok  "nor see their messages" "hidden";;
 esac
+
+echo ""
+echo "=== 20b. Lists, and the tidying people actually do ==="
+CT=$(ctok /portal/sms/groups)
+cpost /portal/sms/groups --data "_token=$CT&name=SMSTEST+tidy&description=for+tidying" > /dev/null
+TIDY=$(q "SELECT id FROM bulk_contact_groups WHERE account_id=$ACC AND name='SMSTEST tidy';")
+ne "a list can be made with a description" "$TIDY" ""
+
+CT=$(ctok /portal/sms/groups)
+cpost /portal/sms/groups --data "_token=$CT&id=$TIDY&name=SMSTEST+renamed&description=still+for+tidying" > /dev/null
+eq "and renamed"  "$(q "SELECT name FROM bulk_contact_groups WHERE id=$TIDY;")" "SMSTEST renamed"
+
+# Everybody in one list, moved to another.
+CT=$(ctok /portal/sms/groups)
+cpost /portal/sms/contacts/move --data "_token=$CT&from_group=$GRP&to_group=$TIDY" > /dev/null
+eq "a whole list can be moved across" "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND group_id=$TIDY;")" "2"
+eq "and the old one is left empty"    "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND group_id=$GRP;")" "0"
+
+# Emptying deletes the contacts but keeps the list.
+CT=$(ctok /portal/sms/groups)
+cpost /portal/sms/groups/$TIDY/empty --data "_token=$CT" > /dev/null
+eq "emptying a list removes its contacts" "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND group_id=$TIDY;")" "0"
+eq "but keeps the list itself"            "$(q "SELECT COUNT(*) FROM bulk_contact_groups WHERE id=$TIDY;")" "1"
+
+echo ""
+echo "=== 20c. Importing, and what to do about duplicates ==="
+IMP2="$D/smstest-dupes.csv"
+printf 'phone,name,town\n0722000601,Faith,Kisumu\n0722000602,Gideon,Eldoret\nnotanumber,Junk,\n' > "$IMP2"
+
+CT=$(ctok /portal/sms/contacts/import)
+curl -s -o /dev/null -b "$CJ" -c "$CJ" -X POST "$BASE/portal/sms/contacts/import" \
+     -F "_token=$CT" -F "group_id=$TIDY" -F "duplicates=skip" -F "list=@$IMP2"
+eq "two good rows are imported"   "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND group_id=$TIDY;")" "2"
+eq "and the junk row is not"      "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND name='Junk';")" "0"
+
+# The same file again, three ways.
+CT=$(ctok /portal/sms/contacts/import)
+curl -s -o /dev/null -b "$CJ" -c "$CJ" -X POST "$BASE/portal/sms/contacts/import" \
+     -F "_token=$CT" -F "group_id=$TIDY" -F "duplicates=skip" -F "list=@$IMP2"
+eq "skipping leaves the count alone" "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND group_id=$TIDY;")" "2"
+
+printf 'phone,name,town\n0722000601,Faith Changed,Mombasa\n' > "$D/smstest-update.csv"
+CT=$(ctok /portal/sms/contacts/import)
+curl -s -o /dev/null -b "$CJ" -c "$CJ" -X POST "$BASE/portal/sms/contacts/import" \
+     -F "_token=$CT" -F "group_id=$TIDY" -F "duplicates=update" -F "list=@$D/smstest-update.csv"
+eq "updating changes the one there"  "$(q "SELECT name FROM bulk_contacts WHERE account_id=$ACC AND phone='+254722000601';")" "Faith Changed"
+eq "and does not add another"        "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND group_id=$TIDY;")" "2"
+has "the new details are kept for personalising" \
+    "$(q "SELECT metadata FROM bulk_contacts WHERE account_id=$ACC AND phone='+254722000601';")" "Mombasa"
+
+CT=$(ctok /portal/sms/contacts/import)
+curl -s -o /dev/null -b "$CJ" -c "$CJ" -X POST "$BASE/portal/sms/contacts/import" \
+     -F "_token=$CT" -F "group_id=$TIDY" -F "duplicates=allow" -F "list=@$D/smstest-update.csv"
+eq "allowing adds it again, on purpose" "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE account_id=$ACC AND group_id=$TIDY;")" "3"
+
+# An import into somebody else's list must not work.
+STRANGERGRP=$(q "SELECT id FROM bulk_contact_groups WHERE account_id <> $ACC LIMIT 1;")
+if [ -n "$STRANGERGRP" ]; then
+  BEFORE=$(q "SELECT COUNT(*) FROM bulk_contacts WHERE group_id=$STRANGERGRP;")
+  CT=$(ctok /portal/sms/contacts/import)
+  curl -s -o /dev/null -b "$CJ" -c "$CJ" -X POST "$BASE/portal/sms/contacts/import" \
+       -F "_token=$CT" -F "group_id=$STRANGERGRP" -F "list=@$IMP2"
+  eq "nobody can import into another account's list" \
+     "$(q "SELECT COUNT(*) FROM bulk_contacts WHERE group_id=$STRANGERGRP;")" "$BEFORE"
+fi
+
+echo ""
+echo "=== 20d. Getting their own list back out ==="
+EXPORT=$(cget "/portal/sms/contacts/export?group=$TIDY")
+has "the download holds their contacts" "$EXPORT" "+254722000602"
+has "with the list named"               "$EXPORT" "SMSTEST renamed"
+case "$EXPORT" in
+  *NOTYOURS*|*"+254700000999"*) bad "and nobody else's" "leaked" "only theirs";;
+  *)                            ok  "and nobody else's" "only theirs";;
+esac
+has "there is a template to fill in" "$(cget /portal/sms/contacts/template)" "phone"
+
+echo ""
+echo "=== 20e. Saved messages ==="
+CT=$(ctok /portal/sms/templates)
+cpost /portal/sms/templates --data "_token=$CT&title=SMSTEST+greeting&message=Hello+%7Bname%7D%2C+your+order+is+ready." > /dev/null
+TPL=$(q "SELECT id FROM bulk_templates WHERE account_id=$ACC AND title='SMSTEST greeting';")
+ne "a message can be saved" "$TPL" ""
+has "and it is listed"      "$(cget /portal/sms/templates)" "SMSTEST greeting"
+CT=$(ctok /portal/sms/templates)
+cpost /portal/sms/templates --data "_token=$CT&id=$TPL&title=SMSTEST+greeting&message=Hello+%7Bname%7D%2C+it+is+ready+now." > /dev/null
+has "and edited" "$(q "SELECT message FROM bulk_templates WHERE id=$TPL;")" "it is ready now"
+CT=$(ctok /portal/sms/templates)
+cpost /portal/sms/templates/$TPL/delete --data "_token=$CT" > /dev/null
+eq "and deleted" "$(q "SELECT COUNT(*) FROM bulk_templates WHERE id=$TPL;")" "0"
+
+echo ""
+echo "=== 20f. What is going out later ==="
+LATER=$(date -d '+3 hours' '+%Y-%m-%dT%H:%M' 2>/dev/null || date -v+3H '+%Y-%m-%dT%H:%M')
+CT=$(ctok /portal/sms/campaigns/new)
+cpost /portal/sms/campaigns --data "_token=$CT&name=SMSTEST+later&sender_id=SMSTEST&audience=numbers&recipients=0700000551&message=Later&scheduled_at=$LATER" > /dev/null
+SCHED=$(q "SELECT id FROM bulk_campaigns WHERE account_id=$ACC AND name='SMSTEST later';")
+eq "a scheduled campaign waits"      "$(q "SELECT status FROM bulk_campaigns WHERE id=$SCHED;")" "scheduled"
+has "and is listed on the page"      "$(cget /portal/sms/scheduled)" "SMSTEST later"
+
+MOVED=$(date -d '+6 hours' '+%Y-%m-%dT%H:%M' 2>/dev/null || date -v+6H '+%Y-%m-%dT%H:%M')
+CT=$(ctok /portal/sms/scheduled)
+cpost /portal/sms/campaigns/$SCHED/reschedule --data "_token=$CT&scheduled_at=$MOVED" > /dev/null
+eq "the time can be changed" \
+   "$(q "SELECT DATE_FORMAT(scheduled_at, '%Y-%m-%dT%H:%i') FROM bulk_campaigns WHERE id=$SCHED;")" "$MOVED"
+
+CT=$(ctok /portal/sms/scheduled)
+cpost /portal/sms/campaigns/$SCHED/reschedule --data "_token=$CT&scheduled_at=2020-01-01T09:00" > /dev/null
+eq "but not to a time that has passed" \
+   "$(q "SELECT DATE_FORMAT(scheduled_at, '%Y-%m-%dT%H:%i') FROM bulk_campaigns WHERE id=$SCHED;")" "$MOVED"
+
+CT=$(ctok /portal/sms/scheduled)
+cpost /portal/sms/campaigns/$SCHED/cancel --data "_token=$CT" > /dev/null
+eq "and it can be stopped before it goes" "$(q "SELECT status FROM bulk_campaigns WHERE id=$SCHED;")" "cancelled"
+
+echo ""
+echo "=== 20g. Their own settings ==="
+eq "the send-from-a-file page opens" "$(ccode /portal/sms/send-file)" "200"
+CT=$(ctok /portal/sms/settings)
+cpost /portal/sms/settings --data "_token=$CT&default_sender_id=SMSTEST&low_balance_threshold=60&alert_email=1" > /dev/null
+eq "a default sender is saved"    "$(q "SELECT default_sender_id FROM bulk_accounts WHERE id=$ACC;")" "SMSTEST"
+eq "and a warning level"          "$(q "SELECT ROUND(low_balance_threshold) FROM bulk_accounts WHERE id=$ACC;")" "60"
+eq "and being texted can be turned off" "$(q "SELECT alert_sms FROM bulk_accounts WHERE id=$ACC;")" "0"
+
+CT=$(ctok /portal/sms/settings)
+cpost /portal/sms/settings --data "_token=$CT&default_sender_id=NOTMINE&alert_email=1" > /dev/null
+eq "a sender they may not use is refused" "$(q "SELECT default_sender_id FROM bulk_accounts WHERE id=$ACC;")" "SMSTEST"
+
+# With texting off, a top-up receipt goes by e-mail only.
+$MYSQL -e "DELETE FROM notifications WHERE event='bulk_topup' AND body LIKE '%SMSTESTQUIET%';"
+QUIET=$(q "INSERT INTO bulk_purchases (account_id, seller_account_id, units, amount, method, transaction_ref, status)
+           VALUES ($ACC, $HOUSE, 10, 10, 'bank', 'SMSTESTQUIET', 'pending'); SELECT LAST_INSERT_ID();")
+T=$(tok /bulk-sms/purchases)
+signin_admin > /dev/null
+T=$(tok /bulk-sms/purchases)
+post /bulk-sms/purchases/$QUIET/complete --data "_token=$T" > /dev/null
+eq "the receipt still goes by e-mail" \
+   "$(q "SELECT COUNT(*) FROM notifications WHERE event='bulk_topup' AND channel='email' AND body LIKE '%SMSTESTQUIET%';")" "1"
+eq "but not by text, because they asked not to be" \
+   "$(q "SELECT COUNT(*) FROM notifications WHERE event='bulk_topup' AND channel='sms' AND body LIKE '%SMSTESTQUIET%';")" "0"
 
 echo ""
 echo "=== 20. The developer API ==="

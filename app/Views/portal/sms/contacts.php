@@ -13,9 +13,13 @@ require_once APP_PATH . '/Views/partials/icons.php';
   <div class="portal-card">
     <div class="portal-card__head">
       <div class="portal-card__title">Your lists</div>
-      <button class="btn btn--outline btn--sm" type="button" data-modal-open="import-contacts">
-        <?= icon('download') ?> Import a file
-      </button>
+      <div>
+        <a class="btn btn--outline btn--sm" href="<?= url($base . '/contacts/import') ?>">
+          <?= icon('download') ?> Import a file
+        </a>
+        <a class="btn btn--ghost btn--sm" href="<?= url($base . '/groups') ?>">Manage lists</a>
+        <a class="btn btn--ghost btn--sm" href="<?= url($base . '/contacts/export' . ($groupId ? '?group=' . (int) $groupId : '')) ?>">Download</a>
+      </div>
     </div>
 
     <?php if ($groups): ?>
@@ -126,46 +130,5 @@ require_once APP_PATH . '/Views/partials/icons.php';
       </div>
       <?php include APP_PATH . '/Views/partials/pagination.php'; ?>
     <?php endif; ?>
-  </div>
-</div>
-
-<div class="modal-backdrop" id="import-contacts">
-  <div class="modal">
-    <form method="post" action="<?= url($base . '/contacts/import') ?>" enctype="multipart/form-data">
-      <?= csrf_field() ?>
-      <div class="modal__head">
-        <div class="card__title">Import contacts</div>
-        <button class="modal__close" type="button" data-modal-close>&times;</button>
-      </div>
-      <div class="modal__body">
-        <div class="field">
-          <label class="label" for="im-file">The file</label>
-          <input class="input" type="file" id="im-file" name="list" accept=".csv,.xlsx,.txt" required>
-          <span class="field-hint">
-            CSV or Excel. A column called phone, mobile or number is enough;
-            a name column is used if there is one, and everything else is
-            kept so you can write {column} in a message. A plain list of
-            numbers with no headings works too.
-          </span>
-        </div>
-        <div class="field">
-          <label class="label" for="im-group">Put them in</label>
-          <select class="select" id="im-group" name="group_id">
-            <option value="">No list</option>
-            <?php foreach ($groups as $g): ?>
-              <option value="<?= (int) $g['id'] ?>" <?= $groupId === (int) $g['id'] ? 'selected' : '' ?>><?= e($g['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="field mb-0">
-          <label class="label" for="im-new">Or a new list called</label>
-          <input class="input" id="im-new" name="new_group" maxlength="120" placeholder="e.g. Expo leads">
-        </div>
-      </div>
-      <div class="modal__foot">
-        <button class="btn btn--ghost" type="button" data-modal-close>Cancel</button>
-        <button class="btn btn--primary" type="submit">Import</button>
-      </div>
-    </form>
   </div>
 </div>

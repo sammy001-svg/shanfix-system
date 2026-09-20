@@ -88,8 +88,24 @@ $waiting = (int) ($_GET['waiting'] ?? 0);
           <?= icon('info') ?>
           <div class="alert__body">
             Your SMS units come from <strong><?= e($sellerName) ?></strong>.
-            Pay them as you normally do, then send this request — they add
-            the units once they have confirmed the money.
+            <?php if (!empty($sellerHelp['instructions'])): ?>
+              <div class="mt-8" style="white-space:pre-wrap"><?= e($sellerHelp['instructions']) ?></div>
+            <?php else: ?>
+              Pay them as you normally do, then send this request — they add
+              the units once they have confirmed the money.
+            <?php endif; ?>
+            <?php if (!empty($sellerHelp['phone']) || !empty($sellerHelp['email'])): ?>
+              <div class="text-sm mt-8">
+                Reach them on
+                <?php if (!empty($sellerHelp['phone'])): ?>
+                  <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', (string) $sellerHelp['phone'])) ?>"><?= e($sellerHelp['phone']) ?></a>
+                <?php endif; ?>
+                <?php if (!empty($sellerHelp['phone']) && !empty($sellerHelp['email'])): ?> or <?php endif; ?>
+                <?php if (!empty($sellerHelp['email'])): ?>
+                  <a href="mailto:<?= e($sellerHelp['email']) ?>"><?= e($sellerHelp['email']) ?></a>
+                <?php endif; ?>.
+              </div>
+            <?php endif; ?>
           </div>
         </div>
         <button class="btn btn--primary btn--block btn--lg" type="submit">
