@@ -1,36 +1,40 @@
 <?php
 /**
- * The sign-in shell, used by both doors.
+ * The sign-in shell, used by all four doors.
  *
- * Staff and customers arrive at different addresses and cannot use each
- * other's accounts, but they are signing in to the same company, and a
- * customer who has just been sent a link has no reason to trust a page
- * that looks nothing like the one the staff use. So both are dressed the
- * same — same brand, same photograph, same contact details underneath —
- * and told apart by a single labelled badge rather than by being built
- * twice.
+ * A split page: the photograph on one side, the form on the other. It
+ * used to be a card floating in the middle of a photograph that had been
+ * dimmed almost to black to keep the words on top of it legible — so the
+ * picture was both the background and the problem.
  *
- * Set $authKind to 'client' for the portal side; anything else is staff.
+ * Splitting it solves that properly. The photograph is a photograph,
+ * bright enough to be worth having; every piece of text sits on solid
+ * colour, so contrast is a property of the layout rather than something
+ * bought by ruining the image.
+ *
+ * Staff, customers and partners arrive at different addresses and cannot
+ * use each other's accounts, but they are signing in to the same company:
+ * one shell, told apart by a labelled badge rather than built three times.
+ *
+ * Set $authKind to 'client', 'partner' or 'staff'; 'none' is a real
+ * answer for the chooser, which is not a door.
  */
 require_once APP_PATH . '/Views/partials/icons.php';
 
-$brand   = \App\Core\Settings::company();
-// Which door this is. 'none' is a real answer: the chooser is not a
-// door, it is the question of which one you want, and badging it as any
-// of the three would be wrong.
-$kind = $authKind ?? 'staff';
+$brand = \App\Core\Settings::company();
+$kind  = $authKind ?? 'staff';
 
 $kinds = [
-    'staff'   => ['Staff sign-in',    'briefcase', 'login__kind--staff'],
-    'client'  => ['Customer portal',  'user',      'login__kind--client'],
-    'partner' => ['Partner portal',   'users',     'login__kind--partner'],
+    'staff'   => ['Staff sign-in',   'briefcase', 'login__kind--staff'],
+    'client'  => ['Customer portal', 'user',      'login__kind--client'],
+    'partner' => ['Partner portal',  'users',     'login__kind--partner'],
 ];
 
 $badge   = $kinds[$kind] ?? null;
 $isGuest = $kind !== 'staff';
 
 // The photo is optional — the navy ground underneath stands on its own,
-// so a missing file degrades to a plain dark page rather than a broken
+// so a missing file degrades to a plain dark panel rather than a broken
 // one. Preference order: whatever was uploaded in Settings (no server
 // access needed), then a file dropped into public/assets/img/ by hand.
 $bg     = null;
@@ -94,44 +98,40 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
 <link rel="icon" href="<?= asset('img/favicon.svg') ?>" type="image/svg+xml">
 <meta name="theme-color" content="#0C2B4A">
 </head>
-<body>
+<body class="auth-body">
 
-<div class="login">
-  <?php if ($bg !== null): ?>
-    <div class="login__bg" style="background-image:url('<?= e($bg) ?>')"></div>
-  <?php endif; ?>
-  <div class="login__veil"></div>
+<div class="auth">
 
-  <main class="login__panel">
-    <?php // The brand sits outside the card and is placed by the grid: to
-          // the left of the form on a wide screen, above it on a phone.
-          // One copy in the markup, so it cannot drift between the two. ?>
-    <div class="login__aside">
-      <?php if ($brand['logo']): ?>
-        <?php // A wordmark already carries the company name, so repeating
-              // it beside the image reads as a mistake. Logo alone. ?>
-        <img class="login__logo" src="<?= e($logoSrc) ?>" alt="<?= e($brand['name']) ?>">
-      <?php else: ?>
-        <div class="login__lockup">
-          <span class="login__mark">SF</span>
-          <span class="login__company"><?= e($brand['name']) ?></span>
-        </div>
-      <?php endif; ?>
+  <?php // ── The photograph, and what we say over it ───────────────────
+        // Hidden from assistive technology: it is decoration plus a
+        // repetition of what the form side already says. ?>
+  <section class="auth__stage" <?= $bg !== null ? 'style="background-image:url(\'' . e($bg) . '\')"' : '' ?>>
+    <div class="auth__scrim"></div>
+
+    <div class="auth__stageInner">
+      <div class="auth__lockup">
+        <?php if ($brand['logo']): ?>
+          <img class="auth__logo" src="<?= e($logoSrc) ?>" alt="<?= e($brand['name']) ?>">
+        <?php else: ?>
+          <span class="auth__mark">SF</span>
+          <span class="auth__company"><?= e($brand['name']) ?></span>
+        <?php endif; ?>
+      </div>
 
       <?php if ($brand['tagline']): ?>
-        <p class="login__tagline"><?= e($brand['tagline']) ?></p>
+        <p class="auth__tagline"><?= e($brand['tagline']) ?></p>
       <?php endif; ?>
 
-      <?php // What is behind the door, for the person deciding whether they
-            // are at the right one. Only shown where there is room for it,
-            // and only on the customer side: staff know what this is.
+      <?php // What is behind the door, for the person deciding whether
+            // they are at the right one. Customers and partners only:
+            // staff know what this is.
             //
             // Each line is checked against the setting that turns it on.
             // Promising a customer they can pay here, when payments are
-            // switched off, is a broken promise made before they have even
-            // signed in. ?>
+            // switched off, is a broken promise made before they have
+            // even signed in. ?>
       <?php if ($isGuest): ?>
-        <ul class="login__points">
+        <ul class="auth__points">
           <li><?= icon('file-text') ?><span>Your quotations, invoices and statement</span></li>
           <?php if (\App\Core\Settings::bool('kopokopo_enabled')): ?>
             <li><?= icon('credit-card') ?><span>Pay an invoice by M-Pesa</span></li>
@@ -139,16 +139,36 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
           <?php if (\App\Core\Settings::bool('portal_uploads_enabled', true)): ?>
             <li><?= icon('paperclip') ?><span>Send us artwork for printing</span></li>
           <?php endif; ?>
+          <?php if (\App\Core\Settings::bool('bulk_sms_enabled', true)): ?>
+            <li><?= icon('message') ?><span>Send bulk SMS to your own customers</span></li>
+          <?php endif; ?>
           <li><?= icon('repeat') ?><span>See what renews, and when</span></li>
         </ul>
       <?php endif; ?>
     </div>
 
-    <div class="login__card">
+    <?php // The way out, kept on the picture side where it cannot be
+          // mistaken for part of the form. ?>
+    <a class="auth__back" href="/">
+      <?= icon('arrow-left') ?> <span>Back to <?= e($brand['name']) ?></span>
+    </a>
+  </section>
 
-      <?php // Which door this is. Two accounts that look alike and do not
-            // work in each other's page is the confusion worth heading off,
-            // and one badge does it without a paragraph of explanation. ?>
+  <?php // ── The form side ─────────────────────────────────────────── ?>
+  <main class="auth__panel" id="main" tabindex="-1">
+    <div class="auth__form">
+
+      <?php // On a narrow screen the picture side shrinks to a strip, so
+            // the brand is repeated here where it can be read. ?>
+      <div class="auth__smallbrand">
+        <?php if ($brand['logo']): ?>
+          <img src="<?= e($logoSrc) ?>" alt="<?= e($brand['name']) ?>">
+        <?php else: ?>
+          <span class="auth__mark auth__mark--sm">SF</span>
+          <span><?= e($brand['name']) ?></span>
+        <?php endif; ?>
+      </div>
+
       <?php if ($badge !== null): ?>
         <p class="login__kind <?= e($badge[2]) ?>">
           <?= icon($badge[1]) ?> <?= e($badge[0]) ?>
@@ -168,47 +188,38 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
       <?php endforeach; ?>
 
       <?= $content ?>
-    </div>
 
-    <?php // The way out.
-          //
-          // The website is the front door of this domain and the sign-in
-          // page is behind it, so somebody who arrived here by mistake —
-          // or who came to sign in and then wanted a phone number — has
-          // no way back except the browser's back button. Which does not
-          // exist if they typed the address, or followed a link from an
-          // email. ?>
-    <p class="login__back">
-      <a href="/">
-        <?= icon('arrow-left') ?> Back to <?= e($brand['name']) ?>
-      </a>
-    </p>
+      <footer class="auth__foot">
+        <?php // Somebody who cannot get in needs a way to reach a person.
+              // On the customer side especially, "contact your
+              // administrator" means nothing — these are the details they
+              // actually need. ?>
+        <?php if ($brand['phone'] || $brand['email']): ?>
+          <div class="auth__contact">
+            <?php if ($brand['phone']): ?>
+              <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $brand['phone'])) ?>">
+                <?= icon('phone') ?><?= e($brand['phone']) ?>
+              </a>
+            <?php endif; ?>
+            <?php if ($brand['email']): ?>
+              <a href="mailto:<?= e($brand['email']) ?>">
+                <?= icon('mail') ?><?= e($brand['email']) ?>
+              </a>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
 
-    <footer class="login__foot">
-      <?php // Somebody who cannot get in needs a way to reach a person.
-            // On the customer side especially, "contact your administrator"
-            // means nothing — these are the details they actually need. ?>
-      <?php if ($brand['phone'] || $brand['email']): ?>
-        <div class="login__contact">
-          <?php if ($brand['phone']): ?>
-            <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $brand['phone'])) ?>">
-              <?= icon('phone') ?><?= e($brand['phone']) ?>
-            </a>
-          <?php endif; ?>
-          <?php if ($brand['email']): ?>
-            <a href="mailto:<?= e($brand['email']) ?>">
-              <?= icon('mail') ?><?= e($brand['email']) ?>
-            </a>
-          <?php endif; ?>
+        <div class="auth__legal">
+          &copy; <?= date('Y') ?> <?= e($brand['name']) ?>
+          <span aria-hidden="true">·</span>
+          <?= $isGuest ? 'Customer portal' : 'Business Management System' ?>
         </div>
-      <?php endif; ?>
 
-      <div>
-        &copy; <?= date('Y') ?> <?= e($brand['name']) ?>
-        <span aria-hidden="true">·</span>
-        <?= $isGuest ? 'Customer portal' : 'Business Management System' ?>
-      </div>
-    </footer>
+        <?php // Repeated for small screens, where the picture side — and
+              // the link on it — is only a strip. ?>
+        <a class="auth__backsm" href="/"><?= icon('arrow-left') ?> Back to our website</a>
+      </footer>
+    </div>
   </main>
 </div>
 

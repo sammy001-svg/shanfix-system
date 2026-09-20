@@ -149,7 +149,7 @@ final class Topup
         $result = (new KopoKopo())->stkPush(
             phone:       $phone,
             amount:      (float) $purchase['amount'],
-            callbackUrl: Notifier::absoluteUrl('/webhooks/kopokopo'),
+            callbackUrl: KopoKopo::callbackUrl(),
             reference:   'SMS-' . $purchase['id'],
             firstName:   $names[0] ?? 'Customer',
             lastName:    count($names) > 1 ? (string) end($names) : '-',
@@ -173,10 +173,19 @@ final class Topup
         ], ['id' => $stkId]);
 
         if (!$result['ok']) {
-            Purchases::fail($purchase['id'], 'M-Pesa could not be reached');
-            Logger::warning('Bulk SMS top-up could not start: ' . ($result['error'] ?? ''));
+            $why = (string) ($result['error'] ?? 'No reason given');
 
-            return ['ok' => false, 'error' => 'We could not reach M-Pesa just now. Please try again in a moment.'];
+            Purchases::fail($purchase['id'], mb_substr('M-Pesa refused the request: ' . $why, 0, 255));
+
+            // The real text goes to the log and onto the request row; the
+            // customer gets something they can act on.
+            Logger::error('Bulk SMS top-up could not start: ' . $why, [
+                'account'  => $accountId,
+                'purchase' => $purchase['id'],
+                'callback' => KopoKopo::callbackUrl(),
+            ]);
+
+            return ['ok' => false, 'error' => KopoKopo::customerMessage($why)];
         }
 
         ActivityLog::record('bulksms_topup', 'bulk_purchase', (int) $purchase['id'],

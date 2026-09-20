@@ -452,6 +452,8 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
                   <?= e(label_of(setting('kopokopo_env', 'sandbox'))) ?>
                 </span>
               </dd>
+              <dt>Calls back to</dt>
+              <dd class="text-xs" style="word-break:break-all"><?= e($kopokopoCallback) ?></dd>
               <dt>Credentials</dt>
               <dd>
                 <span class="badge <?= $kopokopoReady ? 'badge--green' : 'badge--grey' ?>">
@@ -475,16 +477,53 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     </div>
   </form>
 
+  <?php if (!empty($kopokopoChecks)): ?>
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card__title">What the check found</div>
+          <div class="card__sub">Every step a payment has to get through, in order</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table table--compact">
+          <tbody>
+            <?php foreach ($kopokopoChecks as $c): ?>
+              <tr>
+                <td style="width:190px" class="fw-600"><?= e($c['name']) ?></td>
+                <td style="width:110px">
+                  <span class="badge <?= match ($c['state']) {
+                      'ok'   => 'badge--green',
+                      'warn' => 'badge--amber',
+                      default => 'badge--red',
+                  } ?>">
+                    <?= match ($c['state']) { 'ok' => 'Good', 'warn' => 'Careful', default => 'Stopping it' } ?>
+                  </span>
+                </td>
+                <td class="text-sm"><?= e($c['detail']) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <?php endif; ?>
+
   <div class="grid-2">
     <div class="card">
       <div class="card__body">
         <form method="post" action="<?= url('/settings/payments/test') ?>">
           <?= csrf_field() ?>
-          <button class="btn btn--outline btn--block" type="submit" <?= $kopokopoReady ? '' : 'disabled' ?>>
-            <?= icon('zap') ?> Test connection
+          <button class="btn btn--outline btn--block" type="submit">
+            <?= icon('zap') ?> Check M-Pesa end to end
           </button>
         </form>
-        <p class="field-hint mt-8 mb-0">Requests an OAuth token to confirm your Client ID and Secret.</p>
+        <p class="field-hint mt-8 mb-0">
+          Checks that it is switched on, that all three credentials are there,
+          that KopoKopo accepts them, and that the address it has to call back
+          is one it can actually reach. Run this first whenever a customer
+          says a prompt did not arrive.
+        </p>
       </div>
     </div>
 

@@ -314,7 +314,7 @@ class PaymentController extends Controller
         }
 
         $reference   = $invoice['doc_number'] ?? ($client['client_code'] . '-' . date('YmdHis'));
-        $callbackUrl = $this->callbackUrl();
+        $callbackUrl = KopoKopo::callbackUrl();
 
         $nameParts = preg_split('/\s+/', trim((string) $client['name']));
         $firstName = $nameParts[0] ?? 'Client';

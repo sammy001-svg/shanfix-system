@@ -1173,197 +1173,251 @@ fieldset:last-of-type { margin-bottom: 0; }
 .pagination .is-disabled { opacity: .4; pointer-events: none; }
 
 /* ---------------------------------------------------------------------
-   Sign-in screen  — Professional redesign
+   Sign-in — a split page
+   ---------------------------------------------------------------------
+   The photograph on one side, the form on the other.
 
-   A split-card layout on wide screens (brand left, form right) and a
-   centred card on mobile. The dark navy ground sits behind the photo so
-   the page is on-brand before the image arrives and after it is gone.
+   The old page floated a card in the middle of the photograph, which
+   meant the photograph had to be dimmed almost to black to keep the
+   words on top of it readable: the picture was both the background and
+   the problem, and it was barely visible.
+
+   Here every piece of text sits on solid colour — the form side is a
+   plain surface, and the words on the picture side sit inside a solid
+   navy panel. Contrast is therefore a property of the layout, and the
+   photograph only has to be a photograph.
+
+   Flat colours throughout: no gradients anywhere, as everywhere else.
    --------------------------------------------------------------------- */
-.login {
-  position: relative;
+.auth-body { background: var(--navy-900); }
+
+.auth {
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
-  place-items: center;
-  padding: 28px 16px;
-  background: var(--navy-900);
-  overflow: hidden;
+  grid-template-columns: 1fr;
 }
 
-/* Background photo — desaturated and dimmed so it reads as atmosphere,
-   not subject matter, and the navy brand colour stays dominant. */
-.login__bg {
-  position: absolute;
-  inset: 0;
+/* ── The picture side ───────────────────────────────────────────────── */
+.auth__stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 30px;
+  min-height: 210px;
+  background-color: var(--navy-900);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: saturate(.35) brightness(.28);
-  transform: scale(1.03); /* hides any edge artefacts from the filter */
+  /* Enough to sit under white text with the scrim, and no more: the
+     point of the picture is to be seen. */
+  isolation: isolate;
 }
 
-/* Layered navy veil — flat colour, no gradient (house rule). */
-.login__veil {
+/* A flat wash, not a gradient. Light enough that the photograph still
+   reads; the text itself does not rely on it. */
+.auth__scrim {
   position: absolute;
   inset: 0;
-  background: rgba(8, 32, 58, .78);
+  background: rgba(8, 32, 58, .46);
+  z-index: -1;
 }
 
-/* Subtle diagonal pattern gives the dark ground texture without photos. */
-.login__veil::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 28px,
-      rgba(255,255,255,.018) 28px,
-      rgba(255,255,255,.018) 29px
-    );
-  pointer-events: none;
-}
-
-/* ── Layout panel ─────────────────────────────────────────────────── */
-.login__panel {
-  position: relative; /* above the veil */
-  width: 100%;
-  max-width: 440px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* Two-column grid on wide screens: brand aside + form card. */
-@media (min-width: 960px) {
-  .login__panel {
-    max-width: 960px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 440px;
-    grid-template-areas:
-      "aside card"
-      "foot  foot";
-    align-items: center;
-    column-gap: 72px;
-    row-gap: 32px;
-  }
-  .login__aside { grid-area: aside; }
-  .login__card  { grid-area: card; }
-  .login__foot  { grid-area: foot; }
-}
-
-/* ── The card ─────────────────────────────────────────────────────── */
-.login__card {
-  background: var(--surface-2);
-  /* Top highlight simulates a light source; bottom shadow grounds the card. */
-  border: 1px solid var(--border-strong);
-  border-top-color: rgba(255, 255, 255, .10);
-  border-radius: 20px;
-  padding: 38px 38px 32px;
-  box-shadow:
-    0 2px  0   rgba(255, 255, 255, .06) inset,   /* top rim highlight */
-    0 32px 80px rgba(2, 8, 18, .65),              /* deep drop shadow  */
-    0 8px  24px rgba(2, 8, 18, .40);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Subtle green accent line across the top of the card. */
-.login__card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: var(--green-600);
-  border-radius: 20px 20px 0 0;
-}
-
-/* ── Brand aside (left column on desktop) ─────────────────────────── */
-.login__aside {
-  text-align: center;
+.auth__stageInner {
+  max-width: 460px;
+  padding: 22px 24px;
+  border-radius: var(--r-lg, 16px);
+  /* The solid panel that guarantees the text is readable whatever the
+     photograph happens to be. */
+  background: rgba(8, 32, 58, .82);
+  border: 1px solid rgba(255, 255, 255, .12);
   color: #fff;
 }
 
-.login__lockup {
+.auth__lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth__logo {
+  max-height: 52px;
+  max-width: 230px;
+  width: auto;
+  object-fit: contain;
+}
+
+.auth__mark {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--green-600);
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: .04em;
+  flex: none;
 }
 
-/* Feature-point list — shown only when there is room. */
-.login__points {
-  list-style: none;
-  margin: 28px 0 0;
-  padding: 26px 0 0;
-  border-top: 1px solid rgba(255, 255, 255, .12);
-  display: none;
+.auth__mark--sm { width: 34px; height: 34px; border-radius: 9px; font-size: 13px; }
+
+.auth__company { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+
+.auth__tagline {
+  margin: 14px 0 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, .86);
 }
-.login__points li {
+
+.auth__points {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, .14);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.auth__points li {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 9px 0;
-  font-size: 14px;
-  color: rgba(255, 255, 255, .84);
-  border-bottom: 1px solid rgba(255, 255, 255, .06);
-}
-.login__points li:last-child { border-bottom: 0; }
-.login__points svg {
-  width: 16px; height: 16px;
-  flex: 0 0 16px;
-  color: var(--green-400);
-  opacity: .9;
+  gap: 11px;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, .92);
 }
 
-@media (min-width: 960px) {
-  .login__points { display: block; }
-  .login__aside  { text-align: left; }
-  .login__logo   { margin-left: 0; }
+.auth__points svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--green-500, #34d399);
 }
 
-/* ── Brand mark & logo ────────────────────────────────────────────── */
-.login__mark {
-  width: 48px; height: 48px;
-  flex: 0 0 48px;
-  border-radius: 11px;
-  background: var(--green-600);
-  /* Subtle inner shadow makes it look raised from the dark aside. */
-  box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 4px 14px rgba(0,0,0,.4);
+.auth__back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(8, 32, 58, .82);
+  border: 1px solid rgba(255, 255, 255, .16);
   color: #fff;
-  display: grid; place-items: center;
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: -.03em;
-}
-
-.login__logo {
-  max-height: 72px;
-  max-width: 100%;
-  width: auto;
-  height: auto;
-  margin: 0 auto;
-  display: block;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,.35));
-}
-
-.login__company {
-  font-weight: 750;
-  font-size: 22px;
-  color: #fff;
-  line-height: 1.2;
-  letter-spacing: -.02em;
-}
-
-.login__tagline {
-  color: var(--green-400);
+  font-size: 13px;
   font-weight: 600;
-  font-size: 14px;
-  letter-spacing: .01em;
-  margin: 14px 0 0;
-  line-height: 1.5;
-  opacity: .92;
+  text-decoration: none;
+}
+
+.auth__back:hover { background: rgba(8, 32, 58, .95); border-color: rgba(255, 255, 255, .3); }
+.auth__back svg { width: 15px; height: 15px; }
+
+/* ── The form side ──────────────────────────────────────────────────── */
+.auth__panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 34px 20px 42px;
+  background: var(--surface-1);
+}
+
+.auth__panel:focus { outline: none; }
+
+.auth__form {
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth__smallbrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  font-weight: 700;
+  color: var(--slate-800);
+}
+
+.auth__smallbrand img { max-height: 38px; max-width: 170px; object-fit: contain; }
+
+.auth__foot {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--slate-500);
+}
+
+.auth__contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.auth__contact a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--slate-700);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth__contact a:hover { color: var(--green-700); }
+.auth__contact svg { width: 14px; height: 14px; color: var(--slate-400); }
+
+.auth__legal { line-height: 1.5; }
+
+.auth__backsm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--slate-600);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth__backsm svg { width: 14px; height: 14px; }
+
+/* Wide enough for two columns: the picture takes the larger share and
+   runs the full height of the window. */
+@media (min-width: 900px) {
+  .auth { grid-template-columns: minmax(0, 1.05fr) minmax(430px, .95fr); }
+
+  .auth__stage { padding: 46px; min-height: 100vh; min-height: 100dvh; }
+  .auth__stageInner { padding: 28px 30px; }
+  .auth__panel { padding: 48px 44px; }
+  .auth__smallbrand, .auth__backsm { display: none; }
+  .auth__tagline { font-size: 15.5px; }
+}
+
+@media (min-width: 1280px) {
+  .auth { grid-template-columns: minmax(0, 1.2fr) 560px; }
+  .auth__panel { padding: 56px 72px; }
+  .auth__form { max-width: 420px; }
+}
+
+/* Small screens: the picture becomes a header strip, and the panel below
+   it holds everything that matters. */
+@media (max-width: 899px) {
+  .auth__stage { min-height: 168px; padding: 22px; justify-content: flex-end; }
+  .auth__stageInner { display: none; }
+  .auth__back { align-self: flex-start; }
+}
+
+/* Very short windows — a laptop with the browser bars showing — should
+   scroll the form rather than crush it. */
+@media (max-height: 620px) and (min-width: 900px) {
+  .auth__stage { overflow: auto; }
+  .auth__panel { align-items: flex-start; }
 }
 
 /* ── Card header (title + intro) ──────────────────────────────────── */
@@ -1383,20 +1437,20 @@ fieldset:last-of-type { margin-bottom: 0; }
 }
 
 /* ── Form fields ──────────────────────────────────────────────────── */
-.login__card .field { margin-bottom: 18px; }
+.auth__form .field { margin-bottom: 18px; }
 
 /* The same gap in the two portals where .field is flush by default. */
 .portal-card .field { margin-bottom: 16px; }
 .portal-card .row-form .field,
 .portal-card .field.mb-0 { margin-bottom: 0; }
 
-/* Slightly taller inputs on the sign-in card feel more premium. */
-.login__card .input {
+/* Slightly taller inputs on the sign-in page feel more considered. */
+.auth__form .input {
   padding-top: 10px;
   padding-bottom: 10px;
   font-size: 14px;
 }
-.login__card .input-icon .input { padding-left: 40px; }
+.auth__form .input-icon .input { padding-left: 40px; }
 
 /* ── Remember-me checkbox ─────────────────────────────────────────── */
 .login__remember {
@@ -1443,42 +1497,6 @@ fieldset:last-of-type { margin-bottom: 0; }
 }
 .login__help svg { width: 13px; height: 13px; flex: 0 0 13px; color: var(--green-500); opacity: .8; }
 
-/* ── Footer (copyright + contact) ────────────────────────────────── */
-.login__foot {
-  text-align: center;
-  font-size: 12px;
-  color: rgba(255, 255, 255, .55);
-  line-height: 1.7;
-}
-.login__foot span { margin: 0 5px; opacity: .45; }
-
-/* ── Back-to-website pill ─────────────────────────────────────────── */
-.login__back {
-  margin: 0 0 18px;
-  text-align: center;
-  font-size: 13px;
-}
-.login__back a {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 18px;
-  border: 1px solid rgba(255, 255, 255, .20);
-  border-radius: 999px;
-  color: rgba(255, 255, 255, .72);
-  text-decoration: none;
-  font-size: 12.5px;
-  transition: border-color .16s, color .16s, background-color .16s;
-}
-.login__back a:hover,
-.login__back a:focus-visible {
-  border-color: var(--green-400);
-  background: rgba(255, 255, 255, .06);
-  color: #fff;
-  text-decoration: none;
-}
-.login__back svg { width: 14px; height: 14px; }
-
 /* ── Input-with-icon wrapper ──────────────────────────────────────── */
 .input-icon { position: relative; display: flex; align-items: center; }
 
@@ -1514,20 +1532,17 @@ fieldset:last-of-type { margin-bottom: 0; }
 
 /* ── Mobile overrides ─────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  .login { padding: 16px 12px; }
-  .login__card {
-    padding: 28px 22px 26px;
-    border-radius: 16px;
-  }
+  .auth__panel { padding: 26px 18px 34px; }
   .login__title { font-size: 23px; }
   .login__submit { height: 44px; font-size: 14.5px; }
 }
 
-/* Accessibility: drop decorative photo for high-contrast mode. */
+/* Accessibility: in high-contrast mode the photograph goes and the
+   panel behind the words becomes solid navy. */
 @media (prefers-contrast: more) {
-  .login__bg { display: none; }
-  .login__veil { background: var(--navy-900); }
-  .login__veil::after { display: none; }
+  .auth__stage { background-image: none !important; }
+  .auth__scrim { background: var(--navy-900); }
+  .auth__stageInner { background: var(--navy-900); border-color: rgba(255,255,255,.4); }
 }
 
 /* ---------------------------------------------------------------------
@@ -5202,25 +5217,8 @@ a.portal-list__row:hover { background: var(--surface-2); }
 .apply-group:first-of-type { margin-top: 8px; }
 
 /* Anyone who cannot get in needs a way to reach a person. "Contact your
-   administrator" means nothing to a customer, so the real details sit
-   under the card, on the dark ground rather than inside the white. */
-.login__contact {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 18px;
-  margin-bottom: 9px;
-}
-.login__contact a {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: rgba(255, 255, 255, .78);
-  text-decoration: none;
-}
-.login__contact a:hover,
-.login__contact a:focus-visible { color: #fff; text-decoration: underline; }
-.login__contact svg { width: 13px; height: 13px; opacity: .7; }
+   administrator" means nothing to a customer, so the real details sit at
+   the foot of the form, where somebody stuck is already looking. */
 
 /* The back links at the foot of the set-up pages carry an arrow. */
 .login__help svg { width: 14px; height: 14px; vertical-align: -3px; margin-right: 1px; }

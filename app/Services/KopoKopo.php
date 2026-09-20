@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 
+use App\Core\Config;
 use App\Core\Logger;
 use App\Core\Settings;
 
@@ -44,6 +45,156 @@ class KopoKopo
     public function isConfigured(): bool
     {
         return $this->clientId !== '' && $this->clientSecret !== '' && $this->tillNumber !== '';
+    }
+
+    /**
+     * Where KopoKopo should post the result of a payment.
+     *
+     * One resolver for every caller. There used to be two: staff-initiated
+     * payments used the address configured in Settings, while a customer
+     * paying from the portal — or buying SMS units — derived one from
+     * app.url instead. When those two disagree, and they do the moment
+     * anybody fills in the Settings field, KopoKopo refuses the request
+     * and the customer is told we could not reach M-Pesa.
+     *
+     * Order: what the office configured, then the application's own
+     * address, then the host of the request in hand.
+     */
+    public static function callbackUrl(): string
+    {
+        $configured = trim((string) Settings::get('kopokopo_callback_url', ''));
+
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        $appUrl = rtrim((string) Config::get('app.url', ''), '/');
+
+        if ($appUrl !== '') {
+            return $appUrl . base_path() . '/webhooks/kopokopo';
+        }
+
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+
+        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . base_path() . '/webhooks/kopokopo';
+    }
+
+    /**
+     * Why M-Pesa is not working, in the order the answers matter.
+     *
+     * "We could not reach M-Pesa" is all a customer should ever see, but
+     * somebody in the office has to be able to find out which of half a
+     * dozen quite different things went wrong. Each check returns
+     * ok/warn/fail with a sentence that says what to do about it.
+     *
+     * @return list<array{name:string, state:string, detail:string}>
+     */
+    public function diagnose(): array
+    {
+        $checks = [];
+
+        $say = static function (string $name, string $state, string $detail) use (&$checks): void {
+            $checks[] = ['name' => $name, 'state' => $state, 'detail' => $detail];
+        };
+
+        // 1. Is it even switched on?
+        $say('Switched on', Settings::bool('kopokopo_enabled') ? 'ok' : 'fail',
+            Settings::bool('kopokopo_enabled')
+                ? 'M-Pesa is enabled.'
+                : 'M-Pesa is switched off, so no prompt can be sent. Tick "Enable M-Pesa STK Push" below.');
+
+        // 2. The three credentials, named separately — "incomplete" is no
+        //    use when you cannot see which one is missing.
+        $missing = [];
+
+        if ($this->clientId === '')     { $missing[] = 'Client ID'; }
+        if ($this->clientSecret === '') { $missing[] = 'Client Secret'; }
+        if ($this->tillNumber === '')   { $missing[] = 'Till number'; }
+
+        $say('Credentials', $missing === [] ? 'ok' : 'fail',
+            $missing === []
+                ? 'Client ID, Secret and Till number are all set.'
+                : 'Missing: ' . implode(', ', $missing) . '. KopoKopo refuses every request without these.');
+
+        // 3. Sandbox keys against production, or the other way round, is
+        //    the commonest cause of a flat refusal.
+        $env = (string) Settings::get('kopokopo_env', 'sandbox');
+        $say('Environment', $env === 'production' ? 'ok' : 'warn',
+            $env === 'production'
+                ? 'Production — real money, real till.'
+                : 'Sandbox. Sandbox keys only work against sandbox, and no real prompt reaches a phone. '
+                . 'Switch to production when you go live.');
+
+        // 3b. KopoKopo's own till identifier, not the Safaricom number
+        //     printed on the shop wall. Theirs looks like K123456, and
+        //     sending the other one is refused with a message about an
+        //     invalid till that reads like a network fault.
+        if ($this->tillNumber !== '' && !preg_match('/^K\d{5,}$/i', $this->tillNumber)) {
+            $say('Till number', 'warn',
+                'The till is "' . $this->tillNumber . '". KopoKopo expects its own till id, which looks like '
+                . 'K123456 — not the Safaricom till or paybill number. Check it in the KopoKopo dashboard.');
+        }
+
+        if ($missing !== []) {
+            return $checks;
+        }
+
+        // 4. The credentials, proved rather than assumed.
+        $token = $this->token(true);
+
+        $say('Signing in to KopoKopo', $token['ok'] ? 'ok' : 'fail',
+            $token['ok']
+                ? 'KopoKopo accepted the Client ID and Secret.'
+                : (string) ($token['error'] ?? 'No answer.')
+                . ' Check the keys, and that they belong to the ' . $env . ' environment.');
+
+        // 5. The address KopoKopo has to be able to reach. It refuses a
+        //    request whose callback is not a public HTTPS address, which
+        //    looks from the outside exactly like a network failure.
+        $callback = self::callbackUrl();
+        $host     = (string) parse_url($callback, PHP_URL_HOST);
+        $scheme   = (string) parse_url($callback, PHP_URL_SCHEME);
+        $local    = in_array($host, ['localhost', '127.0.0.1', '::1'], true)
+                 || str_ends_with($host, '.local') || str_ends_with($host, '.test');
+
+        if ($scheme !== 'https' || $local || $host === '') {
+            $say('Callback address', 'fail',
+                'KopoKopo would have to reach ' . ($callback ?: 'nothing') . ', which it cannot: '
+                . ($local || $host === ''
+                    ? 'that address only exists on this machine.'
+                    : 'it is not HTTPS.')
+                . ' Set the callback URL below to your public https address.');
+        } else {
+            $say('Callback address', 'ok', 'KopoKopo will post results to ' . $callback . '.');
+        }
+
+        return $checks;
+    }
+
+    /**
+     * What to tell the person at the keyboard when a prompt fails.
+     *
+     * A customer cannot act on "HTTP 422 invalid till_number", and should
+     * not see it. But "try again in a moment" is a lie when the cause is
+     * a missing till number, and it sends them round the same loop for as
+     * long as it takes somebody to notice. So: transient faults invite a
+     * retry, and settled ones say plainly that it is our end and to
+     * contact us. The real text is logged and kept on the request either
+     * way.
+     */
+    public static function customerMessage(string $rawError): string
+    {
+        $e = strtolower($rawError);
+
+        $ourFault = str_contains($e, 'credential') || str_contains($e, 'not configured')
+            || str_contains($e, 'unauthor') || str_contains($e, '401') || str_contains($e, '403')
+            || str_contains($e, 'callback') || str_contains($e, 'till') || str_contains($e, 'invalid')
+            || str_contains($e, '422') || str_contains($e, 'access token');
+
+        return $ourFault
+            ? 'M-Pesa payments are not working at the moment — this is at our end, not yours. '
+            . 'Please contact us and we will take the payment another way.'
+            : 'We could not reach M-Pesa just now. Please try again in a moment.';
     }
 
     // -- OAuth ---------------------------------------------------------

@@ -114,7 +114,7 @@ class StkPayment
         $result = (new KopoKopo())->stkPush(
             phone:       $phone,
             amount:      $amount,
-            callbackUrl: Notifier::absoluteUrl('/webhooks/kopokopo'),
+            callbackUrl: KopoKopo::callbackUrl(),
             reference:   (string) $doc['doc_number'],
             firstName:   $firstName,
             lastName:    $lastName,
@@ -141,10 +141,11 @@ class StkPayment
                 'stk_failed',
                 'stk_request',
                 $stkId,
-                'Client-initiated STK Push failed for ' . $doc['doc_number'] . ' (' . $source . ')'
+                'Client-initiated STK Push failed for ' . $doc['doc_number'] . ' (' . $source . '): '
+                . mb_substr((string) ($result['error'] ?? 'no reason given'), 0, 150)
             );
 
-            return ['ok' => false, 'error' => 'We could not reach M-Pesa just now. Please try again in a moment.'];
+            return ['ok' => false, 'error' => KopoKopo::customerMessage((string) ($result['error'] ?? ''))];
         }
 
         ActivityLog::record(

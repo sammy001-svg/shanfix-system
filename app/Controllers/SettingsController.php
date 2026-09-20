@@ -58,6 +58,10 @@ class SettingsController extends Controller
             'settings'            => $company,
             'categories'          => $grouped,
             'kopokopoReady'       => (new KopoKopo())->isConfigured(),
+            // The result of the last check, shown once. Its absence is
+            // not a pass — it means nobody has looked yet.
+            'kopokopoChecks'      => Session::get('kopokopo_checks'),
+            'kopokopoCallback'    => KopoKopo::callbackUrl(),
             'checklist'           => $checklist,
             'completenessPercent' => $completenessPercent,
             'completedCount'      => $completedCount,
@@ -72,6 +76,10 @@ class SettingsController extends Controller
             'defaultCallback'     => rtrim((string) Config::get('app.url', ''), '/') . base_path() . '/webhooks/kopokopo',
             'appUrlSet'           => rtrim((string) Config::get('app.url', ''), '/') !== '',
         ]);
+
+        // Shown once. Leaving it would have the page still reporting a
+        // fault somebody fixed an hour ago.
+        Session::forget('kopokopo_checks');
     }
 
     public function saveCompany(Request $request): void
@@ -260,24 +268,28 @@ class SettingsController extends Controller
     }
 
     /** Ask KopoKopo for a token, to prove the credentials work. */
+    /**
+     * Check M-Pesa end to end and say what is wrong.
+     *
+     * This used to ask for an access token and stop there, which proves
+     * only that two of the five things that have to be right are right.
+     * A customer whose prompt never arrives is told we could not reach
+     * M-Pesa, and the office had nothing to look at; now it has a list.
+     */
     public function testKopokopo(Request $request): void
     {
-        $kopokopo = new KopoKopo();
+        $checks = (new KopoKopo())->diagnose();
 
-        if (!$kopokopo->isConfigured()) {
-            Session::error('Enter your Client ID, Client Secret and Till number first.');
-            Response::to('/settings?tab=payments');
-        }
+        Session::put('kopokopo_checks', $checks);
 
-        $result = $kopokopo->token(true);
+        $failed = array_filter($checks, static fn(array $c): bool => $c['state'] === 'fail');
 
-        if ($result['ok']) {
-            Session::success(
-                'Connected to KopoKopo (' . Settings::get('kopokopo_env', 'sandbox') . ') successfully. '
-                . 'Access token received.'
-            );
+        if ($failed === []) {
+            Session::success('M-Pesa looks ready. Every check passed.');
         } else {
-            Session::error('KopoKopo connection failed: ' . $result['error']);
+            Session::error(count($failed) === 1
+                ? 'One thing is stopping M-Pesa from working — see below.'
+                : count($failed) . ' things are stopping M-Pesa from working — see below.');
         }
 
         Response::to('/settings?tab=payments');
