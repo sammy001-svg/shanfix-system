@@ -13,7 +13,7 @@ $done    = (int) $c['sent_count'] + (int) $c['failed_count'];
 $total   = max((int) $c['total_count'], $done);
 $pct     = $total > 0 ? min(100, round(100 * $done / $total)) : 0;
 $running = in_array($c['status'], ['queued', 'sending', 'scheduled'], true);
-$base    = '/portal/sms/campaigns/' . (int) $c['id'];
+$campaign = $base . '/campaigns/' . (int) $c['id'];
 ?>
 
 <div class="portal-wrap">
@@ -23,7 +23,7 @@ $base    = '/portal/sms/campaigns/' . (int) $c['id'];
     <div class="portal-card__head">
       <div class="portal-card__title"><?= e($c['name']) ?> <span class="badge <?= e($cls) ?>"><?= e($word) ?></span></div>
       <?php if ($running): ?>
-        <form method="post" action="<?= url($base . '/cancel') ?>"
+        <form method="post" action="<?= url($campaign . '/cancel') ?>"
               data-confirm="Stop this campaign? Messages already sent cannot be recalled.">
           <?= csrf_field() ?>
           <button class="btn btn--ghost btn--sm" type="submit"><?= icon('x-circle') ?> Stop it</button>
@@ -44,7 +44,7 @@ $base    = '/portal/sms/campaigns/' . (int) $c['id'];
       </p>
     <?php endif; ?>
 
-    <div <?= $running ? 'data-sms-progress="' . e(url($base)) . '"' : '' ?>>
+    <div <?= $running ? 'data-sms-progress="' . e(url($campaign)) . '"' : '' ?>>
       <div class="progress"><div class="progress__bar" data-sms-bar style="width:<?= $pct ?>%"></div></div>
       <div class="text-sm text-muted mt-8" data-sms-note>
         <?= number_format($done) ?> of <?= number_format($total) ?>
@@ -80,7 +80,7 @@ $base    = '/portal/sms/campaigns/' . (int) $c['id'];
       <div class="bars">
         <?php foreach ($labels as $l => $n): ?>
           <?php [$lcls, $lword] = Present::label((string) $l); ?>
-          <a class="bar-row" href="<?= url($base . '?label=' . rawurlencode((string) $l)) ?>">
+          <a class="bar-row" href="<?= url($campaign . '?label=' . rawurlencode((string) $l)) ?>">
             <span class="bar-row__label"><?= e($lword) ?></span>
             <span class="bar-row__track"><span class="bar-row__fill <?= str_contains($lcls, 'red') ? 'bar-row__fill--red' : ($lcls === 'badge--green' ? '' : 'bar-row__fill--navy') ?>" style="width:<?= number_format($n / $lmax * 100, 2) ?>%"></span></span>
             <span class="bar-row__value"><?= number_format((int) $n) ?></span>
@@ -93,7 +93,7 @@ $base    = '/portal/sms/campaigns/' . (int) $c['id'];
   <div class="portal-card">
     <div class="portal-card__head">
       <div class="portal-card__title">Messages</div>
-      <?php if ($label !== ''): ?><a class="portal-card__more" href="<?= url($base) ?>">Show all</a><?php endif; ?>
+      <?php if ($label !== ''): ?><a class="portal-card__more" href="<?= url($campaign) ?>">Show all</a><?php endif; ?>
     </div>
 
     <?php if (!$messages): ?>

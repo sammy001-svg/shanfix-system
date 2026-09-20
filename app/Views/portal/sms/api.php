@@ -53,7 +53,7 @@ $sender   = $senders[0]['sender_id'] ?? 'YOUR_SENDER_ID';
     <?php endif; ?>
 
     <div class="row-form">
-      <form method="post" action="<?= url('/portal/sms/api/key') ?>"
+      <form method="post" action="<?= url($base . '/api/key') ?>"
             <?= $account['api_key_hash'] ? 'data-confirm="Issue a new key? Anything using the current one stops working straight away."' : '' ?>>
         <?= csrf_field() ?>
         <button class="btn btn--primary" type="submit">
@@ -61,7 +61,7 @@ $sender   = $senders[0]['sender_id'] ?? 'YOUR_SENDER_ID';
         </button>
       </form>
       <?php if ($account['api_key_hash']): ?>
-        <form method="post" action="<?= url('/portal/sms/api/key/revoke') ?>"
+        <form method="post" action="<?= url($base . '/api/key/revoke') ?>"
               data-confirm="Revoke this key? Anything using it will be refused.">
           <?= csrf_field() ?>
           <button class="btn btn--ghost" type="submit">Revoke</button>

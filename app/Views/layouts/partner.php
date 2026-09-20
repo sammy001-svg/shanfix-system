@@ -86,6 +86,10 @@ $brand   = \App\Core\Settings::company();
          href="<?= url('/partners/clients/new') ?>">Register a customer</a>
       <a class="portal-nav__link <?= $on('/partners/refer') ? 'is-active' : '' ?>"
          href="<?= url('/partners/refer') ?>">Introduce someone</a>
+      <?php if (\App\Core\Settings::bool('bulk_sms_enabled', true)): ?>
+        <a class="portal-nav__link <?= str_contains($here, '/partners/sms') ? 'is-active' : '' ?>"
+           href="<?= url('/partners/sms') ?>">Bulk SMS</a>
+      <?php endif; ?>
     </nav>
 
     <div class="portal-top__right">

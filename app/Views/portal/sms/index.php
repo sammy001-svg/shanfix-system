@@ -24,14 +24,14 @@ $chartMax = max(1, ...array_map(static fn(array $d): int => $d['sent'] + $d['fai
       <?= icon('info') ?>
       <div class="alert__body">
         Before you can send anything, you need a sender ID — the name your
-        messages arrive from. <a href="<?= url('/portal/sms/senders') ?>"><strong>Ask for one</strong></a>;
+        messages arrive from. <a href="<?= url($base . '/senders') ?>"><strong>Ask for one</strong></a>;
         the networks usually approve it within a few working days.
       </div>
     </div>
   <?php endif; ?>
 
   <div class="portal-card">
-    <form method="post" action="<?= url('/portal/sms/send') ?>" id="quick-send">
+    <form method="post" action="<?= url($base . '/send') ?>" id="quick-send">
       <?= csrf_field() ?>
 
       <div class="field">
@@ -40,7 +40,7 @@ $chartMax = max(1, ...array_map(static fn(array $d): int => $d['sent'] + $d['fai
                   placeholder="0712345678, 0722000111"><?= e(old('recipients')) ?></textarea>
         <span class="field-hint">
           Up to 50 numbers, separated by commas or new lines. For a bigger
-          list, <a href="<?= url('/portal/sms/campaigns/new') ?>">start a campaign</a>.
+          list, <a href="<?= url($base . '/campaigns/new') ?>">start a campaign</a>.
         </span>
       </div>
 
@@ -120,7 +120,7 @@ $chartMax = max(1, ...array_map(static fn(array $d): int => $d['sent'] + $d['fai
   <div class="portal-card">
     <div class="portal-card__head">
       <div class="portal-card__title">Recent campaigns</div>
-      <a class="portal-card__more" href="<?= url('/portal/sms/campaigns') ?>">All campaigns</a>
+      <a class="portal-card__more" href="<?= url($base . '/campaigns') ?>">All campaigns</a>
     </div>
 
     <?php if (!$campaigns): ?>
@@ -131,14 +131,14 @@ $chartMax = max(1, ...array_map(static fn(array $d): int => $d['sent'] + $d['fai
           A campaign sends one message to a whole list — a contact group, or
           a spreadsheet you upload.
         </p>
-        <a class="btn btn--outline" href="<?= url('/portal/sms/campaigns/new') ?>">Start a campaign</a>
+        <a class="btn btn--outline" href="<?= url($base . '/campaigns/new') ?>">Start a campaign</a>
       </div>
     <?php else: ?>
       <ul class="portal-list portal-list--tight">
         <?php foreach ($campaigns as $c): ?>
           <?php [$cls, $word] = Present::campaign((string) $c['status']); ?>
           <li class="portal-list__row">
-            <a class="portal-list__main" href="<?= url('/portal/sms/campaigns/' . (int) $c['id']) ?>">
+            <a class="portal-list__main" href="<?= url($base . '/campaigns/' . (int) $c['id']) ?>">
               <span class="portal-list__title"><?= e($c['name']) ?></span>
               <span class="portal-list__meta">
                 <?= number_format((int) $c['sent_count']) ?> sent
@@ -167,7 +167,7 @@ $chartMax = max(1, ...array_map(static fn(array $d): int => $d['sent'] + $d['fai
               <span class="portal-list__meta"><?= e(mb_strimwidth((string) $t['message'], 0, 90, '…')) ?></span>
             </span>
             <span class="portal-list__side">
-              <form method="post" action="<?= url('/portal/sms/templates/' . (int) $t['id'] . '/delete') ?>"
+              <form method="post" action="<?= url($base . '/templates/' . (int) $t['id'] . '/delete') ?>"
                     data-confirm="Delete this saved message?">
                 <?= csrf_field() ?>
                 <button class="btn btn--ghost btn--sm" type="submit"><?= icon('trash') ?></button>
@@ -178,7 +178,7 @@ $chartMax = max(1, ...array_map(static fn(array $d): int => $d['sent'] + $d['fai
       </ul>
     <?php endif; ?>
 
-    <form method="post" action="<?= url('/portal/sms/templates') ?>" class="mt-8">
+    <form method="post" action="<?= url($base . '/templates') ?>" class="mt-8">
       <?= csrf_field() ?>
       <div class="portal-cols">
         <div class="field">

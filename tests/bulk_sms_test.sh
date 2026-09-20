@@ -63,6 +63,14 @@ scrub_sms() {
       WHERE c.name LIKE 'SMSTEST%';
     DELETE FROM clients WHERE name LIKE 'SMSTEST%';
     DELETE FROM bulk_plans WHERE name LIKE 'SMSTEST%';
+    DELETE l FROM bulk_ledger l JOIN bulk_accounts a ON a.id = l.account_id
+      JOIN partners p ON a.owner_type='partner' AND p.id = a.owner_id WHERE p.name LIKE 'SMSTEST%';
+    DELETE b FROM bulk_purchases b JOIN bulk_accounts a ON a.id = b.account_id OR a.id = b.seller_account_id
+      JOIN partners p ON a.owner_type='partner' AND p.id = a.owner_id WHERE p.name LIKE 'SMSTEST%';
+    DELETE a FROM bulk_accounts a JOIN partners p ON a.owner_type='partner' AND p.id = a.owner_id
+      WHERE p.name LIKE 'SMSTEST%';
+    DELETE FROM partners WHERE name LIKE 'SMSTEST%';
+    DELETE FROM staff_notifications WHERE event='bulk_sender_requested';
     DELETE FROM notifications WHERE event LIKE 'bulk\_%' AND recipient LIKE '%smstest%';
   "
 
@@ -241,7 +249,14 @@ post /bulk-sms/campaigns/$CAMP/cancel --data "_token=$T" > /dev/null
 eq "it can be stopped"     "$(q "SELECT status FROM bulk_campaigns WHERE id=$CAMP;")" "cancelled"
 T=$(tok /bulk-sms/campaigns/$CAMP)
 post /bulk-sms/campaigns/$CAMP/retry --data "_token=$T" > /dev/null
-eq "and started again"     "$(q "SELECT status FROM bulk_campaigns WHERE id=$CAMP;")" "queued"
+# Retrying starts a worker straight away, so by the time this looks it
+# may already be sending or even finished. Any of those means it is on
+# its way again; only the ones that mean it is not are a failure.
+RETRIED=$(q "SELECT status FROM bulk_campaigns WHERE id=$CAMP;")
+case "$RETRIED" in
+  queued|sending|completed) ok  "and started again" "$RETRIED";;
+  *)                        bad "and started again" "$RETRIED" "on its way again";;
+esac
 
 echo ""
 echo "=== 9. Delivery reports come back from the gateway ==="
@@ -526,14 +541,27 @@ eq "a suspended account is refused" \
 $MYSQL -e "UPDATE bulk_accounts SET status='active' WHERE id=$ACC;"
 
 # The rate limit, proved rather than assumed.
-$MYSQL -e "DELETE FROM bulk_rate_counters;"
-LIMITED=0
-for i in $(seq 1 11); do
-  RC=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/bulksend.php" \
-       -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY" \
-       --data "to=0700000404&sender_id=SMSTEST&message=rate")
-  if [ "$RC" = "429" ]; then LIMITED=1; break; fi
-done
+#
+# Counted per clock minute, so a burst that straddles a minute boundary
+# starts again half way through and never trips it. The whole burst is
+# repeated when that happens rather than the assertion being loosened.
+burst() {
+  $MYSQL -e "DELETE FROM bulk_rate_counters;"
+  local i rc
+  for i in $(seq 1 12); do
+    rc=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/v1/bulksend.php" \
+         -H "X-Client-Id: $APICID" -H "X-Api-Key: $APIKEY" \
+         --data "to=0700000404&sender_id=SMSTEST&message=rate")
+    if [ "$rc" = "429" ]; then echo 1; return; fi
+  done
+  echo 0
+}
+
+MINUTE_BEFORE=$(date +%M)
+LIMITED=$(burst)
+if [ "$LIMITED" = "0" ] && [ "$(date +%M)" != "$MINUTE_BEFORE" ]; then
+  LIMITED=$(burst)
+fi
 eq "too many bulk calls a minute are refused" "$LIMITED" "1"
 $MYSQL -e "DELETE FROM bulk_rate_counters;"
 
@@ -543,6 +571,171 @@ $MYSQL -e "DELETE FROM bulk_messages WHERE account_id=$OTHERACC;
            DELETE FROM bulk_accounts WHERE id=$OTHERACC;
            DELETE FROM clients WHERE id=$OTHERCID;
            DELETE FROM client_users WHERE email='smstest@example.test';"
+
+echo ""
+echo "=== 21. A partner is a reseller ==="
+PPASS="SmsPartner1"
+PHASH=$($PHP -r 'echo password_hash($argv[1], PASSWORD_DEFAULT);' "$PPASS")
+$MYSQL -e "DELETE FROM partners WHERE email='smspartner@example.test';
+           INSERT INTO partners (partner_code, first_name, last_name, name, email, phone, status, password_hash)
+           VALUES ('SMSTESTP','Sms','Partner','SMSTEST Partner','smspartner@example.test','254700000600','active','$PHASH');"
+PID=$(q "SELECT id FROM partners WHERE email='smspartner@example.test';")
+
+PJ2="$D/jar_smspartner.txt"; rm -f "$PJ2"
+pget2()  { curl -s -b "$PJ2" -c "$PJ2" "$BASE$1"; }
+pcode2() { curl -s -o /dev/null -w '%{http_code}' -b "$PJ2" "$BASE$1"; }
+ptok2()  { pget2 "$1" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//'; }
+ppost2() { local p="$1"; shift; curl -s -o /dev/null -w '%{http_code}' -b "$PJ2" -c "$PJ2" -X POST "$BASE$p" "$@"; }
+
+PT=$(curl -s -c "$PJ2" "$BASE/partners/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -s -o /dev/null -b "$PJ2" -c "$PJ2" -X POST "$BASE/partners/login" \
+     --data "_token=$PT&email=smspartner@example.test&password=$PPASS"
+
+eq "the partner is signed in"    "$(pcode2 /partners)" "200"
+eq "their SMS page opens"        "$(pcode2 /partners/sms)" "200"
+PACC=$(q "SELECT id FROM bulk_accounts WHERE owner_type='partner' AND owner_id=$PID;")
+ne "an account was opened for them" "$PACC" ""
+eq "and they buy from the house" \
+   "$(q "SELECT p.owner_type FROM bulk_accounts a JOIN bulk_accounts p ON p.id=a.parent_id WHERE a.id=$PACC;")" "house"
+eq "their clients page opens"    "$(pcode2 /partners/sms/clients)" "200"
+eq "their payments page"         "$(pcode2 /partners/sms/sales)" "200"
+eq "their prices page"           "$(pcode2 /partners/sms/pricing)" "200"
+eq "and the shared send page"    "$(pcode2 /partners/sms/campaigns)" "200"
+
+echo ""
+echo "=== 22. They set a price and supply a client ==="
+PT=$(ptok2 /partners/sms/pricing)
+ppost2 /partners/sms/pricing --data "_token=$PT&resale_unit_price=1.60" > /dev/null
+eq "their standard price is saved" \
+   "$(q "SELECT ROUND(resale_unit_price,2) FROM bulk_accounts WHERE id=$PACC;")" "1.60"
+
+# A client of theirs, registered against them the usual way.
+PCLIENT=$(q "INSERT INTO clients (client_code, client_type, name, email, status, partner_id)
+             VALUES ('SMSTEST-P1','company','SMSTEST Partner Client','pclient@example.test','active',$PID);
+             SELECT LAST_INSERT_ID();")
+PT=$(ptok2 /partners/sms/clients)
+ppost2 /partners/sms/clients --data "_token=$PT&client_id=$PCLIENT" > /dev/null
+PCACC=$(q "SELECT id FROM bulk_accounts WHERE owner_type='client' AND owner_id=$PCLIENT;")
+ne "SMS is opened for their client" "$PCACC" ""
+eq "and that client buys from the partner, not from us" \
+   "$(q "SELECT parent_id FROM bulk_accounts WHERE id=$PCACC;")" "$PACC"
+eq "at the partner's price" \
+   "$(q "SELECT ROUND(COALESCE(c.unit_price, p.resale_unit_price),2) FROM bulk_accounts c
+         JOIN bulk_accounts p ON p.id=c.parent_id WHERE c.id=$PCACC;")" "1.60"
+
+# Units the partner does not have cannot be given away.
+PT=$(ptok2 /partners/sms/clients)
+ppost2 /partners/sms/clients/$PCACC/units --data "_token=$PT&units=100" > /dev/null
+eq "a partner with nothing cannot give units" "$(q "SELECT ROUND(sms_units) FROM bulk_accounts WHERE id=$PCACC;")" "0"
+
+# The office sells them some, then they pass them on.
+T=$(tok /bulk-sms/purchases)
+signin_admin > /dev/null
+T=$(tok /bulk-sms/purchases)
+post /bulk-sms/purchases --data "_token=$T&account_id=$PACC&units=1000&method=bank&transaction_ref=SMSTESTP1" > /dev/null
+eq "the partner has units to sell" "$(q "SELECT ROUND(sms_units) FROM bulk_accounts WHERE id=$PACC;")" "1000"
+
+PT=$(ptok2 /partners/sms/clients)
+ppost2 /partners/sms/clients/$PCACC/units --data "_token=$PT&units=300&note=SMSTEST+handover" > /dev/null
+eq "now they can hand units over"  "$(q "SELECT ROUND(sms_units) FROM bulk_accounts WHERE id=$PCACC;")" "300"
+eq "and it comes out of their own" "$(q "SELECT ROUND(sms_units) FROM bulk_accounts WHERE id=$PACC;")" "700"
+
+PT=$(ptok2 /partners/sms/clients)
+ppost2 /partners/sms/clients/$PCACC/price --data "_token=$PT&unit_price=2.50" > /dev/null
+eq "they can price one client differently" \
+   "$(q "SELECT ROUND(unit_price,2) FROM bulk_accounts WHERE id=$PCACC;")" "2.50"
+
+echo ""
+echo "=== 23. Their client asks to buy, and they confirm it ==="
+CP2="SmsPc1"
+CH2=$($PHP -r 'echo password_hash($argv[1], PASSWORD_DEFAULT);' "$CP2")
+$MYSQL -e "INSERT INTO client_users (client_id, name, email, password_hash, status)
+           VALUES ($PCLIENT,'PC User','pclient@example.test','$CH2','active');"
+PCJ="$D/jar_pclient.txt"; rm -f "$PCJ"
+CT2=$(curl -s -c "$PCJ" "$BASE/portal/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -s -o /dev/null -b "$PCJ" -c "$PCJ" -X POST "$BASE/portal/login" \
+     --data "_token=$CT2&email=pclient@example.test&password=$CP2"
+
+BUYPAGE=$(curl -s -b "$PCJ" "$BASE/portal/sms/buy")
+has "they are told who supplies them" "$BUYPAGE" "SMSTEST Partner"
+case "$BUYPAGE" in
+  *"Buy with M-Pesa"*) bad "and are not offered M-Pesa here" "offered" "not offered";;
+  *)                   ok  "and are not offered M-Pesa here" "not offered";;
+esac
+
+CT2=$(curl -s -b "$PCJ" -c "$PCJ" "$BASE/portal/sms/buy" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+curl -s -o /dev/null -b "$PCJ" -c "$PCJ" -X POST "$BASE/portal/sms/buy" \
+     --data "_token=$CT2&units=100&transaction_ref=SMSTESTMP1"
+SALE=$(q "SELECT id FROM bulk_purchases WHERE account_id=$PCACC AND status='pending' ORDER BY id DESC LIMIT 1;")
+ne "the request reaches the partner" "$SALE" ""
+eq "priced at what that client pays" \
+   "$(q "SELECT ROUND(amount) FROM bulk_purchases WHERE id=$SALE;")" "250"
+eq "and it is the partner who sells it" \
+   "$(q "SELECT seller_account_id FROM bulk_purchases WHERE id=$SALE;")" "$PACC"
+
+# The office must not be able to settle a partner's sale.
+signin_admin > /dev/null
+T=$(tok /bulk-sms/purchases)
+post /bulk-sms/purchases/$SALE/complete --data "_token=$T" > /dev/null
+eq "the office cannot confirm a partner's sale" "$(q "SELECT status FROM bulk_purchases WHERE id=$SALE;")" "pending"
+
+PT=$(ptok2 /partners/sms/sales)
+ppost2 /partners/sms/sales/$SALE/approve --data "_token=$PT&transaction_ref=SMSTESTMP1" > /dev/null
+eq "the partner can"                  "$(q "SELECT status FROM bulk_purchases WHERE id=$SALE;")" "completed"
+eq "their client gets the units"      "$(q "SELECT ROUND(sms_units) FROM bulk_accounts WHERE id=$PCACC;")" "400"
+eq "and they come out of the partner" "$(q "SELECT ROUND(sms_units) FROM bulk_accounts WHERE id=$PACC;")" "600"
+
+echo ""
+echo "=== 24. What a reseller may not do ==="
+# Another partner's client, and a client that is not theirs at all.
+STRANGER=$(q "SELECT id FROM bulk_accounts WHERE owner_type='client' AND id <> $PCACC AND parent_id <> $PACC LIMIT 1;")
+if [ -n "$STRANGER" ]; then
+  BEFORE=$(q "SELECT ROUND(sms_units,4) FROM bulk_accounts WHERE id=$STRANGER;")
+  PT=$(ptok2 /partners/sms/clients)
+  eq "they cannot give units to somebody else's client" \
+     "$(ppost2 /partners/sms/clients/$STRANGER/units --data "_token=$PT&units=10")" "403"
+  eq "and nothing moved" "$(q "SELECT ROUND(sms_units,4) FROM bulk_accounts WHERE id=$STRANGER;")" "$BEFORE"
+  PT=$(ptok2 /partners/sms/clients)
+  eq "nor change what they pay" \
+     "$(ppost2 /partners/sms/clients/$STRANGER/price --data "_token=$PT&unit_price=0.01")" "403"
+  PT=$(ptok2 /partners/sms/clients)
+  eq "nor suspend them" "$(ppost2 /partners/sms/clients/$STRANGER/status --data "_token=$PT")" "403"
+fi
+
+# A reseller supplies credit; they do not get to read the messages.
+$MYSQL -e "INSERT INTO bulk_messages (account_id, sender_id, recipient, message, status)
+           VALUES ($PCACC,'SMSTEST','+254700000701','a private message from their client','sent');"
+case "$(pget2 /partners/sms/reports)" in
+  *"a private message from their client"*) bad "a reseller cannot read their clients' messages" "visible" "hidden";;
+  *)                                       ok  "a reseller cannot read their clients' messages" "hidden";;
+esac
+
+# And the office's own screens are not theirs either.
+OFFICE=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -b "$PJ2" "$BASE/bulk-sms")
+case "$OFFICE" in
+  302*"/login"*) ok  "nor open the office's SMS pages" "sent to the staff sign-in";;
+  *)             bad "nor open the office's SMS pages" "$OFFICE" "302 to /login";;
+esac
+
+echo ""
+echo "=== 25. The chain still adds up ==="
+eq "every account's balance equals its ledger" \
+   "$(q "SELECT COUNT(*) FROM bulk_accounts a
+          WHERE ROUND(a.sms_units,4) <> ROUND(COALESCE((SELECT SUM(l.amount) FROM bulk_ledger l WHERE l.account_id=a.id),0),4);")" "0"
+eq "what the partner sold on came out of what we sold them" \
+   "$(q "SELECT CASE WHEN (SELECT COALESCE(SUM(units),0) FROM bulk_purchases WHERE seller_account_id=$PACC AND status='completed')
+                   <= (SELECT COALESCE(SUM(units),0) FROM bulk_purchases WHERE account_id=$PACC AND status='completed')
+                   THEN 'ok' ELSE 'more than they bought' END;")" "ok"
+
+$MYSQL -e "DELETE FROM bulk_messages WHERE account_id IN ($PCACC, $PACC);
+           DELETE FROM bulk_ledger WHERE account_id IN ($PCACC, $PACC);
+           DELETE FROM bulk_purchases WHERE account_id IN ($PCACC, $PACC) OR seller_account_id = $PACC;
+           DELETE FROM bulk_plans WHERE owner_account_id = $PACC;
+           DELETE FROM client_users WHERE client_id = $PCLIENT;
+           DELETE FROM bulk_accounts WHERE id = $PCACC;
+           DELETE FROM bulk_accounts WHERE id = $PACC;
+           DELETE FROM clients WHERE id = $PCLIENT;
+           DELETE FROM partners WHERE id = $PID;"
 
 scrub_sms
 report

@@ -15,7 +15,7 @@ $smsTab = 'campaigns';
   <div class="portal-card">
     <div class="portal-card__head">
       <div class="portal-card__title">Campaigns</div>
-      <a class="btn btn--primary btn--sm" href="<?= url('/portal/sms/campaigns/new') ?>"><?= icon('plus') ?> New campaign</a>
+      <a class="btn btn--primary btn--sm" href="<?= url($base . '/campaigns/new') ?>"><?= icon('plus') ?> New campaign</a>
     </div>
 
     <?php if (!$rows): ?>
@@ -32,7 +32,7 @@ $smsTab = 'campaigns';
                 $total = max((int) $c['total_count'], $done);
                 $pct   = $total > 0 ? min(100, round(100 * $done / $total)) : 0; ?>
           <li class="portal-list__row">
-            <a class="portal-list__main" href="<?= url('/portal/sms/campaigns/' . (int) $c['id']) ?>">
+            <a class="portal-list__main" href="<?= url($base . '/campaigns/' . (int) $c['id']) ?>">
               <span class="portal-list__title"><?= e($c['name']) ?></span>
               <span class="portal-list__meta">
                 <?= e($c['sender_id']) ?>

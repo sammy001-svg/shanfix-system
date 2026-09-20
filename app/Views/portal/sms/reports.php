@@ -14,7 +14,7 @@ $smsTab = 'reports';
   <?php include __DIR__ . '/_nav.php'; ?>
 
   <div class="portal-card">
-    <form method="get" action="<?= url('/portal/sms/reports') ?>" class="row-form">
+    <form method="get" action="<?= url($base . '/reports') ?>" class="row-form">
       <div class="field mb-0" style="max-width:160px">
         <label class="label" for="from">From</label>
         <input class="input" type="date" id="from" name="from" value="<?= e($from) ?>">

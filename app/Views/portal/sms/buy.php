@@ -21,7 +21,7 @@ $waiting = (int) ($_GET['waiting'] ?? 0);
   <?php include __DIR__ . '/_nav.php'; ?>
 
   <?php if ($waiting > 0): ?>
-    <div class="portal-card" data-sms-topup="<?= e(url('/portal/sms/buy/' . $waiting . '/status')) ?>">
+    <div class="portal-card" data-sms-topup="<?= e(url($base . '/buy/' . $waiting . '/status')) ?>">
       <div class="portal-card__head"><div class="portal-card__title">Waiting for your M-Pesa PIN</div></div>
       <p class="text-sm" data-sms-topup-note>Check your phone and enter your M-Pesa PIN.</p>
     </div>
@@ -32,7 +32,7 @@ $waiting = (int) ($_GET['waiting'] ?? 0);
       <div class="portal-card__head"><div class="portal-card__title">Bundles</div></div>
       <div class="portal-grid">
         <?php foreach ($plans as $p): ?>
-          <form method="post" action="<?= url('/portal/sms/buy') ?>" class="portal-tile <?= $p['is_popular'] ? 'portal-tile--owing' : '' ?>">
+          <form method="post" action="<?= url($base . '/buy') ?>" class="portal-tile <?= $p['is_popular'] ? 'portal-tile--owing' : '' ?>">
             <?= csrf_field() ?>
             <input type="hidden" name="plan_id" value="<?= (int) $p['id'] ?>">
             <?php if ($byMpesa): ?><input type="hidden" name="phone" value="<?= e($phone) ?>"><?php endif; ?>
@@ -56,7 +56,7 @@ $waiting = (int) ($_GET['waiting'] ?? 0);
       <div class="portal-card__title">Any number of units</div>
     </div>
 
-    <form method="post" action="<?= url('/portal/sms/buy') ?>">
+    <form method="post" action="<?= url($base . '/buy') ?>">
       <?= csrf_field() ?>
 
       <div class="portal-cols">

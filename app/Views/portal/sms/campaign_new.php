@@ -21,12 +21,12 @@ $smsTab = 'campaigns';
       <?= icon('alert-triangle') ?>
       <div class="alert__body">
         You need an approved sender ID first.
-        <a href="<?= url('/portal/sms/senders') ?>"><strong>Ask for one</strong></a>.
+        <a href="<?= url($base . '/senders') ?>"><strong>Ask for one</strong></a>.
       </div>
     </div>
   <?php else: ?>
     <div class="portal-card">
-      <form method="post" action="<?= url('/portal/sms/campaigns') ?>" enctype="multipart/form-data">
+      <form method="post" action="<?= url($base . '/campaigns') ?>" enctype="multipart/form-data">
         <?= csrf_field() ?>
 
         <div class="portal-cols">
@@ -65,7 +65,7 @@ $smsTab = 'campaigns';
               <?php endforeach; ?>
             </select>
             <?php if (!$groups): ?>
-              <span class="field-hint">You have no lists yet. <a href="<?= url('/portal/sms/contacts') ?>">Make one</a>, or upload a file below.</span>
+              <span class="field-hint">You have no lists yet. <a href="<?= url($base . '/contacts') ?>">Make one</a>, or upload a file below.</span>
             <?php endif; ?>
           </div>
 

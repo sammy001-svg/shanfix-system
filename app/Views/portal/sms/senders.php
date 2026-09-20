@@ -54,7 +54,7 @@ $smsTab = 'senders';
       you have them and it goes through faster.
     </p>
 
-    <form method="post" action="<?= url('/portal/sms/senders') ?>" enctype="multipart/form-data">
+    <form method="post" action="<?= url($base . '/senders') ?>" enctype="multipart/form-data">
       <?= csrf_field() ?>
 
       <div class="field">

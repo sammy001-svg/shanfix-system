@@ -22,18 +22,18 @@ $smsTab = 'contacts';
     <?php if ($groups): ?>
       <ul class="portal-list portal-list--tight">
         <li class="portal-list__row">
-          <a class="portal-list__main" href="<?= url('/portal/sms/contacts') ?>">
+          <a class="portal-list__main" href="<?= url($base . '/contacts') ?>">
             <span class="portal-list__title">Everybody</span>
           </a>
         </li>
         <?php foreach ($groups as $g): ?>
           <li class="portal-list__row">
-            <a class="portal-list__main" href="<?= url('/portal/sms/contacts?group=' . (int) $g['id']) ?>">
+            <a class="portal-list__main" href="<?= url($base . '/contacts?group=' . (int) $g['id']) ?>">
               <span class="portal-list__title <?= $groupId === (int) $g['id'] ? 'fw-700' : '' ?>"><?= e($g['name']) ?></span>
               <span class="portal-list__meta"><?= number_format((int) $g['people']) ?> contact<?= (int) $g['people'] === 1 ? '' : 's' ?></span>
             </a>
             <span class="portal-list__side">
-              <form method="post" action="<?= url('/portal/sms/groups/' . (int) $g['id'] . '/delete') ?>"
+              <form method="post" action="<?= url($base . '/groups/' . (int) $g['id'] . '/delete') ?>"
                     data-confirm="Delete the list &quot;<?= e($g['name']) ?>&quot;? The contacts in it stay in your address book.">
                 <?= csrf_field() ?>
                 <button class="btn btn--ghost btn--sm" type="submit"><?= icon('trash') ?></button>
@@ -46,7 +46,7 @@ $smsTab = 'contacts';
       <p class="text-sm text-muted">No lists yet. A list is what a campaign sends to.</p>
     <?php endif; ?>
 
-    <form method="post" action="<?= url('/portal/sms/groups') ?>" class="row-form mt-8">
+    <form method="post" action="<?= url($base . '/groups') ?>" class="row-form mt-8">
       <?= csrf_field() ?>
       <div class="field mb-0" style="flex:1">
         <label class="label" for="g-name">New list</label>
@@ -64,7 +64,7 @@ $smsTab = 'contacts';
       </div>
     </div>
 
-    <form method="get" action="<?= url('/portal/sms/contacts') ?>" class="row-form">
+    <form method="get" action="<?= url($base . '/contacts') ?>" class="row-form">
       <?php if ($groupId): ?><input type="hidden" name="group" value="<?= (int) $groupId ?>"><?php endif; ?>
       <div class="field mb-0" style="flex:1">
         <input class="input" name="q" value="<?= e($q) ?>" placeholder="Search a name or number">
@@ -72,7 +72,7 @@ $smsTab = 'contacts';
       <button class="btn btn--outline" type="submit"><?= icon('search') ?></button>
     </form>
 
-    <form method="post" action="<?= url('/portal/sms/contacts') ?>" class="row-form mt-8">
+    <form method="post" action="<?= url($base . '/contacts') ?>" class="row-form mt-8">
       <?= csrf_field() ?>
       <?php if ($groupId): ?><input type="hidden" name="group_id" value="<?= (int) $groupId ?>"><?php endif; ?>
       <div class="field mb-0" style="flex:1">
@@ -114,7 +114,7 @@ $smsTab = 'contacts';
                 <td class="code text-sm"><?= e($r['phone']) ?></td>
                 <td class="text-sm text-muted"><?= e($r['group_name'] ?: '—') ?></td>
                 <td>
-                  <form method="post" action="<?= url('/portal/sms/contacts/' . (int) $r['id'] . '/delete') ?>"
+                  <form method="post" action="<?= url($base . '/contacts/' . (int) $r['id'] . '/delete') ?>"
                         data-confirm="Remove this contact?">
                     <?= csrf_field() ?>
                     <button class="btn btn--ghost btn--sm" type="submit"><?= icon('trash') ?></button>
@@ -132,7 +132,7 @@ $smsTab = 'contacts';
 
 <div class="modal-backdrop" id="import-contacts">
   <div class="modal">
-    <form method="post" action="<?= url('/portal/sms/contacts/import') ?>" enctype="multipart/form-data">
+    <form method="post" action="<?= url($base . '/contacts/import') ?>" enctype="multipart/form-data">
       <?= csrf_field() ?>
       <div class="modal__head">
         <div class="card__title">Import contacts</div>

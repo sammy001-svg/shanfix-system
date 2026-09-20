@@ -38,6 +38,7 @@ use App\Controllers\NotificationController;
 use App\Controllers\PartnerAuthController;
 use App\Controllers\PartnerAdminController;
 use App\Controllers\PartnerController;
+use App\Controllers\PartnerSmsController;
 use App\Controllers\PayoutController;
 use App\Controllers\PayrollController;
 use App\Controllers\PaymentController;
@@ -323,6 +324,54 @@ $r->group(['partner_auth'], function ($r) {
 
     // A month set out so they can invoice us against it, which is what the
     // terms they agreed to actually say happens.
+    // -- Bulk SMS: their own sending, and their reselling
+    //
+    // The sending half is the same code and the same pages the client
+    // portal uses — a partner texting their customers is doing what a
+    // client does. The reselling half is theirs alone.
+    $r->get('/partners/sms',                 [PartnerSmsController::class, 'home']);
+    $r->get('/partners/sms/campaigns',       [PartnerSmsController::class, 'campaigns']);
+    $r->get('/partners/sms/campaigns/new',   [PartnerSmsController::class, 'newCampaign']);
+    $r->get('/partners/sms/campaigns/{id}',  [PartnerSmsController::class, 'campaign']);
+    $r->get('/partners/sms/contacts',        [PartnerSmsController::class, 'contacts']);
+    $r->get('/partners/sms/senders',         [PartnerSmsController::class, 'senders']);
+    $r->get('/partners/sms/buy',             [PartnerSmsController::class, 'buy']);
+    $r->get('/partners/sms/buy/{id}/status', [PartnerSmsController::class, 'purchaseStatus']);
+    $r->get('/partners/sms/reports',         [PartnerSmsController::class, 'reports']);
+    $r->get('/partners/sms/api',             [PartnerSmsController::class, 'api']);
+    $r->get('/partners/sms/clients',         [PartnerSmsController::class, 'clients']);
+    $r->get('/partners/sms/sales',           [PartnerSmsController::class, 'sales']);
+    $r->get('/partners/sms/pricing',         [PartnerSmsController::class, 'pricing']);
+
+    $r->group(['csrf'], function ($r) {
+        $r->post('/partners/sms/send',                  [PartnerSmsController::class, 'send']);
+        $r->post('/partners/sms/campaigns',             [PartnerSmsController::class, 'createCampaign']);
+        $r->post('/partners/sms/campaigns/{id}/cancel', [PartnerSmsController::class, 'cancelCampaign']);
+        $r->post('/partners/sms/contacts',              [PartnerSmsController::class, 'saveContact']);
+        $r->post('/partners/sms/contacts/import',       [PartnerSmsController::class, 'importContacts']);
+        $r->post('/partners/sms/contacts/{id}/delete',  [PartnerSmsController::class, 'deleteContact']);
+        $r->post('/partners/sms/groups',                [PartnerSmsController::class, 'saveGroup']);
+        $r->post('/partners/sms/groups/{id}/delete',    [PartnerSmsController::class, 'deleteGroup']);
+        $r->post('/partners/sms/templates',             [PartnerSmsController::class, 'saveTemplate']);
+        $r->post('/partners/sms/templates/{id}/delete', [PartnerSmsController::class, 'deleteTemplate']);
+        $r->post('/partners/sms/senders',               [PartnerSmsController::class, 'requestSender']);
+        $r->post('/partners/sms/buy',                   [PartnerSmsController::class, 'startPurchase']);
+        $r->post('/partners/sms/api/key',               [PartnerSmsController::class, 'issueKey']);
+        $r->post('/partners/sms/api/key/revoke',        [PartnerSmsController::class, 'revokeKey']);
+
+        // Reselling.
+        $r->post('/partners/sms/clients',                   [PartnerSmsController::class, 'openClient']);
+        $r->post('/partners/sms/clients/{id}/units',        [PartnerSmsController::class, 'giveUnits']);
+        $r->post('/partners/sms/clients/{id}/price',        [PartnerSmsController::class, 'clientPrice']);
+        $r->post('/partners/sms/clients/{id}/status',       [PartnerSmsController::class, 'clientStatus']);
+        $r->post('/partners/sms/sales/{id}/approve',        [PartnerSmsController::class, 'approveSale']);
+        $r->post('/partners/sms/sales/{id}/decline',        [PartnerSmsController::class, 'declineSale']);
+        $r->post('/partners/sms/pricing',                   [PartnerSmsController::class, 'saveResale']);
+        $r->post('/partners/sms/pricing/plans',             [PartnerSmsController::class, 'savePlan']);
+        $r->post('/partners/sms/pricing/plans/{id}',        [PartnerSmsController::class, 'savePlan']);
+        $r->post('/partners/sms/pricing/plans/{id}/toggle', [PartnerSmsController::class, 'togglePlan']);
+        $r->post('/partners/sms/pricing/plans/{id}/delete', [PartnerSmsController::class, 'deletePlan']);
+    });
     $r->get('/partners/statement/{period}', [PartnerController::class, 'statement']);
 });
 
