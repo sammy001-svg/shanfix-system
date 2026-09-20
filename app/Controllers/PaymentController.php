@@ -3,7 +3,6 @@ namespace App\Controllers;
 
 use App\Core\ActivityLog;
 use App\Core\Auth;
-use App\Core\Config;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Core\HttpException;
@@ -597,25 +596,5 @@ class PaymentController extends Controller
 
         // Confirm to the client. Runs after the payment is safely committed.
         PaymentPoster::notifyClient($result['payment_id']);
-    }
-
-    /** Callback URL KopoKopo posts back to. */
-    private function callbackUrl(): string
-    {
-        $configured = (string) Settings::get('kopokopo_callback_url', '');
-
-        if ($configured !== '') {
-            return $configured;
-        }
-
-        $appUrl = rtrim((string) Config::get('app.url', ''), '/');
-
-        if ($appUrl !== '') {
-            return $appUrl . base_path() . '/webhooks/kopokopo';
-        }
-
-        // Last resort: derive from the current request.
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . url('/webhooks/kopokopo');
     }
 }
