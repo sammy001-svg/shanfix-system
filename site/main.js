@@ -129,23 +129,27 @@ document.querySelectorAll('.nav-link').forEach(link => {
   });
 });
 
-// Mega Menu Mobile Toggle
-const navItemDropdown = document.querySelector('.nav-item-dropdown');
+// Mega Menu Mobile Toggle — handles ALL dropdowns
+document.querySelectorAll('.nav-item-dropdown').forEach(dropdown => {
+  const dropdownLink = dropdown.querySelector(':scope > .nav-link');
+  if (!dropdownLink) return;
 
-if (navItemDropdown && window.innerWidth <= 767) {
-  const dropdownLink = navItemDropdown.querySelector('.nav-link');
-  
   dropdownLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    navItemDropdown.classList.toggle('active');
+    if (window.innerWidth <= 767) {
+      e.preventDefault();
+      // Close other open dropdowns
+      document.querySelectorAll('.nav-item-dropdown').forEach(other => {
+        if (other !== dropdown) other.classList.remove('active');
+      });
+      dropdown.classList.toggle('active');
+    }
   });
-}
+});
 
 // Update mega menu behavior on window resize
 window.addEventListener('resize', () => {
-  const navItemDropdown = document.querySelector('.nav-item-dropdown');
-  if (window.innerWidth > 767 && navItemDropdown) {
-    navItemDropdown.classList.remove('active');
+  if (window.innerWidth > 767) {
+    document.querySelectorAll('.nav-item-dropdown').forEach(d => d.classList.remove('active'));
   }
 });
 

@@ -213,7 +213,6 @@ foreach ($_seo as $_k => $_v) {
         </div>
         <ul class="nav-menu" id="navMenu">
           <li><a href="index.php" class="nav-link">Home</a></li>
-          <li><a href="who-we-are.php" class="nav-link">About Us</a></li>
           <li class="nav-item-dropdown">
             <a href="index.php#services" class="nav-link">
               Our Services
@@ -510,9 +509,54 @@ foreach ($_seo as $_k => $_v) {
             </div>
           </li>
 
-          <li><a href="portfolio.php" class="nav-link">Portfolio</a></li>
-          <li><a href="blog.php" class="nav-link">Blog</a></li>
-          <li><a href="contact.php" class="nav-link">Contacts</a></li>
+          <li class="nav-item-dropdown">
+            <a href="#" class="nav-link" id="companyDropdownToggle">
+              Company
+              <svg class="dropdown-arrow" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+              </svg>
+            </a>
+            <div class="mega-menu company-dropdown">
+              <div class="company-dropdown-content">
+                <a href="who-we-are.php" class="company-dropdown-item">
+                  <div class="company-dropdown-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </div>
+                  <div class="company-dropdown-text">
+                    <h4>About Us</h4>
+                    <p>Our story, mission &amp; team</p>
+                  </div>
+                </a>
+                <a href="portfolio.php" class="company-dropdown-item">
+                  <div class="company-dropdown-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                  </div>
+                  <div class="company-dropdown-text">
+                    <h4>Portfolio</h4>
+                    <p>Projects we're proud of</p>
+                  </div>
+                </a>
+                <a href="blog.php" class="company-dropdown-item">
+                  <div class="company-dropdown-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                  </div>
+                  <div class="company-dropdown-text">
+                    <h4>Blog</h4>
+                    <p>Insights, tips &amp; news</p>
+                  </div>
+                </a>
+                <a href="contact.php" class="company-dropdown-item">
+                  <div class="company-dropdown-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  </div>
+                  <div class="company-dropdown-text">
+                    <h4>Contacts</h4>
+                    <p>Get in touch with us</p>
+                  </div>
+                </a>
+              </div>
+            </div>
+          </li>
           <li><a href="https://aicoder.shanfixtechnology.com/" class="btn btn-primary nav-btn-small">AI Coder</a></li>
           <li><a href="https://automation.shanfixtechnology.com/" class="btn btn-secondary nav-btn-small">AI Automations</a></li>
 
