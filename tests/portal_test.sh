@@ -529,40 +529,44 @@ ne "and they are not the same label"    "$(echo "$STAFF" | grep -c 'login__kind-
 eq "no app chrome before signing in" "$(echo "$PORTAL" | grep -c 'portal-nav')" "0"
 
 # The sign-in ground. A background photograph left at full strength pulled
-# the page to rgb(73,89,110) — pale slate rather than navy — which took the
-# brand colour with it and dropped the tagline to 2.85:1 against its own
-# background, well under the 4.5:1 minimum. Darkening and draining the
-# photograph first put it at 5.75:1 and made the page navy again. Both
-# halves of that treatment have to stay, or the page silently goes pale the
-# next time somebody uploads a bright picture.
+# the page to rgb(73,89,110) — pale slate rather than navy — and dropped
+# the tagline to 2.85:1 against its own background, under the 4.5:1
+# minimum. That was solved by dimming the photograph almost to black,
+# which cost the picture: it could no longer be seen at all.
+#
+# The page is a split layout now, so contrast comes from the arrangement
+# instead. Every word sits on solid colour — the form on a plain surface,
+# the words on the picture side inside a solid navy panel — and the
+# photograph only has to be a photograph. What has to hold:
+#
+#   the panel behind the words on the photo is nearly opaque, and
+#   the wash over the photo is light enough to leave a picture visible.
+#
+# Lose the first and the words become unreadable over a pale photo; lose
+# the second and we are back to a page with an invisible background.
 CSS=$(curl -s "$BASE/assets/css/app.css")
-# Checked as "at least this dark" rather than as exact numbers. The
-# treatment has been strengthened since (.45/.34 became .35/.28, and the
-# veil .82 became .78) and this assertion failed for a page that had got
-# better, not worse — a test that breaks when the design improves teaches
-# people to ignore it.
-BRIGHTNESS=$(printf '%s' "$CSS" | grep -oE 'filter: saturate\([0-9.]+\) brightness\([0-9.]+\)' | head -1 \
-             | grep -oE 'brightness\([0-9.]+\)' | grep -oE '[0-9.]+')
-# From the .login__veil rule itself: the same navy appears at other
-# strengths elsewhere, and the first match was one of those.
-VEIL=$(printf '%s' "$CSS" | grep -A 4 '^\.login__veil {' \
-       | grep -oE 'rgba\(8, 32, 58, \.[0-9]+\)' | head -1 | grep -oE '\.[0-9]+')
 
-if [ -n "$BRIGHTNESS" ] && awk "BEGIN{exit !($BRIGHTNESS <= 0.34)}"; then
-  ok  "the photograph is darkened" "brightness $BRIGHTNESS"
+PANEL=$(printf '%s' "$CSS" | grep -A 8 '^\.auth__stageInner {'         | grep -oE 'background: rgba\(8, 32, 58, \.[0-9]+\)' | head -1 | grep -oE '\.[0-9]+')
+SCRIM=$(printf '%s' "$CSS" | grep -A 5 '^\.auth__scrim {'         | grep -oE 'rgba\(8, 32, 58, \.[0-9]+\)' | head -1 | grep -oE '\.[0-9]+')
+
+if [ -n "$PANEL" ] && awk "BEGIN{exit !($PANEL >= 0.75)}"; then
+  ok  "the words sit on solid colour" "panel at $PANEL"
 else
-  bad "the photograph is darkened" "${BRIGHTNESS:-no filter}" "brightness .34 or less"
+  bad "the words sit on solid colour" "${PANEL:-no panel}" "navy at .75 or more"
 fi
 
-if [ -n "$VEIL" ] && awk "BEGIN{exit !($VEIL >= 0.78)}"; then
-  ok  "and a flat navy sits over it" "alpha $VEIL"
+if [ -n "$SCRIM" ] && awk "BEGIN{exit !($SCRIM <= 0.55)}"; then
+  ok  "and the photograph can still be seen" "wash at $SCRIM"
 else
-  bad "and a flat navy sits over it" "${VEIL:-no veil}" "navy at .78 or more"
+  bad "and the photograph can still be seen" "${SCRIM:-no wash}" "a wash of .55 or less"
 fi
 
-# The card was darker than the ground behind it, which reads as a hole in
-# the page rather than a panel on it.
-has "the card sits above the ground" "$CSS" "background: var(--surface-2)"
+# The photograph is applied to the stage, not to the whole page, so it
+# cannot creep behind the form and take the text down with it.
+has "the photo belongs to the picture side" "$(curl -s "$BASE/login")" 'class="auth__stage"'
+
+# The form sits on a plain surface rather than floating on the picture.
+has "the form sits on a surface of its own" "$CSS" ".auth__panel {"
 
 # Every one of those has to actually go somewhere.
 for path in /login /portal/login /portal/start /portal/request-access; do
