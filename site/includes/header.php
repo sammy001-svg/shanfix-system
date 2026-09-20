@@ -48,6 +48,8 @@ foreach ($_seo as $_k => $_v) {
     <meta name="keywords" content="<?= htmlspecialchars($_seo['keywords']) ?>" />
     <meta name="author" content="<?= htmlspecialchars($_brand['name']) ?>" />
     <link rel="canonical" href="<?= htmlspecialchars($_seo['canonical']) ?>" />
+    <!-- Google Search Console Verification -->
+    <meta name="google-site-verification" content="PoQBUsHgSE3ZR_VPYpm_w2gQ2Vwml1NacJ0BzS33STE" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
