@@ -371,10 +371,27 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php // Two different things that both involve texting. This one is
+            // us messaging our own clients; the SMS platform below is the
+            // product customers and partners send their own texts through. ?>
       <?php if (can('sms.campaign')): ?>
         <a class="nav-link <?= is_active_nav('/sms-campaigns') ? 'is-active' : '' ?>"
            href="<?= url('/sms-campaigns') ?>">
-          <?= icon('message', 'nav-link__icon') ?> Bulk SMS
+          <?= icon('message', 'nav-link__icon') ?> Text our clients
+        </a>
+      <?php endif; ?>
+
+      <?php if (can('bulksms.view')): ?>
+        <?php $smsWaiting = (int) \App\Core\Database::scalar(
+            "SELECT (SELECT COUNT(*) FROM bulk_sender_ids WHERE status = 'pending')
+                  + (SELECT COUNT(*) FROM bulk_purchases p JOIN bulk_accounts s ON s.id = p.seller_account_id
+                      WHERE p.status = 'pending' AND s.owner_type = 'house')", [], 0); ?>
+        <a class="nav-link <?= is_active_nav('/bulk-sms') ? 'is-active' : '' ?>"
+           href="<?= url('/bulk-sms') ?>">
+          <?= icon('smartphone', 'nav-link__icon') ?> SMS platform
+          <?php if ($smsWaiting > 0): ?>
+            <span class="nav-link__badge"><?= $smsWaiting ?></span>
+          <?php endif; ?>
         </a>
       <?php endif; ?>
 
