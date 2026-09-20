@@ -7,7 +7,6 @@
  */
 require_once APP_PATH . '/Views/partials/icons.php';
 
-$smsTab = 'api';
 $clientId = $account['api_client_id'] ?: 'YOUR_CLIENT_ID';
 $sender   = $senders[0]['sender_id'] ?? 'YOUR_SENDER_ID';
 ?>

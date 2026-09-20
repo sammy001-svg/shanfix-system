@@ -1037,6 +1037,9 @@ $r->group(['auth'], function ($r) {
         $r->post('/bulk-sms/campaigns/{id}/cancel',    [BulkSmsTrafficController::class, 'cancel']);
         $r->post('/bulk-sms/campaigns/{id}/retry',     [BulkSmsTrafficController::class, 'retry']);
         $r->post('/bulk-sms/sender-ids',               [BulkSmsTrafficController::class, 'addSender']);
+        $r->post('/bulk-sms/sender-ids/whitelist',    [BulkSmsTrafficController::class, 'whitelistSenders']);
+        $r->post('/bulk-sms/sender-ids/{id}/assign',   [BulkSmsTrafficController::class, 'assignSender']);
+        $r->post('/bulk-sms/sender-ids/{id}/unassign', [BulkSmsTrafficController::class, 'unassignSender']);
         $r->post('/bulk-sms/sender-ids/{id}/decide',   [BulkSmsTrafficController::class, 'decideSender']);
         $r->post('/bulk-sms/sender-ids/{id}/delete',   [BulkSmsTrafficController::class, 'deleteSender']);
     });

@@ -13,7 +13,6 @@ require_once APP_PATH . '/Views/partials/icons.php';
 use App\Services\BulkSms\Present;
 use App\Services\BulkSms\Purchases;
 
-$smsTab  = 'buy';
 $waiting = (int) ($_GET['waiting'] ?? 0);
 ?>
 

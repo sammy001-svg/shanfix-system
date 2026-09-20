@@ -25,9 +25,36 @@ final class Topup
     /** Prompts one account may trigger in an hour, as on invoices. */
     public const MAX_ATTEMPTS_PER_HOUR = 6;
 
+    /**
+     * Can somebody buy units on their phone right now?
+     *
+     * Three things have to be true, and all three are worth reporting
+     * separately when they are not — "M-Pesa is off" and "M-Pesa has no
+     * till number" look identical to a customer staring at a missing
+     * button, and cost the office the same phone call.
+     *
+     * @return array{ok:bool, reason:string}
+     */
+    public static function readiness(): array
+    {
+        if (!Settings::bool('bulk_sms_mpesa', true)) {
+            return ['ok' => false, 'reason' => 'Paying for SMS units by M-Pesa is switched off in the SMS gateway settings.'];
+        }
+
+        if (!Settings::bool('kopokopo_enabled')) {
+            return ['ok' => false, 'reason' => 'M-Pesa payments are switched off for the whole system, under Settings → Payments.'];
+        }
+
+        if (!(new KopoKopo())->isConfigured()) {
+            return ['ok' => false, 'reason' => 'M-Pesa is on but has no client id, secret or till number yet, under Settings → Payments.'];
+        }
+
+        return ['ok' => true, 'reason' => 'Customers and partners can buy units on their phone.'];
+    }
+
     public static function available(): bool
     {
-        return Settings::bool('kopokopo_enabled');
+        return self::readiness()['ok'];
     }
 
     /**

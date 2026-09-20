@@ -629,7 +629,10 @@ class BulkSmsAdminController extends Controller
                 'bulk_sms_max_workers' => Settings::get('bulk_sms_max_workers', '5'),
                 'bulk_sms_dlr_token'   => Settings::get('bulk_sms_dlr_token', ''),
                 'bulk_sms_enabled'     => Settings::bool('bulk_sms_enabled', true),
+                'bulk_sms_cors_origins' => Settings::get('bulk_sms_cors_origins', ''),
             ],
+            'mpesa'        => \App\Services\BulkSms\Topup::readiness(),
+            'mpesaOn'      => Settings::bool('bulk_sms_mpesa', true),
             'hasApiKey'    => Settings::get('onfon_api_key', '') !== '',
             'hasAccessKey' => Settings::get('onfon_access_key', '') !== '',
             'dlrUrl'       => \App\Services\Notifier::absoluteUrl('/webhooks/sms-dlr'),
@@ -654,6 +657,13 @@ class BulkSmsAdminController extends Controller
             'bulk_sms_max_workers' => (string) max(1, min(50, $request->int('bulk_sms_max_workers'))),
             'bulk_sms_dlr_token'   => preg_replace('/[^A-Za-z0-9_-]/', '', (string) $request->input('bulk_sms_dlr_token', '')),
             'bulk_sms_enabled'     => $request->bool('bulk_sms_enabled') ? '1' : '0',
+            'bulk_sms_mpesa'       => $request->bool('bulk_sms_mpesa') ? '1' : '0',
+            // Which websites may call the API from a browser. Empty
+            // means any: the key is what authorises a call, not the
+            // page it came from.
+            'bulk_sms_cors_origins' => implode(',', array_filter(array_map('trim',
+                explode(',', (string) $request->input('bulk_sms_cors_origins', ''))),
+                static fn(string $o): bool => filter_var($o, FILTER_VALIDATE_URL) !== false)),
         ];
 
         // Secrets are only replaced when something is typed: an empty box

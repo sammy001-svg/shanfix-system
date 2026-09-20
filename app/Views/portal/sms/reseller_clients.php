@@ -10,7 +10,6 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 use App\Services\BulkSms\Present;
 
-$smsTab = 'clients';
 ?>
 
 <div class="portal-wrap">

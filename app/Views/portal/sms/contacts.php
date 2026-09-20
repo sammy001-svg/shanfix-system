@@ -5,7 +5,6 @@
  */
 require_once APP_PATH . '/Views/partials/icons.php';
 
-$smsTab = 'contacts';
 ?>
 
 <div class="portal-wrap">

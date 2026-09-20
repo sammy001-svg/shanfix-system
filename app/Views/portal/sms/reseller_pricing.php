@@ -10,7 +10,6 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 use App\Services\BulkSms\Present;
 
-$smsTab = 'pricing';
 $resale = $account['resale_unit_price'] !== null ? (float) $account['resale_unit_price'] : null;
 $margin = $resale !== null ? $resale - $cost : null;
 ?>

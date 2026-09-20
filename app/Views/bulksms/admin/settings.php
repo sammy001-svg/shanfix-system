@@ -7,6 +7,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 $section = 'settings';
 $dlrFull = $dlrUrl . ($values['bulk_sms_dlr_token'] !== '' ? '?token=' . $values['bulk_sms_dlr_token'] : '');
+$apiBase = \App\Services\Notifier::absoluteUrl('/api/v1');
 ?>
 
 <div class="page-head">
@@ -90,6 +91,37 @@ $dlrFull = $dlrUrl . ($values['bulk_sms_dlr_token'] !== '' ? '?token=' . $values
     </div>
 
     <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card__title">Paying by M-Pesa</div>
+          <div class="card__sub">How clients and partners buy units themselves</div>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="alert <?= $mpesa['ok'] ? 'alert--success' : 'alert--warning' ?>">
+          <?= icon($mpesa['ok'] ? 'check-circle' : 'alert-triangle') ?>
+          <div class="alert__body"><?= e($mpesa['reason']) ?></div>
+        </div>
+
+        <label class="check-row">
+          <input type="checkbox" name="bulk_sms_mpesa" value="1" <?= $mpesaOn ? 'checked' : '' ?>>
+          <span>Let customers and partners buy units with M-Pesa</span>
+        </label>
+        <div class="field-hint mb-8">
+          The prompt goes to their phone and the units land by themselves, through
+          the same Kopo Kopo account that collects invoice payments —
+          <a href="<?= url('/settings#payments') ?>">Settings → Payments</a> holds
+          the till number and keys.
+        </div>
+
+        <p class="text-sm text-muted mb-0">
+          A partner's own clients are never offered M-Pesa here. They pay the
+          partner directly, so the portal records the request and the partner
+          confirms it.
+        </p>
+      </div>
+    </div>
+    <div class="card">
       <div class="card__head"><div class="card__title">Selling</div></div>
       <div class="card__body">
         <div class="field">
@@ -130,6 +162,34 @@ $dlrFull = $dlrUrl . ($values['bulk_sms_dlr_token'] !== '' ? '?token=' . $values
     </div>
   </div>
 
+
+  <div class="card">
+    <div class="card__head">
+      <div>
+        <div class="card__title">The developer API</div>
+        <div class="card__sub">Customers' own software sending through us</div>
+      </div>
+    </div>
+    <div class="card__body">
+      <p class="text-sm text-muted">
+        Every account can issue its own key from its portal, and you can issue
+        one for them from their account page. Calls answer at
+        <span class="code"><?= e($apiBase) ?></span> — the old platform's
+        addresses, so code customers already have keeps working.
+      </p>
+      <div class="field mb-0">
+        <label class="label" for="bulk_sms_cors_origins">Websites allowed to call it from a browser</label>
+        <input class="input input--code" id="bulk_sms_cors_origins" name="bulk_sms_cors_origins"
+               value="<?= e($values['bulk_sms_cors_origins']) ?>"
+               placeholder="https://example.co.ke, https://shop.example.co.ke">
+        <div class="field-hint">
+          Comma separated, and empty means any — which is the old platform's
+          behaviour and is safe, because a key is what authorises a call, not
+          the page it came from. Fill it in only if a customer asks you to.
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="card">
     <div class="card__body">
       <button class="btn btn--primary" type="submit"><?= icon('save') ?> Save gateway settings</button>

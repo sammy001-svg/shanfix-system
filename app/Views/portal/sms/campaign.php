@@ -7,7 +7,6 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 use App\Services\BulkSms\Present;
 
-$smsTab = 'campaigns';
 [$cls, $word] = Present::campaign((string) $c['status']);
 $done    = (int) $c['sent_count'] + (int) $c['failed_count'];
 $total   = max((int) $c['total_count'], $done);

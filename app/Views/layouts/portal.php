@@ -1,10 +1,33 @@
 <?php
+/**
+ * The customer portal's shell.
+ *
+ * The navigation is down the side, the same shape as the staff system's.
+ * It was across the top, which worked while there were eight links and
+ * stopped working when Bulk SMS arrived with seven of its own: a row that
+ * wraps onto three lines is not a menu, it is a wall. Down the side the
+ * list can group itself, say which section you are in, and grow again
+ * without being redesigned.
+ *
+ * The shell classes (.layout, .sidebar, .main, .topbar) are the staff
+ * system's, so the small-screen drawer, its scrim and the toggle button
+ * all work here without a second implementation.
+ */
 require_once APP_PATH . '/Views/partials/icons.php';
 
 use App\Core\ClientAuth;
+use App\Core\Settings;
 
 $portalUser = ClientAuth::user();
-$brand      = \App\Core\Settings::company();
+$brand      = Settings::company();
+
+// is_active_nav('/portal') matches every page in the portal, so the
+// overview would stay lit on all of them. Matched on the path itself.
+$here = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+$on   = static fn(string $p): bool => str_ends_with($here, $p);
+$in   = static fn(string $p): bool => str_contains($here, $p);
+
+$smsOn = Settings::bool('bulk_sms_enabled', true);
 ?>
 <!doctype html>
 <html lang="en">
@@ -43,63 +66,119 @@ $brand      = \App\Core\Settings::company();
 
 <a class="skip-link" href="#main">Skip to content</a>
 
-<header class="portal-top">
-  <a class="portal-brand" href="<?= url($portalUser ? '/portal' : '/portal/login') ?>">
-    <?php if ($brand['logo']): ?>
-      <?php // /brand/logo, not /files — that route is behind the staff guard,
-            // so a client got a broken image where the logo should be.
-            //
-            // A wordmark already carries the company name, so it stands on
-            // its own here rather than being repeated in text beside it. ?>
-      <img class="portal-brand__logo" src="<?= url('/brand/logo') ?>" alt="<?= e($brand['name']) ?>">
-    <?php else: ?>
-      <span class="portal-brand__mark">SF</span>
-      <span>
-        <span class="portal-brand__name"><?= e($brand['name']) ?></span>
-        <?php if ($brand['tagline']): ?>
-          <span class="portal-brand__tag"><?= e($brand['tagline']) ?></span>
-        <?php endif; ?>
-      </span>
-    <?php endif; ?>
-  </a>
+<?php if (!$portalUser): ?>
+  <?php // Signed out — the sign-in pages draw themselves, with no menu to
+        // show and nothing to navigate to. ?>
+  <main class="portal-main" id="main" tabindex="-1">
+    <?php foreach (($flashes ?? []) as $flash): ?>
+      <div class="alert alert--<?= e($flash['type']) ?>">
+        <?= icon(match ($flash['type']) {
+            'success' => 'check-circle',
+            'error'   => 'x-circle',
+            'warning' => 'alert-triangle',
+            default   => 'info',
+        }) ?>
+        <div class="alert__body"><?= e($flash['message']) ?></div>
+        <button class="alert__close" type="button" aria-label="Dismiss">&times;</button>
+      </div>
+    <?php endforeach; ?>
+    <?= $content ?>
+  </main>
+<?php else: ?>
 
-  <?php if ($portalUser): ?>
-    <?php
-      // is_active_nav('/portal') matches every page in the portal, so the
-      // overview would stay lit on all of them. Matched on the path itself.
-      $here = rtrim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
-      $on   = static fn(string $p): bool => str_ends_with($here, $p);
-    ?>
-    <nav class="portal-nav">
-      <a class="portal-nav__link <?= $on('/portal') ? 'is-active' : '' ?>"
-         href="<?= url('/portal') ?>">Overview</a>
-      <a class="portal-nav__link <?= str_contains($here, '/portal/quotations') ? 'is-active' : '' ?>"
-         href="<?= url('/portal/quotations') ?>">Quotations</a>
-      <a class="portal-nav__link <?= str_contains($here, '/portal/invoices') ? 'is-active' : '' ?>"
-         href="<?= url('/portal/invoices') ?>">Invoices</a>
-      <a class="portal-nav__link <?= $on('/portal/statement') ? 'is-active' : '' ?>"
-         href="<?= url('/portal/statement') ?>">Statement</a>
-      <a class="portal-nav__link <?= $on('/portal/services') ? 'is-active' : '' ?>"
-         href="<?= url('/portal/services') ?>">Renewals</a>
-      <a class="portal-nav__link <?= $on('/portal/catalogue') ? 'is-active' : '' ?>"
-         href="<?= url('/portal/catalogue') ?>">What we do</a>
-      <a class="portal-nav__link <?= $on('/portal/requests') ? 'is-active' : '' ?>"
-         href="<?= url('/portal/requests') ?>">My requests</a>
-      <a class="portal-nav__link <?= $on('/portal/uploads') ? 'is-active' : '' ?>"
-         href="<?= url('/portal/uploads') ?>">Send artwork</a>
-      <?php // Only when we actually sell SMS. A link to a product that
-            // is switched off is a promise we cannot keep. ?>
-      <?php if (\App\Core\Settings::bool('bulk_sms_enabled', true)): ?>
-        <a class="portal-nav__link <?= str_contains($here, '/portal/sms') ? 'is-active' : '' ?>"
-           href="<?= url('/portal/sms') ?>">Bulk SMS</a>
+<div class="layout">
+
+  <div class="sidebar__scrim"></div>
+
+  <aside class="sidebar">
+    <a class="sidebar__brand" href="<?= url('/portal') ?>" style="text-decoration:none">
+      <?php if ($brand['logo']): ?>
+        <?php // /brand/logo, not /files — that route is behind the staff
+              // guard, so a client got a broken image where the logo
+              // should be. ?>
+        <img class="sidebar__logo" src="<?= url('/brand/logo') ?>" alt="<?= e($brand['name']) ?>">
+      <?php else: ?>
+        <span class="sidebar__mark">SF</span>
+        <span>
+          <span class="sidebar__name"><?= e($brand['name']) ?></span>
+          <span class="sidebar__sub">CUSTOMER PORTAL</span>
+        </span>
+      <?php endif; ?>
+    </a>
+
+    <nav class="sidebar__nav">
+      <a class="nav-link <?= $on('/portal') ? 'is-active' : '' ?>" href="<?= url('/portal') ?>">
+        <?= icon('grid', 'nav-link__icon') ?> Overview
+      </a>
+
+      <div class="nav-group__label">Your account</div>
+      <a class="nav-link <?= $in('/portal/quotations') ? 'is-active' : '' ?>" href="<?= url('/portal/quotations') ?>">
+        <?= icon('file-text', 'nav-link__icon') ?> Quotations
+      </a>
+      <a class="nav-link <?= $in('/portal/invoices') ? 'is-active' : '' ?>" href="<?= url('/portal/invoices') ?>">
+        <?= icon('receipt', 'nav-link__icon') ?> Invoices
+      </a>
+      <a class="nav-link <?= $on('/portal/statement') ? 'is-active' : '' ?>" href="<?= url('/portal/statement') ?>">
+        <?= icon('list', 'nav-link__icon') ?> Statement
+      </a>
+      <a class="nav-link <?= $on('/portal/services') ? 'is-active' : '' ?>" href="<?= url('/portal/services') ?>">
+        <?= icon('repeat', 'nav-link__icon') ?> Renewals
+      </a>
+
+      <div class="nav-group__label">Working with us</div>
+      <a class="nav-link <?= $on('/portal/catalogue') ? 'is-active' : '' ?>" href="<?= url('/portal/catalogue') ?>">
+        <?= icon('package', 'nav-link__icon') ?> What we do
+      </a>
+      <a class="nav-link <?= $on('/portal/requests') ? 'is-active' : '' ?>" href="<?= url('/portal/requests') ?>">
+        <?= icon('inbox', 'nav-link__icon') ?> My requests
+      </a>
+      <a class="nav-link <?= $on('/portal/uploads') ? 'is-active' : '' ?>" href="<?= url('/portal/uploads') ?>">
+        <?= icon('paperclip', 'nav-link__icon') ?> Send artwork
+      </a>
+
+      <?php // Only when we actually sell SMS. A link to a product that is
+            // switched off is a promise we cannot keep. ?>
+      <?php if ($smsOn): ?>
+        <div class="nav-group__label">Bulk SMS</div>
+        <a class="nav-link <?= $on('/portal/sms') ? 'is-active' : '' ?>" href="<?= url('/portal/sms') ?>">
+          <?= icon('send', 'nav-link__icon') ?> Send a message
+        </a>
+        <a class="nav-link <?= $in('/portal/sms/campaigns') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/campaigns') ?>">
+          <?= icon('layers', 'nav-link__icon') ?> Campaigns
+        </a>
+        <a class="nav-link <?= $in('/portal/sms/contacts') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/contacts') ?>">
+          <?= icon('users', 'nav-link__icon') ?> Contacts
+        </a>
+        <a class="nav-link <?= $on('/portal/sms/reports') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/reports') ?>">
+          <?= icon('activity', 'nav-link__icon') ?> Delivery reports
+        </a>
+        <a class="nav-link <?= $on('/portal/sms/senders') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/senders') ?>">
+          <?= icon('shield', 'nav-link__icon') ?> Sender IDs
+        </a>
+        <a class="nav-link <?= $in('/portal/sms/buy') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/buy') ?>">
+          <?= icon('credit-card', 'nav-link__icon') ?> Buy units
+        </a>
+        <a class="nav-link <?= $in('/portal/sms/api') ? 'is-active' : '' ?>" href="<?= url('/portal/sms/api') ?>">
+          <?= icon('code', 'nav-link__icon') ?> Developer API
+        </a>
       <?php endif; ?>
     </nav>
+  </aside>
 
-    <div class="portal-top__right">
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn sidebar__toggle" data-sidebar-toggle type="button" aria-label="Toggle navigation">
+        <?= icon('menu') ?>
+      </button>
+
+      <div class="topbar__title"><?= e($title ?? 'Your account') ?></div>
+
+      <div class="topbar__spacer"></div>
+
       <button class="icon-btn" type="button" data-theme-toggle
               title="Switch between dark and light" aria-label="Switch between dark and light">
         <span data-theme-icon="dark"><?= icon('moon') ?></span>
-        <span data-theme-icon="light"><?= icon('sun') ?></span>
+        <span data-theme-icon="light" hidden><?= icon('sun') ?></span>
       </button>
 
       <div class="dropdown">
@@ -123,35 +202,37 @@ $brand      = \App\Core\Settings::company();
           </form>
         </div>
       </div>
-    </div>
-  <?php endif; ?>
-</header>
+    </header>
 
-<main class="portal-main" id="main" tabindex="-1">
-  <?php // $flashes is shared by App::run(), same as the staff layout. ?>
-  <?php foreach (($flashes ?? []) as $flash): ?>
-    <div class="alert alert--<?= e($flash['type']) ?>">
-      <?= icon(match ($flash['type']) {
-          'success' => 'check-circle',
-          'error'   => 'x-circle',
-          'warning' => 'alert-triangle',
-          default   => 'info',
-      }) ?>
-      <div class="alert__body"><?= e($flash['message']) ?></div>
-      <button class="alert__close" type="button" aria-label="Dismiss">&times;</button>
-    </div>
-  <?php endforeach; ?>
-  <?= $content ?>
-</main>
+    <main class="portal-main" id="main" tabindex="-1">
+      <?php // $flashes is shared by App::run(), same as the staff layout. ?>
+      <?php foreach (($flashes ?? []) as $flash): ?>
+        <div class="alert alert--<?= e($flash['type']) ?>">
+          <?= icon(match ($flash['type']) {
+              'success' => 'check-circle',
+              'error'   => 'x-circle',
+              'warning' => 'alert-triangle',
+              default   => 'info',
+          }) ?>
+          <div class="alert__body"><?= e($flash['message']) ?></div>
+          <button class="alert__close" type="button" aria-label="Dismiss">&times;</button>
+        </div>
+      <?php endforeach; ?>
+      <?= $content ?>
+    </main>
 
-<footer class="portal-foot">
-  <div><?= e($brand['name']) ?></div>
-  <div>
-    <?php if ($brand['phone']): ?><?= e($brand['phone']) ?><?php endif; ?>
-    <?php if ($brand['email']): ?> &middot; <?= e($brand['email']) ?><?php endif; ?>
-    <?php if ($brand['website']): ?> &middot; <?= e($brand['website']) ?><?php endif; ?>
+    <footer class="portal-foot">
+      <div><?= e($brand['name']) ?></div>
+      <div>
+        <?php if ($brand['phone']): ?><?= e($brand['phone']) ?><?php endif; ?>
+        <?php if ($brand['email']): ?> &middot; <?= e($brand['email']) ?><?php endif; ?>
+        <?php if ($brand['website']): ?> &middot; <?= e($brand['website']) ?><?php endif; ?>
+      </div>
+    </footer>
   </div>
-</footer>
+</div>
+
+<?php endif; ?>
 
 <?= js_tag() ?>
 </body>

@@ -62,6 +62,8 @@ scrub_sms() {
     DELETE a FROM bulk_accounts a JOIN clients c ON a.owner_type='client' AND c.id = a.owner_id
       WHERE c.name LIKE 'SMSTEST%';
     DELETE FROM clients WHERE name LIKE 'SMSTEST%';
+    DELETE FROM bulk_sender_ids WHERE sender_id LIKE 'SMSTESTP%';
+    DELETE FROM stk_requests WHERE kopokopo_id LIKE 'smstest-kk-%';
     DELETE FROM bulk_plans WHERE name LIKE 'SMSTEST%';
     DELETE l FROM bulk_ledger l JOIN bulk_accounts a ON a.id = l.account_id
       JOIN partners p ON a.owner_type='partner' AND p.id = a.owner_id WHERE p.name LIKE 'SMSTEST%';
@@ -71,7 +73,9 @@ scrub_sms() {
       WHERE p.name LIKE 'SMSTEST%';
     DELETE FROM partners WHERE name LIKE 'SMSTEST%';
     DELETE FROM staff_notifications WHERE event='bulk_sender_requested';
-    DELETE FROM notifications WHERE event LIKE 'bulk\_%' AND recipient LIKE '%smstest%';
+    DELETE FROM notifications WHERE event LIKE 'bulk\_%'
+      AND (recipient LIKE '%example.test' OR recipient LIKE '%smstest%'
+           OR recipient LIKE '2547000002%' OR body LIKE '%SMSTEST%');
   "
 
   # The house survives the scrub above, and its balance and ledger would
@@ -571,6 +575,121 @@ $MYSQL -e "DELETE FROM bulk_messages WHERE account_id=$OTHERACC;
            DELETE FROM bulk_accounts WHERE id=$OTHERACC;
            DELETE FROM clients WHERE id=$OTHERCID;
            DELETE FROM client_users WHERE email='smstest@example.test';"
+
+echo ""
+echo "=== 26. Sender IDs we already hold, mapped to customers ==="
+signin_admin
+T=$(tok "/bulk-sms/sender-ids?status=pool")
+post /bulk-sms/sender-ids/whitelist \
+     --data "_token=$T&sender_ids=SMSTESTP1%0ASMSTESTP2%0Anot+a+valid+one%0ASMSTESTP1" > /dev/null
+eq "the list is recorded as stock" \
+   "$(q "SELECT COUNT(*) FROM bulk_sender_ids WHERE sender_id LIKE 'SMSTESTP%' AND account_id IS NULL AND status='approved';")" "2"
+eq "a name the networks would refuse is not" \
+   "$(q "SELECT COUNT(*) FROM bulk_sender_ids WHERE sender_id LIKE 'not %';")" "0"
+eq "and a repeat in the same paste is not doubled" \
+   "$(q "SELECT COUNT(*) FROM bulk_sender_ids WHERE sender_id='SMSTESTP1';")" "1"
+
+# Pasting the whole list again is safe.
+T=$(tok "/bulk-sms/sender-ids?status=pool")
+post /bulk-sms/sender-ids/whitelist --data "_token=$T&sender_ids=SMSTESTP1%0ASMSTESTP2" > /dev/null
+eq "pasting the list twice adds nothing" \
+   "$(q "SELECT COUNT(*) FROM bulk_sender_ids WHERE sender_id LIKE 'SMSTESTP%';")" "2"
+
+POOLED=$(q "SELECT id FROM bulk_sender_ids WHERE sender_id='SMSTESTP1';")
+
+# Held by nobody means usable by nobody.
+BEFORE=$(q "SELECT COUNT(*) FROM bulk_messages WHERE account_id=$ACC;")
+$PHP "$ROOT/tests/helpers/bulk_sms_send.php" "$ACC" 0700000801 SMSTESTP1 > /dev/null 2>&1
+eq "a sender ID in stock cannot be used by anyone" \
+   "$(q "SELECT COUNT(*) FROM bulk_messages WHERE account_id=$ACC;")" "$BEFORE"
+
+T=$(tok "/bulk-sms/sender-ids?status=pool")
+post /bulk-sms/sender-ids/$POOLED/assign --data "_token=$T&account_id=$ACC" > /dev/null
+eq "giving it to a customer maps it to them" \
+   "$(q "SELECT account_id FROM bulk_sender_ids WHERE id=$POOLED;")" "$ACC"
+eq "and they are told"  "$(q "SELECT COUNT(*) FROM notifications WHERE event='bulk_sender_approved' AND recipient='smstest@example.test';")" "1"
+
+SENT=$($PHP "$ROOT/tests/helpers/bulk_sms_send.php" "$ACC" 0700000802 SMSTESTP1 2>&1)
+has "now they can send under it" "$SENT" "sent"
+eq  "and the message really went" \
+    "$(q "SELECT COUNT(*) FROM bulk_messages WHERE account_id=$ACC AND recipient='+254700000802' AND sender_id='SMSTESTP1';")" "1"
+
+T=$(tok "/bulk-sms/sender-ids?status=approved")
+post /bulk-sms/sender-ids/$POOLED/unassign --data "_token=$T" > /dev/null
+eq "taking it back leaves it in stock" \
+   "$(q "SELECT COUNT(*) FROM bulk_sender_ids WHERE id=$POOLED AND account_id IS NULL AND status='approved';")" "1"
+BEFORE=$(q "SELECT COUNT(*) FROM bulk_messages WHERE account_id=$ACC;")
+$PHP "$ROOT/tests/helpers/bulk_sms_send.php" "$ACC" 0700000803 SMSTESTP1 > /dev/null 2>&1
+eq "and they can no longer send under it" \
+   "$(q "SELECT COUNT(*) FROM bulk_messages WHERE account_id=$ACC;")" "$BEFORE"
+
+echo ""
+echo "=== 27. Buying units with M-Pesa ==="
+# The office can see whether it is available at all, and why not when it
+# is not. The credentials are not set in a test database, so the page
+# must say so rather than offering a button that cannot work.
+$MYSQL -e "INSERT INTO settings (setting_key,setting_value) VALUES ('bulk_sms_mpesa','1')
+           ON DUPLICATE KEY UPDATE setting_value='1';"
+has "the gateway page reports the M-Pesa state" "$(page /bulk-sms/settings)" "Paying by M-Pesa"
+
+# Switched off for SMS, a customer is not offered it even when M-Pesa
+# itself is on for invoices.
+$MYSQL -e "UPDATE settings SET setting_value='0' WHERE setting_key='bulk_sms_mpesa';"
+case "$(curl -s -b "$CJ" "$BASE/portal/sms/buy")" in
+  *"Buy with M-Pesa"*) bad "switched off, no M-Pesa button" "offered" "not offered";;
+  *)                   ok  "switched off, no M-Pesa button" "not offered";;
+esac
+$MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key='bulk_sms_mpesa';"
+
+# The half that matters: money arriving credits the units. The prompt
+# itself goes to Kopo Kopo, which a test cannot call, so this starts from
+# the callback — the same path a real payment takes on its way back.
+KKKEY=$($PHP "$ROOT/tests/helpers/setting.php" kopokopo_api_key)
+if [ -n "$KKKEY" ]; then
+  BAL=$(q "SELECT ROUND(sms_units,4) FROM bulk_accounts WHERE id=$ACC;")
+  SELLER=$(q "SELECT id FROM bulk_accounts WHERE owner_type='house';")
+  BUY=$(q "INSERT INTO bulk_purchases (account_id, seller_account_id, units, amount, unit_price, method, phone, status)
+           VALUES ($ACC, $SELLER, 250, 250, 1, 'mpesa_stk', '254700000201', 'pending');
+           SELECT LAST_INSERT_ID();")
+  KKID="smstest-kk-$(date +%s)"
+  STK=$(q "INSERT INTO stk_requests (client_id, document_id, purpose, bulk_purchase_id, phone, amount, kopokopo_id, status)
+           VALUES ($CID, NULL, 'bulk_sms', $BUY, '254700000201', 250, '$KKID', 'pending');
+           SELECT LAST_INSERT_ID();")
+
+  BODY="{\"topic\":\"buygoods_transaction_received\",\"id\":\"evt-$KKID\",\"data\":{\"id\":\"$KKID\",\"type\":\"incoming_payment\",\"attributes\":{\"status\":\"Success\",\"event\":{\"type\":\"Incoming Payment Request\",\"resource\":{\"id\":\"res-1\",\"reference\":\"SMSTESTMPESA9\",\"sender_phone_number\":\"+254700000201\",\"amount\":\"250.0\",\"currency\":\"KES\",\"status\":\"Received\"},\"errors\":null},\"metadata\":{\"purpose\":\"bulk_sms\",\"purchase_id\":\"$BUY\",\"stk_id\":\"$STK\"}}}}"
+  SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$KKKEY" | sed 's/^.* //')
+
+  eq "a forged callback is refused" \
+     "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/webhooks/kopokopo" \
+        -H 'Content-Type: application/json' -H 'X-KopoKopo-Signature: 0000bad0000' --data "$BODY")" "401"
+  eq "and nothing was credited" "$(q "SELECT ROUND(sms_units,4) FROM bulk_accounts WHERE id=$ACC;")" "$BAL"
+
+  eq "a real one is accepted" \
+     "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/webhooks/kopokopo" \
+        -H 'Content-Type: application/json' -H "X-KopoKopo-Signature: $SIG" --data "$BODY")" "200"
+  eq "the purchase is paid"     "$(q "SELECT status FROM bulk_purchases WHERE id=$BUY;")" "completed"
+  eq "the M-Pesa code is kept"  "$(q "SELECT transaction_ref FROM bulk_purchases WHERE id=$BUY;")" "SMSTESTMPESA9"
+  eq "the units arrive"         "$(q "SELECT ROUND(sms_units - $BAL) FROM bulk_accounts WHERE id=$ACC;")" "250"
+  eq "and they came out of the house" \
+     "$(q "SELECT COUNT(*) FROM bulk_ledger WHERE ref_type='purchase' AND ref_id=$BUY AND kind='sale';")" "1"
+
+  # M-Pesa retries a callback it thinks failed. Paying once must credit once.
+  curl -s -o /dev/null -X POST "$BASE/webhooks/kopokopo" \
+       -H 'Content-Type: application/json' -H "X-KopoKopo-Signature: $SIG" --data "$BODY"
+  eq "a repeated callback credits nothing more" \
+     "$(q "SELECT ROUND(sms_units - $BAL) FROM bulk_accounts WHERE id=$ACC;")" "250"
+  # A receipt goes out by e-mail and by text, so two rows is right and one
+  # would mean a channel had been lost. What a repeated callback must not
+  # do is add a third.
+  eq "the receipt goes out once by e-mail" \
+     "$(q "SELECT COUNT(*) FROM notifications WHERE event='bulk_topup' AND channel='email' AND body LIKE '%SMSTESTMPESA9%';")" "1"
+  eq "and once by text" \
+     "$(q "SELECT COUNT(*) FROM notifications WHERE event='bulk_topup' AND channel='sms' AND body LIKE '%SMSTESTMPESA9%';")" "1"
+
+  $MYSQL -e "DELETE FROM stk_requests WHERE id=$STK;"
+else
+  ok "M-Pesa callback" "skipped: no Kopo Kopo key in this database"
+fi
 
 echo ""
 echo "=== 21. A partner is a reseller ==="

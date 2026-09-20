@@ -188,9 +188,19 @@ class BulkSmsTrafficController extends Controller
 
         $status = (string) $request->query('status', 'pending');
 
-        if (!in_array($status, ['pending', 'approved', 'rejected', 'all'], true)) {
+        if (!in_array($status, ['pending', 'pool', 'approved', 'rejected', 'all'], true)) {
             $status = 'pending';
         }
+
+        // "pool" is the stock: names registered with Onfon that nobody
+        // has been given yet. They have no account, so the join has to be
+        // a LEFT one or they would be invisible on every tab.
+        $where = match ($status) {
+            'all'      => '1 = 1',
+            'pool'     => "s.account_id IS NULL AND s.status = 'approved'",
+            'approved' => "s.account_id IS NOT NULL AND s.status = 'approved'",
+            default    => 's.status = :s',
+        };
 
         $this->view('bulksms/admin/senders', [
             'title'  => 'Sender IDs',
@@ -198,13 +208,17 @@ class BulkSmsTrafficController extends Controller
             'rows'   => Database::all(
                 'SELECT s.*, a.owner_type, ' . Accounts::OWNER_NAME_SQL . ' AS owner_name, u.name AS decided_name
                    FROM bulk_sender_ids s
-                   JOIN bulk_accounts a ON a.id = s.account_id
+                   LEFT JOIN bulk_accounts a ON a.id = s.account_id
                    LEFT JOIN users u ON u.id = s.decided_by
-                  WHERE ' . ($status === 'all' ? '1 = 1' : 's.status = :s') . '
-                  ORDER BY s.created_at DESC LIMIT 300',
-                $status === 'all' ? [] : ['s' => $status]),
-            'counts' => array_column(Database::all(
-                'SELECT status, COUNT(*) AS n FROM bulk_sender_ids GROUP BY status'), 'n', 'status'),
+                  WHERE ' . $where . '
+                  ORDER BY s.status = \'pending\' DESC, s.sender_id LIMIT 500',
+                in_array($status, ['all', 'pool', 'approved'], true) ? [] : ['s' => $status]),
+            'counts' => [
+                'pending'  => (int) Database::scalar("SELECT COUNT(*) FROM bulk_sender_ids WHERE status = 'pending'"),
+                'pool'     => (int) Database::scalar("SELECT COUNT(*) FROM bulk_sender_ids WHERE account_id IS NULL AND status = 'approved'"),
+                'approved' => (int) Database::scalar("SELECT COUNT(*) FROM bulk_sender_ids WHERE account_id IS NOT NULL AND status = 'approved'"),
+                'rejected' => (int) Database::scalar("SELECT COUNT(*) FROM bulk_sender_ids WHERE status = 'rejected'"),
+            ],
             'accountsList' => Database::all(
                 'SELECT a.id, a.owner_type, ' . Accounts::OWNER_NAME_SQL . " AS owner_name
                    FROM bulk_accounts a WHERE a.owner_type <> 'house' ORDER BY owner_name"),
@@ -255,6 +269,169 @@ class BulkSmsTrafficController extends Controller
         ActivityLog::record('bulksms_sender_add', 'bulk_account', $accountId, 'Sender ID ' . $sender . ' added');
         Session::success('Sender ID ' . $sender . ' is ready to use on that account.');
         Response::to('/bulk-sms/sender-ids?status=approved');
+    }
+
+    /**
+     * Record sender IDs we already hold with Onfon, in one go.
+     *
+     * The real list lives in the Onfon portal, and it is long. Pasting it
+     * here means a customer who asks for a name we already hold can be
+     * given it in one click instead of waiting days for a registration
+     * that happened months ago.
+     *
+     * They land unassigned. A sender with no account belongs to nobody
+     * and can be used by nobody, which is what makes this safe to do in
+     * bulk before deciding who gets what.
+     */
+    public function whitelistSenders(Request $request): void
+    {
+        $this->authorize('bulksms.approve');
+
+        $raw = (string) $request->input('sender_ids', '');
+        $names = array_values(array_unique(array_filter(
+            array_map('trim', preg_split('/[\r\n,;]+/', $raw) ?: []),
+            static fn(string $n): bool => $n !== ''
+        )));
+
+        if ($names === []) {
+            Session::error('Paste the sender IDs, one per line.');
+            Response::to('/bulk-sms/sender-ids?status=pool');
+        }
+
+        if (count($names) > 500) {
+            Session::error('That is more than 500 at once. Paste them in smaller batches.');
+            Response::to('/bulk-sms/sender-ids?status=pool');
+        }
+
+        $added = 0;
+        $already = 0;
+        $bad = [];
+
+        foreach ($names as $name) {
+            if (!self::validSender($name)) {
+                $bad[] = $name;
+                continue;
+            }
+
+            // Already here — as stock, or in somebody's hands.
+            $exists = Database::scalar(
+                'SELECT id FROM bulk_sender_ids WHERE BINARY sender_id = :s LIMIT 1',
+                ['s' => $name]
+            );
+
+            if ($exists) {
+                $already++;
+                continue;
+            }
+
+            Database::insert('bulk_sender_ids', [
+                'account_id' => null,
+                'sender_id'  => $name,
+                'purpose'    => 'Registered with Onfon and held by the office',
+                'status'     => 'approved',
+                'source'     => 'office',
+                'decided_by' => Auth::id(),
+                'decided_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $added++;
+        }
+
+        ActivityLog::record('bulksms_sender_whitelist', null, null,
+            'Recorded ' . $added . ' sender ID(s) held with Onfon');
+
+        $said = $added . ' sender ID' . ($added === 1 ? '' : 's') . ' recorded';
+
+        if ($already > 0) {
+            $said .= ', ' . $already . ' already known';
+        }
+
+        if ($bad !== []) {
+            $said .= '. These are not names the networks accept: ' . implode(', ', array_slice($bad, 0, 5));
+        }
+
+        $added > 0 ? Session::success($said . '.') : Session::warning($said . '.');
+        Response::to('/bulk-sms/sender-ids?status=pool');
+    }
+
+    /**
+     * Give a sender ID we hold to a customer, so they can send under it.
+     *
+     * The mapping is what lets them use it: the engine checks the name
+     * against the account asking, and nothing else.
+     */
+    public function assignSender(Request $request): void
+    {
+        $this->authorize('bulksms.approve');
+
+        $id  = $request->paramInt('id');
+        $row = Database::first('SELECT * FROM bulk_sender_ids WHERE id = :id', ['id' => $id])
+            ?? throw new HttpException(404, 'Sender ID not found.');
+
+        $accountId = $request->int('account_id');
+        $account   = Accounts::find($accountId);
+
+        if ($account === null || $account['owner_type'] === 'house') {
+            Session::error('Choose the client or partner it is for.');
+            Response::to('/bulk-sms/sender-ids?status=pool');
+        }
+
+        // The same name may be held by more than one of our customers —
+        // the networks allow it, and a shared name like INFO is common —
+        // but giving one account the same name twice is a mistake.
+        $clash = Database::scalar(
+            'SELECT id FROM bulk_sender_ids WHERE account_id = :a AND BINARY sender_id = :s AND id <> :id',
+            ['a' => $accountId, 's' => $row['sender_id'], 'id' => $id]
+        );
+
+        if ($clash) {
+            Session::info('They already have that sender ID.');
+            Response::to('/bulk-sms/sender-ids?status=pool');
+        }
+
+        Database::run(
+            "UPDATE bulk_sender_ids
+                SET account_id = :a, status = 'approved', reject_reason = NULL,
+                    decided_by = :u, decided_at = NOW()
+              WHERE id = :id",
+            ['a' => $accountId, 'u' => Auth::id(), 'id' => $id]
+        );
+
+        Alerts::senderDecided($id);
+
+        ActivityLog::record('bulksms_sender_assign', 'bulk_account', $accountId,
+            'Sender ID ' . $row['sender_id'] . ' given to ' . Accounts::describe($account)['name']);
+
+        Session::success($row['sender_id'] . ' is now ' . Accounts::describe($account)['name']
+            . "'s to send under. They have been told.");
+        Response::to('/bulk-sms/sender-ids?status=approved');
+    }
+
+    /**
+     * Take a sender ID back off an account, keeping it in stock.
+     *
+     * Not a delete: it is still registered with the networks and still
+     * ours to give to somebody else.
+     */
+    public function unassignSender(Request $request): void
+    {
+        $this->authorize('bulksms.approve');
+
+        $id  = $request->paramInt('id');
+        $row = Database::first('SELECT * FROM bulk_sender_ids WHERE id = :id', ['id' => $id])
+            ?? throw new HttpException(404, 'Sender ID not found.');
+
+        Database::run(
+            "UPDATE bulk_sender_ids SET account_id = NULL, source = 'office', decided_by = :u, decided_at = NOW()
+              WHERE id = :id",
+            ['u' => Auth::id(), 'id' => $id]
+        );
+
+        ActivityLog::record('bulksms_sender_unassign', 'bulk_account', (int) $row['account_id'],
+            'Sender ID ' . $row['sender_id'] . ' taken back into stock');
+
+        Session::success($row['sender_id'] . ' is back in stock. Whoever had it can no longer send under it.');
+        Response::to('/bulk-sms/sender-ids?status=pool');
     }
 
     public function decideSender(Request $request): void

@@ -12,7 +12,6 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 use App\Services\BulkSms\Present;
 
-$smsTab = 'home';
 $chartMax = max(1, ...array_map(static fn(array $d): int => $d['sent'] + $d['failed'], $daily));
 ?>
 
