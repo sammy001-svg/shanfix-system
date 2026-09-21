@@ -136,6 +136,58 @@ class Settings
         ];
     }
 
+    /** The social networks the company can list, in the order shown. */
+    public const SOCIAL = [
+        'facebook'  => 'Facebook',
+        'instagram' => 'Instagram',
+        'linkedin'  => 'LinkedIn',
+        'x'         => 'X (Twitter)',
+        'tiktok'    => 'TikTok',
+        'youtube'   => 'YouTube',
+        'whatsapp'  => 'WhatsApp',
+    ];
+
+    /**
+     * The company's social links that are actually filled in.
+     *
+     * Only those: an icon pointing at "#" is worse than no icon, because
+     * a visitor who clicks it learns only that the site is neglected.
+     * WhatsApp is stored as a number and turned into its wa.me link here.
+     *
+     * @return array<string, string> network => absolute URL
+     */
+    public static function social(): array
+    {
+        $out = [];
+
+        foreach (array_keys(self::SOCIAL) as $network) {
+            $value = trim((string) self::get('company_' . $network, ''));
+
+            if ($value === '') {
+                continue;
+            }
+
+            if ($network === 'whatsapp') {
+                $digits = preg_replace('/\D+/', '', $value) ?? '';
+
+                // A Kenyan number typed the local way, 07.. or 01..
+                if (str_starts_with($digits, '0') && strlen($digits) === 10) {
+                    $digits = '254' . substr($digits, 1);
+                }
+
+                if (strlen($digits) >= 9) {
+                    $out[$network] = 'https://wa.me/' . $digits;
+                }
+
+                continue;
+            }
+
+            $out[$network] = $value;
+        }
+
+        return $out;
+    }
+
     public static function currency(): string
     {
         return self::get('currency', 'KES');

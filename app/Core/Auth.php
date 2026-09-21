@@ -186,6 +186,10 @@ class Auth
         // greeting and office hours the public sees.
         'livechat.manage'   => ['admin', 'manager'],
 
+        // The newsletter list from the website footer. Whoever does the
+        // marketing needs it; the export holds only people who asked.
+        'newsletter.view'   => ['admin', 'manager', 'sales'],
+
         // The company WhatsApp is one number answered by many people.
         // Everyone client-facing can read and reply; production and general
         // staff have no reason to be inside a customer's conversation.

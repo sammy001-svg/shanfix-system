@@ -3609,3 +3609,155 @@ section[id] { scroll-margin-top: 140px; }
 
 /* .highlight was only coloured inside the hero; section headings use it too. */
 .section-title .highlight { color: var(--color-primary); }
+
+/* ===================================
+   FOOTER (rebuilt)
+   Company navy, the same as the header, so the page is framed top and
+   bottom by one colour. Green is kept for what can be acted on.
+   =================================== */
+.sf {
+  background: #0C2B4A;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+}
+
+.sf a { color: rgba(255, 255, 255, 0.78); text-decoration: none; transition: color 0.15s ease; }
+.sf a:hover { color: #ffffff; }
+
+.sf-sr, .sf-trap {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── Newsletter band ─────────────────────────────────────────────── */
+.sf-news {
+  background: #08203A;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sf-news-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding-top: 2.5rem;
+  padding-bottom: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.sf-news-copy h3 { color: #ffffff; font-size: 1.4rem; margin: 0 0 0.35rem; }
+.sf-news-copy p  { margin: 0; max-width: 460px; line-height: 1.6; }
+
+.sf-news-form {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  flex: 0 1 460px;
+}
+
+.sf-news-form input[type="email"] {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font: inherit;
+}
+.sf-news-form input[type="email"]::placeholder { color: rgba(255, 255, 255, 0.5); }
+.sf-news-form input[type="email"]:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+.sf-news-form button {
+  padding: 0.85rem 1.5rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.sf-news-form button:hover { background: var(--color-primary-dark); }
+.sf-news-form button:disabled { opacity: 0.6; cursor: default; }
+
+.sf-news-msg { flex-basis: 100%; margin: 0; min-height: 1.2em; font-size: 0.9rem; }
+.sf-news-msg.is-good { color: #86efac; }
+.sf-news-msg.is-bad  { color: #fca5a5; }
+
+/* ── Main columns ────────────────────────────────────────────────── */
+.sf-main {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(3, 1fr) 1.4fr;
+  gap: 2.5rem;
+  padding-top: 3.5rem;
+  padding-bottom: 3rem;
+}
+
+.sf-logo { height: 46px; width: auto; display: block; margin-bottom: 1.1rem; }
+.sf-brand p { line-height: 1.7; margin: 0 0 1.4rem; max-width: 320px; }
+
+.sf-social { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.sf-social a {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+.sf-social a:hover { background: var(--color-primary); }
+.sf-social svg { width: 17px; height: 17px; }
+
+.sf-col h4 {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0 0 1.1rem;
+}
+
+.sf-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+
+.sf-contact li { display: flex; align-items: flex-start; gap: 0.65rem; line-height: 1.5; }
+.sf-contact svg { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 2px; color: var(--color-primary); }
+
+/* ── Bottom line ─────────────────────────────────────────────────── */
+.sf-bottom { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+
+.sf-bottom-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 1.3rem;
+  padding-bottom: 1.3rem;
+  font-size: 0.875rem;
+}
+.sf-bottom-inner p { margin: 0; color: rgba(255, 255, 255, 0.55); }
+.sf-bottom-inner nav { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+
+/* ── Narrower screens ────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .sf-main { grid-template-columns: repeat(3, 1fr); }
+  .sf-brand { grid-column: 1 / -1; }
+  .sf-contact { grid-column: span 3; }
+}
+
+@media (max-width: 640px) {
+  .sf-news-inner { flex-direction: column; align-items: stretch; }
+  .sf-news-form { flex-basis: auto; }
+  .sf-main { grid-template-columns: 1fr 1fr; gap: 2rem; }
+  .sf-contact { grid-column: 1 / -1; }
+  .sf-bottom-inner { flex-direction: column; text-align: center; }
+}
+
+/* The site sets a grey on every <p>, which on navy is too faint to read. */
+.sf p { color: rgba(255, 255, 255, 0.72); font-size: 0.95rem; }
+.sf .sf-bottom-inner p { color: rgba(255, 255, 255, 0.55); font-size: 0.875rem; }
+.sf .sf-news-msg.is-good { color: #86efac; }
+.sf .sf-news-msg.is-bad  { color: #fca5a5; }

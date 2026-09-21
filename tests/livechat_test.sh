@@ -47,13 +47,16 @@ newest_id() { q "SELECT id FROM live_conversations ORDER BY id DESC LIMIT 1;"; }
 # whether the visitor is told we are away. Both are global, so they are
 # put back at the end — a suite that leaves a switch flipped fails the
 # next one for reasons that have nothing to do with its code.
-BEFORE=$(q "SELECT GROUP_CONCAT(CONCAT(setting_key,'=',setting_value)) FROM settings
+# Joined with ';', not the default ','. livechat_hours_days is itself a
+# comma list (1,2,3,4,5,6); splitting on commas used to restore it as
+# just "1", which left the office "open" on Mondays only.
+BEFORE=$(q "SELECT GROUP_CONCAT(CONCAT(setting_key,'=',setting_value) SEPARATOR ';') FROM settings
              WHERE setting_key IN ('livechat_enabled','livechat_ask_department',
                                    'livechat_hours_from','livechat_hours_to','livechat_hours_days');")
 
 restore() {
   local pair key val
-  for pair in $(echo "$BEFORE" | tr ',' ' '); do
+  for pair in $(echo "$BEFORE" | tr ';' ' '); do
     key="${pair%%=*}"; val="${pair#*=}"
     q "UPDATE settings SET setting_value='$val' WHERE setting_key='$key';"
   done

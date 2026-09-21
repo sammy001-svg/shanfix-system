@@ -631,6 +631,42 @@ has "and it ends by asking"              "$HOME" "home-cta"
 # bottom of the ring back tone advert.
 eq "banners keep their own shape" "$(grep -c 'aspect-ratio: 1200 / 450' "$ROOT/site/index.css")" "1"
 
+echo ""
+echo "=== 16h. The footer: the newsletter saves, and nothing links nowhere ==="
+# For years the newsletter box had no field name and no action, so every
+# sign-up was lost on reload. These pin down that it now actually saves,
+# and that the footer no longer publishes links to "#" or a "24/7" claim
+# the live chat's own hours contradict.
+NL="footer.test.$$@example.com"
+$MYSQL -e "DELETE FROM newsletter_subscribers WHERE email LIKE 'footer.test.%@example.com';"
+
+FOOT=$(get /)
+has "the footer carries the newsletter form"  "$FOOT" 'id="sfNewsForm"'
+eq  "no social icon points at #"             "$(echo "$FOOT" | grep -c 'class="sf-social"[^>]*href="#"')" "0"
+eq  "and it no longer promises 24/7 support"  "$(echo "$FOOT" | grep -ci '24/7 support')" "0"
+
+R=$(curl -s -X POST "$BASE/api/newsletter/subscribe" --data-urlencode "email=$NL" --data-urlencode "page=$BASE/")
+has "a sign-up is accepted"                   "$R" '"ok":true'
+eq  "and is actually saved"                   "$(q "SELECT status FROM newsletter_subscribers WHERE email='$NL';")" "subscribed"
+
+curl -s -X POST "$BASE/api/newsletter/subscribe" --data-urlencode "email=$NL" > /dev/null
+eq  "signing up twice keeps one row"          "$(q "SELECT COUNT(*) FROM newsletter_subscribers WHERE email='$NL';")" "1"
+
+BAD=$(curl -s -X POST "$BASE/api/newsletter/subscribe" --data-urlencode "email=nope")
+has "a bad address is refused"                "$BAD" '"ok":false'
+
+curl -s -X POST "$BASE/api/newsletter/subscribe" --data-urlencode "email=trap.$NL" --data-urlencode "website=http://spam" > /dev/null
+eq  "a bot filling the hidden field saves nothing" "$(q "SELECT COUNT(*) FROM newsletter_subscribers WHERE email='trap.$NL';")" "0"
+
+TOKN=$(q "SELECT unsubscribe_token FROM newsletter_subscribers WHERE email='$NL';")
+curl -s "$BASE/newsletter/unsubscribe?t=$TOKN" > /dev/null
+eq  "opening the unsubscribe link alone changes nothing (mail scanners open links)" \
+    "$(q "SELECT status FROM newsletter_subscribers WHERE email='$NL';")" "subscribed"
+curl -s -X POST "$BASE/newsletter/unsubscribe" --data-urlencode "t=$TOKN" > /dev/null
+eq  "pressing the button unsubscribes"        "$(q "SELECT status FROM newsletter_subscribers WHERE email='$NL';")" "unsubscribed"
+
+$MYSQL -e "DELETE FROM newsletter_subscribers WHERE email LIKE '%footer.test.%@example.com';"
+
 echo "=== 17. Deployment keeps what the server owns ==="
 # --delete would otherwise take the site's credentials and anything
 # uploaded through its admin with it on the next deployment.

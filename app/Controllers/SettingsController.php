@@ -109,6 +109,31 @@ class SettingsController extends Controller
             'currency'        => strtoupper((string) $request->input('currency', 'KES')),
         ]);
 
+        // Social links, shown as icons in the website footer. A value that
+        // is not a web address is refused rather than saved, because the
+        // footer would otherwise publish a link that goes nowhere — which
+        // is exactly what these fields replaced.
+        $social = [];
+
+        foreach (array_keys(Settings::SOCIAL) as $network) {
+            $value = trim((string) $request->input('company_' . $network, ''));
+
+            if ($value !== '' && $network !== 'whatsapp') {
+                if (!preg_match('~^https?://~i', $value)) {
+                    $value = 'https://' . ltrim($value, '/');
+                }
+
+                if (!filter_var($value, FILTER_VALIDATE_URL)) {
+                    Session::error(Settings::SOCIAL[$network] . ': that does not look like a web address.');
+                    Response::to('/settings?tab=company');
+                }
+            }
+
+            $social['company_' . $network] = mb_substr($value, 0, 255);
+        }
+
+        Settings::setMany($social);
+
         // Logo appears on every printed document.
         $logo = $this->storeUpload($request->file('company_logo'), 'logos');
         if ($logo) {

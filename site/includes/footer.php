@@ -7,97 +7,189 @@ require_once __DIR__ . '/brand.php';
 // from memory after the first call either way.
 $_brand = site_brand();
 ?>
-<!-- Footer -->
-    <footer class="footer">
-      <div class="footer-top-decoration"></div>
-      <div class="container">
-        <div class="footer-newsletter" data-aos="fade-up">
-          <div class="newsletter-content">
-            <h3 class="newsletter-title">Subscribe to Our <span class="highlight">Newsletter</span></h3>
-            <p>Get the latest updates on technology trends and business solutions.</p>
+<!-- Footer
+     Rebuilt. What changed and why:
+       - The newsletter form saves now. It posts to the system's
+         /api/newsletter/subscribe; before, the field had no name and the
+         form no action, so every sign-up was lost on reload.
+       - Social icons come from the system's company settings and only
+         the filled-in ones appear. They were all href="#".
+       - "24/7 Support" is gone. It contradicted the live chat's own
+         hours; the real hours are shown instead, from the same settings.
+       - No fade-in animations: a footer is where people go looking for a
+         phone number, and it should simply be there. -->
+<?php
+$_year   = date('Y');
+$_social = $_brand['social'] ?? [];
+
+// One path per network, drawn at 24x24 and filled with currentColor.
+$_socialIcons = [
+    'facebook'  => ['Facebook',  'M24 12.07C24 5.44 18.63.07 12 .07S0 5.44 0 12.07c0 5.99 4.39 10.95 10.13 11.85v-8.38H7.08v-3.47h3.05V9.43c0-3.01 1.79-4.67 4.53-4.67 1.31 0 2.69.24 2.69.24v2.95h-1.51c-1.49 0-1.96.93-1.96 1.87v2.25h3.33l-.53 3.47h-2.8v8.38C19.61 23.02 24 18.06 24 12.07z'],
+    'instagram' => ['Instagram', 'M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.72 3.72 0 0 1-1.38-.9 3.72 3.72 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63a5.88 5.88 0 0 0-2.13 1.38A5.88 5.88 0 0 0 .63 4.14C.33 4.9.13 5.78.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.3.79.72 1.46 1.38 2.13a5.88 5.88 0 0 0 2.13 1.38c.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56a5.88 5.88 0 0 0 2.13-1.38 5.88 5.88 0 0 0 1.38-2.13c.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.88 5.88 0 0 0-1.38-2.13A5.88 5.88 0 0 0 19.86.63C19.1.33 18.22.13 16.95.07 15.67.01 15.26 0 12 0zm0 5.84a6.16 6.16 0 1 0 0 12.32 6.16 6.16 0 0 0 0-12.32zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.4-11.85a1.44 1.44 0 1 0 0 2.88 1.44 1.44 0 0 0 0-2.88z'],
+    'linkedin'  => ['LinkedIn',  'M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z'],
+    'x'         => ['X',         'M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.4l-5.8-7.58-6.63 7.58H.49l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93zm-1.29 19.5h2.04L6.48 3.24H4.3l13.31 17.41z'],
+    'tiktok'    => ['TikTok',    'M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z'],
+    'youtube'   => ['YouTube',   'M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.5 3.55 12 3.55 12 3.55s-7.5 0-9.38.5A3.02 3.02 0 0 0 .5 6.19C0 8.07 0 12 0 12s0 3.93.5 5.81a3.02 3.02 0 0 0 2.12 2.14c1.88.5 9.38.5 9.38.5s7.5 0 9.38-.5a3.02 3.02 0 0 0 2.12-2.14C24 15.93 24 12 24 12s0-3.93-.5-5.81zM9.55 15.57V8.43L15.82 12l-6.27 3.57z'],
+    'whatsapp'  => ['WhatsApp',  'M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.39-1.47-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51l-.57-.01c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.07c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35zM12.05 21.79h-.01a9.87 9.87 0 0 1-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 0 1-1.51-5.26c0-5.45 4.44-9.88 9.89-9.88a9.82 9.82 0 0 1 6.99 2.9 9.82 9.82 0 0 1 2.89 6.99c0 5.45-4.44 9.88-9.88 9.88zm8.41-18.3A11.81 11.81 0 0 0 12.05 0C5.5 0 .16 5.34.16 11.89c0 2.1.55 4.14 1.59 5.95L.06 24l6.3-1.65a11.88 11.88 0 0 0 5.68 1.45h.01c6.55 0 11.89-5.34 11.89-11.89 0-3.18-1.24-6.16-3.48-8.41z'],
+];
+
+$_line = static fn(string $d): string =>
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $d . '</svg>';
+?>
+    <footer class="sf">
+
+      <?php // ── Newsletter ───────────────────────────────────────────── ?>
+      <div class="sf-news">
+        <div class="container sf-news-inner">
+          <div class="sf-news-copy">
+            <h3>Stay in the loop</h3>
+            <p>Occasional news, offers and practical technology tips. No spam, and you can leave at any time.</p>
           </div>
-          <form class="newsletter-form">
-            <div class="input-group">
-              <input type="email" placeholder="Your email address" required aria-label="Email Address">
-              <button type="submit" class="btn btn-primary">Subscribe Now</button>
-            </div>
+
+          <form class="sf-news-form" id="sfNewsForm" novalidate>
+            <?php // Real visitors never see this field. A bot that fills in
+                  // every input it finds is told it succeeded and nothing
+                  // is saved. ?>
+            <input type="text" name="website" class="sf-trap" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <label class="sf-sr" for="sfNewsEmail">Email address</label>
+            <input type="email" id="sfNewsEmail" name="email" placeholder="Your email address"
+                   autocomplete="email" required maxlength="160">
+            <button type="submit">Subscribe</button>
+            <p class="sf-news-msg" id="sfNewsMsg" role="status" aria-live="polite"></p>
           </form>
         </div>
+      </div>
 
-        <div class="footer-grid">
-          <div class="footer-col" data-aos="fade-up" data-aos-delay="100">
-            <img src="assets/shanfix-logo.png" alt="Shanfix Technology Logo" class="footer-logo">
-            <p class="footer-text">
-              Pioneering innovative technology solutions and professional business services across East Africa.
-            </p>
-            <div class="contact-info-list">
-              <div class="contact-info-item">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                <span><?= htmlspecialchars($_brand['phone']) ?></span>
-              </div>
-              <div class="contact-info-item">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                <span><?= htmlspecialchars($_brand['email']) ?></span>
-              </div>
-              <div class="contact-info-item">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                <span><?= htmlspecialchars($_brand['address']) ?></span>
-              </div>
+      <?php // ── The main footer ──────────────────────────────────────── ?>
+      <div class="container sf-main">
+        <div class="sf-brand">
+          <a href="index.php"><img src="assets/shanfix-logo.png" alt="<?= htmlspecialchars($_brand['name']) ?>" class="sf-logo"></a>
+          <p>Software, systems, printing and branding for businesses across Kenya and East Africa.</p>
+
+          <?php if ($_social): ?>
+            <div class="sf-social">
+              <?php foreach ($_social as $network => $href): if (!isset($_socialIcons[$network])) continue; ?>
+                <a href="<?= htmlspecialchars($href) ?>" target="_blank" rel="noopener"
+                   aria-label="<?= htmlspecialchars($_brand['name'] . ' on ' . $_socialIcons[$network][0]) ?>">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="<?= $_socialIcons[$network][1] ?>"/></svg>
+                </a>
+              <?php endforeach; ?>
             </div>
-          </div>
-
-          <div class="footer-col" data-aos="fade-up" data-aos-delay="200">
-            <h4 class="footer-heading">Quick Navigation</h4>
-            <ul class="footer-links">
-              <li><a href="index.php">Home Page</a></li>
-              <li><a href="who-we-are.php">Our Story</a></li>
-              <li><a href="index.php#services">Core Services</a></li>
-              <li><a href="portfolio.php">Case Studies</a></li>
-              <li><a href="contact.php">Contact Support</a></li>
-            </ul>
-          </div>
-
-          <div class="footer-col" data-aos="fade-up" data-aos-delay="300">
-            <h4 class="footer-heading">Solution Hub</h4>
-            <ul class="footer-links">
-              <li><a href="web-development.php">Custom Web Design</a></li>
-              <li><a href="software-solution.php">Enterprise Systems</a></li>
-              <li><a href="bulk-sms.php">Bulk SMS Platform</a></li>
-              <li><a href="seo-boost.php">Search Engine Visibility</a></li>
-              <li><a href="networking-solution.php">IT Infrastructure</a></li>
-            </ul>
-          </div>
-
-          <div class="footer-col" data-aos="fade-up" data-aos-delay="400">
-            <h4 class="footer-heading">Global Reach</h4>
-            <div class="social-links">
-              <a href="#" aria-label="Facebook" class="social-link">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-              </a>
-              <a href="#" aria-label="Twitter" class="social-link">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                </svg>
-              </a>
-              <a href="#" aria-label="LinkedIn" class="social-link">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                </svg>
-              </a>
-            </div>
-            <div class="footer-badges">
-              <div class="badge-item">Security Verified</div>
-              <div class="badge-item">24/7 Support</div>
-            </div>
-          </div>
+          <?php endif; ?>
         </div>
-        <div class="footer-bottom">
-          <p>&copy; 2026 Shanfix Technology. Empowering Innovation. All rights reserved.</p>
+
+        <nav class="sf-col" aria-label="Services">
+          <h4>Services</h4>
+          <ul>
+            <li><a href="web-development.php">Web Development</a></li>
+            <li><a href="app-development.php">App Development</a></li>
+            <li><a href="web-hosting.php">Web Hosting</a></li>
+            <li><a href="printing-branding.php">Printing &amp; Branding</a></li>
+            <li><a href="digital-marketing.php">Digital Marketing</a></li>
+            <li><a href="bulk-sms.php">Bulk SMS</a></li>
+          </ul>
+        </nav>
+
+        <nav class="sf-col" aria-label="Software">
+          <h4>Software</h4>
+          <ul>
+            <li><a href="software-solution.php">Software Solutions</a></li>
+            <li><a href="pos-solution.php">Point of Sale</a></li>
+            <li><a href="erp-solution.php">Business ERP</a></li>
+            <li><a href="school-management.php">School Management</a></li>
+            <li><a href="event-ticketing.php">Event Ticketing</a></li>
+          </ul>
+        </nav>
+
+        <nav class="sf-col" aria-label="Company">
+          <h4>Company</h4>
+          <ul>
+            <li><a href="who-we-are.php">About Us</a></li>
+            <li><a href="portfolio.php">Our Work</a></li>
+            <li><a href="blog.php">Blog</a></li>
+            <li><a href="contact.php">Contact</a></li>
+            <li><a href="/portal/login">Client Portal</a></li>
+          </ul>
+        </nav>
+
+        <div class="sf-col sf-contact">
+          <h4>Get in touch</h4>
+          <ul>
+            <li>
+              <?= $_line('<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>') ?>
+              <a href="tel:<?= htmlspecialchars($_brand['phone_tel']) ?>"><?= htmlspecialchars($_brand['phone']) ?></a>
+            </li>
+            <li>
+              <?= $_line('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>') ?>
+              <a href="mailto:<?= htmlspecialchars($_brand['email']) ?>"><?= htmlspecialchars($_brand['email']) ?></a>
+            </li>
+            <li>
+              <?= $_line('<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>') ?>
+              <span><?= htmlspecialchars($_brand['address']) ?></span>
+            </li>
+            <?php if (!empty($_brand['hours'])): ?>
+              <li>
+                <?= $_line('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>') ?>
+                <span><?= htmlspecialchars($_brand['hours']) ?></span>
+              </li>
+            <?php endif; ?>
+          </ul>
+        </div>
+      </div>
+
+      <?php // ── Bottom line ──────────────────────────────────────────── ?>
+      <div class="sf-bottom">
+        <div class="container sf-bottom-inner">
+          <p>&copy; <?= $_year ?> <?= htmlspecialchars($_brand['name']) ?>. All rights reserved.</p>
+          <nav aria-label="Footer">
+            <a href="contact.php">Contact</a>
+            <a href="/portal/login">Client Portal</a>
+            <a href="/signin" rel="nofollow">Staff Sign In</a>
+          </nav>
         </div>
       </div>
     </footer>
+
+    <script>
+    // The newsletter form. Posts to the system and says what happened in
+    // place, without reloading the page — the old form reloaded and saved
+    // nothing, which is exactly what this replaces.
+    (function () {
+      var form = document.getElementById('sfNewsForm');
+      if (!form) { return; }
+      var msg = document.getElementById('sfNewsMsg');
+      var btn = form.querySelector('button');
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        var email = form.email.value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          msg.className = 'sf-news-msg is-bad';
+          msg.textContent = 'Please enter a valid email address.';
+          form.email.focus();
+          return;
+        }
+
+        var data = new FormData(form);
+        data.append('page', location.href.slice(0, 255));
+        btn.disabled = true;
+
+        fetch('/api/newsletter/subscribe', { method: 'POST', body: data })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            msg.className = 'sf-news-msg ' + (d.ok ? 'is-good' : 'is-bad');
+            msg.textContent = d.ok ? d.message : (d.error || 'That did not work. Please try again.');
+            if (d.ok) { form.email.value = ''; }
+          })
+          .catch(function () {
+            msg.className = 'sf-news-msg is-bad';
+            msg.textContent = 'We could not reach our server. Please try again in a moment.';
+          })
+          .then(function () { btn.disabled = false; });
+      });
+    })();
+    </script>
 
     <!-- Checkout Modal -->
     <div id="checkoutModal" class="modal checkout-modal">

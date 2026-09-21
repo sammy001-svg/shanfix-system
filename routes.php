@@ -33,6 +33,7 @@ use App\Controllers\JobRequestController;
 use App\Controllers\LetterController;
 use App\Controllers\JobFileController;
 use App\Controllers\LiveChatApiController;
+use App\Controllers\NewsletterController;
 use App\Controllers\LiveChatController;
 use App\Controllers\LiveChatAdminController;
 use App\Controllers\LeadController;
@@ -128,6 +129,14 @@ $r->post('/api/chat/send',  [LiveChatApiController::class, 'send']);
 $r->get ('/api/chat/poll',  [LiveChatApiController::class, 'poll']);
 $r->post('/api/chat/close', [LiveChatApiController::class, 'close']);
 $r->post('/api/chat/rate',  [LiveChatApiController::class, 'rate']);
+
+// The newsletter box in the website footer, and the page its unsubscribe
+// link opens. Public and sessionless: signing up needs only an address,
+// leaving needs only the token in the person's own link. Rate limited in
+// the controller instead of CSRF, which would protect nothing here.
+$r->post('/api/newsletter/subscribe', [NewsletterController::class, 'subscribe']);
+$r->get ('/newsletter/unsubscribe',   [NewsletterController::class, 'showUnsubscribe']);
+$r->post('/newsletter/unsubscribe',   [NewsletterController::class, 'unsubscribe']);
 
 // Bulk SMS delivery reports from Onfon. Public: the caller is Onfon's
 // server, optionally proving itself with ?token=. The .php address is the
@@ -1210,6 +1219,13 @@ $r->group(['auth'], function ($r) {
         $r->post('/livechat/{id}/transfer',     [LiveChatController::class, 'transfer'],  ['csrf']);
         $r->post('/livechat/{id}/close',        [LiveChatController::class, 'close'],     ['csrf']);
         $r->post('/livechat/{id}/reopen',       [LiveChatController::class, 'reopen'],    ['csrf']);
+    });
+
+    // -- Newsletter subscribers from the website footer
+    $r->group(['permission:newsletter.view'], function ($r) {
+        $r->get ('/newsletter',             [NewsletterController::class, 'index']);
+        $r->get ('/newsletter/export',      [NewsletterController::class, 'export']);
+        $r->post('/newsletter/{id}/remove', [NewsletterController::class, 'remove'], ['csrf']);
     });
 
     // -- Chat

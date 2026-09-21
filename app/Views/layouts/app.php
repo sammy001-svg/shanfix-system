@@ -363,6 +363,12 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php if (can('newsletter.view')): ?>
+        <a class="nav-link <?= is_active_nav('/newsletter') ? 'is-active' : '' ?>" href="<?= url('/newsletter') ?>">
+          <?= icon('mail', 'nav-link__icon') ?> Newsletter
+        </a>
+      <?php endif; ?>
+
       <?php if (can('chat.use')): ?>
         <a class="nav-link <?= is_active_nav('/chat') ? 'is-active' : '' ?>" href="<?= url('/chat') ?>">
           <?= icon('message', 'nav-link__icon') ?> Team Chat

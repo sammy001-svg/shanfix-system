@@ -154,6 +154,25 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
                    value="<?= e($settings['address']) ?>" maxlength="255">
           </div>
 
+          <?php // Shown as icons in the website footer. Only the ones filled
+                // in appear, so leaving a network empty is how you hide it. ?>
+          <div class="field field--full">
+            <div class="text-xs uppercase fw-700 text-muted mb-8">Social media</div>
+            <span class="field-hint">
+              Shown as icons at the foot of the website. Leave any you do not
+              use empty and its icon will not appear.
+            </span>
+          </div>
+
+          <?php foreach (\App\Core\Settings::SOCIAL as $network => $label): ?>
+            <div class="field">
+              <label class="label" for="company_<?= e($network) ?>"><?= e($label) ?></label>
+              <input class="input" id="company_<?= e($network) ?>" name="company_<?= e($network) ?>"
+                     value="<?= e(setting('company_' . $network, '')) ?>" maxlength="255"
+                     placeholder="<?= $network === 'whatsapp' ? '0712 345 678' : 'https://' . ($network === 'x' ? 'x' : $network) . '.com/yourpage' ?>">
+            </div>
+          <?php endforeach; ?>
+
           <div class="field">
             <label class="label" for="currency">Currency code</label>
             <input class="input" id="currency" name="currency" maxlength="5"

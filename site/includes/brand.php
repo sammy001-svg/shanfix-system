@@ -53,6 +53,11 @@ function site_brand(): array
         'street'  => 'Tana House, Karen',
         'city'    => 'Nairobi',
         'country' => 'KE',
+        // Filled from the system when it is there. Empty means the footer
+        // shows no social icons and no opening hours, rather than dead
+        // links or hours nobody set.
+        'social'  => [],
+        'hours'   => '',
     ];
 
     $brand = $defaults;
@@ -92,6 +97,16 @@ function site_brand(): array
 
             $brand['street'] = $street !== '' ? $street : $brand['street'];
             $brand['city']   = $city;
+
+            if (method_exists(\App\Core\Settings::class, 'social')) {
+                $brand['social'] = \App\Core\Settings::social();
+            }
+
+            $brand['hours'] = site_hours_line(
+                (string) \App\Core\Settings::get('livechat_hours_days', ''),
+                (string) \App\Core\Settings::get('livechat_hours_from', ''),
+                (string) \App\Core\Settings::get('livechat_hours_to', '')
+            );
         }
     } catch (\Throwable) {
         // The defaults stand. A marketing page is not worth failing over
@@ -102,6 +117,42 @@ function site_brand(): array
     $brand['phone_tel'] = preg_replace('/[^0-9+]/', '', $brand['phone']) ?? '';
 
     return $brand;
+}
+
+/**
+ * Office hours as a person would say them: "Mon – Sat, 08:00 – 17:30".
+ *
+ * Read from the same settings the live chat uses to decide whether
+ * anybody is at the desk, so the footer and the chat can never disagree
+ * about when we are open. The footer used to say "24/7 Support", which
+ * the chat's own hours contradicted.
+ *
+ * @param string $days "1,2,3,4,5,6" — 0 is Sunday
+ */
+function site_hours_line(string $days, string $from, string $to): string
+{
+    $names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    $set = array_values(array_unique(array_filter(
+        array_map('intval', array_filter(explode(',', $days), 'strlen')),
+        static fn(int $d): bool => $d >= 0 && $d <= 6
+    )));
+    sort($set);
+
+    if (!$set || $from === '' || $to === '') {
+        return '';
+    }
+
+    // A run of consecutive days reads as a range; anything else as a list.
+    $consecutive = $set === range($set[0], $set[count($set) - 1]);
+
+    $dayText = count($set) === 1
+        ? $names[$set[0]]
+        : ($consecutive
+            ? $names[$set[0]] . ' – ' . $names[$set[count($set) - 1]]
+            : implode(', ', array_map(static fn(int $d): string => $names[$d], $set)));
+
+    return $dayText . ', ' . $from . ' – ' . $to;
 }
 
 /**
