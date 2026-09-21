@@ -115,7 +115,7 @@ Options -Indexes
     RewriteEngine On
 
     RewriteRule ^(app|config|database|storage)(/|$)             - [F,L]
-    RewriteRule ^(install|migrate|cron|sms-worker|dev-server|routes|build-cpanel)\.php$ - [F,L]
+    RewriteRule ^(install|migrate|cron|sms-worker|import-bulk-sms|dev-server|routes|build-cpanel)\.php$ - [F,L]
 
     # Force HTTPS (comment out until your SSL certificate is active)
     RewriteCond %{HTTPS} !=on
@@ -137,7 +137,7 @@ Options -Indexes
     Require all denied
 </FilesMatch>
 
-<FilesMatch "^(install|migrate|cron|sms-worker|dev-server|routes|build-cpanel)\.php$">
+<FilesMatch "^(install|migrate|cron|sms-worker|import-bulk-sms|dev-server|routes|build-cpanel)\.php$">
     Require all denied
 </FilesMatch>
 
@@ -186,10 +186,10 @@ say('  wrote   deny rules in app/ config/ database/ storage/');
 // ---------------------------------------------------------------------
 // 6. CLI tools and the self-check page
 // ---------------------------------------------------------------------
-foreach (['install.php', 'migrate.php', 'cron.php', 'sms-worker.php'] as $file) {
+foreach (['install.php', 'migrate.php', 'cron.php', 'sms-worker.php', 'import-bulk-sms.php'] as $file) {
     copy($root . '/' . $file, $out . '/' . $file);
 }
-say('  copied  install.php, migrate.php, cron.php, sms-worker.php  ' . DIM . '(CLI only, blocked over the web)' . OFF);
+say('  copied  install.php, migrate.php, cron.php, sms-worker.php, import-bulk-sms.php  ' . DIM . '(CLI only, blocked over the web)' . OFF);
 
 copy($root . '/check.php', $out . '/check.php');
 say('  copied  check.php  ' . DIM . '(open it in a browser to diagnose the install)' . OFF);

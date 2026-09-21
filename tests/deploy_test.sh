@@ -89,7 +89,7 @@ has "the private folders are refused here as well" \
 has "and the git folder"  "$HT" 'RedirectMatch 404 ^(.*)/\.(git|github|env)(/|$)'
 # sms-worker.php joined this list when Bulk SMS came in: it sends
 # campaigns in the background and has no business answering a request.
-has "and the CLI scripts" "$HT" 'RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel|sms-worker)\.php$'
+has "and the CLI scripts" "$HT" 'RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel|sms-worker|import-bulk-sms)\.php$'
 
 echo ""
 echo "=== 3. The deployment file ==="

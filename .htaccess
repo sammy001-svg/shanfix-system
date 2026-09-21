@@ -137,7 +137,7 @@ RedirectMatch 404 ^(.*)/(composer\.(json|lock)|package(-lock)?\.json|\.cpanel\.y
 
 # migrate.php and cron.php refuse to run over the web on their own, but
 # there is no reason for them to be reachable at all.
-RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel|sms-worker)\.php$
+RedirectMatch 404 ^(.*)/(migrate|cron|build-cpanel|sms-worker|import-bulk-sms)\.php$
 
 # ---------------------------------------------------------------------
 # The website's own working files
