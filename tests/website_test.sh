@@ -616,6 +616,32 @@ eq "and the site falls back to its own details when the system is down" \
    "$($PHP "$ROOT/tests/helpers/site_brand_fallback.php" "$ROOT/site" 2>/dev/null)" "ok"
 
 echo ""
+echo ""
+echo "=== 16g. The homepage makes its case, and the navbar asks once ==="
+# The homepage was rebuilt as a corporate page: one argument in order,
+# and one thing asked for at the end. These assert the structure is
+# actually there rather than that it looks nice, which no test can say.
+HOME=$(get /)
+
+has "the carousel survived the rebuild"   "$HOME" 'class="hero-carousel"'
+has "with slides main.js can drive"       "$HOME" 'class="hero-slide'
+has "and its controls"                    "$HOME" 'carousel-control'
+
+has "proof sits directly under the hero"  "$HOME" "sx-proof"
+has "then what we do"                     "$HOME" "sx-pillars"
+has "then the full service list"          "$HOME" 'id="services"'
+has "and it closes by asking"             "$HOME" "sx--navy"
+
+# The bar used to carry three filled buttons competing with each other.
+# A visitor should be told once what we want them to do.
+eq "the navbar has exactly one primary action"    "$(echo "$HOME" | grep -o 'class="nav-cta"' | wc -l)" "1"
+has "and a quieter way to sign in"        "$HOME" 'class="nav-signin"'
+
+# The website and the system a customer signs into should not look like
+# two different companies.
+has "the site carries the corporate palette" "$HOME" "corporate.css"
+eq "and the old bright green is not redefined after it"    "$(grep -c '\-\-color-primary: #22c55e' "$ROOT/site/corporate.css")" "0"
+
 echo "=== 17. Deployment keeps what the server owns ==="
 # --delete would otherwise take the site's credentials and anything
 # uploaded through its admin with it on the next deployment.

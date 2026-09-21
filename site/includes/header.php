@@ -130,6 +130,11 @@ foreach ($_seo as $_k => $_v) {
                    // than $pageSEO so that {{base}} has been expanded. ?><?php if (!empty($_seo['json_ld'])): ?>
     <script type="application/ld+json"><?= $_seo['json_ld'] ?></script><?php endif; ?>
     <link rel="stylesheet" href="<?= site_asset('./index.css') ?>" />
+    <?php // Loaded after index.css and deliberately so: it redefines the
+          // palette tokens, so the whole site picks up the company's navy
+          // and green rather than the website having one identity and the
+          // customer's portal another. ?>
+    <link rel="stylesheet" href="<?= site_asset('./corporate.css') ?>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -556,8 +561,13 @@ foreach ($_seo as $_k => $_v) {
               </div>
             </div>
           </li>
-          <li><a href="https://aicoder.shanfixtechnology.com/" class="btn btn-primary nav-btn-small">AI Coder</a></li>
-          <li><a href="https://automation.shanfixtechnology.com/" class="btn btn-secondary nav-btn-small">AI Automations</a></li>
+          <?php // AI Coder and AI Automations are products, so they read
+                // as navigation rather than as calls to action. They used
+                // to be filled buttons sitting beside Sign in, which left
+                // three of them competing and a visitor with no idea
+                // which was meant for them. ?>
+          <li><a href="https://aicoder.shanfixtechnology.com/" class="nav-link" target="_blank" rel="noopener">AI Coder</a></li>
+          <li><a href="https://automation.shanfixtechnology.com/" class="nav-link" target="_blank" rel="noopener">AI Automations</a></li>
 
           <?php // The way into the business system that sits behind this
                 // site. One link rather than three, because /signin asks
@@ -565,13 +575,15 @@ foreach ($_seo as $_k => $_v) {
                 // in the others — a customer landing on the staff form has
                 // no way of telling why their password is refused. ?>
           <li>
-            <a href="/signin" class="btn btn-secondary nav-btn-small" rel="nofollow">
+            <a href="/signin" class="nav-signin" rel="nofollow">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                    fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
                    stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"
                    aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign in
             </a>
           </li>
+
+          <li><a href="contact.php" class="nav-cta">Talk to us</a></li>
 
         </ul>
         <button
