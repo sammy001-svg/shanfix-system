@@ -43,6 +43,77 @@ $tabUrl = static fn(string $k): string =>
     </div>
   </div>
 
+  <?php // Reselling SMS is the other half of what a partner makes, and it
+        // is a different kind of money. Commission above is a debt: their
+        // customer paid us, so we owe them a share. SMS margin below is
+        // already theirs — their client paid them directly and we never
+        // held it.
+        //
+        // The two are kept in separate blocks, each saying whose money it
+        // is, precisely so nobody adds them up and invoices us for the
+        // total. Only shown to a partner who actually resells. ?>
+  <?php if (!empty($sms)): ?>
+    <div class="portal-card">
+      <div class="portal-card__head"><div class="portal-card__title">Reselling SMS</div></div>
+
+      <p class="text-sm text-muted">
+        Your clients pay you directly for units, so this money is already
+        yours — it is not part of what we owe you above, and it does not
+        come in a payout. It is here so you can see both in one place.
+      </p>
+
+      <div class="portal-stats">
+        <div class="portal-stat">
+          <span class="portal-stat__figure"><?= e(money($sms['month']['margin'], false)) ?></span>
+          <span class="portal-stat__label">Your margin this month</span>
+        </div>
+        <div class="portal-stat">
+          <span class="portal-stat__figure"><?= e(money($sms['margin'], false)) ?></span>
+          <span class="portal-stat__label">Margin in total</span>
+        </div>
+        <div class="portal-stat">
+          <span class="portal-stat__figure"><?= e(money($sms['revenue'], false)) ?></span>
+          <span class="portal-stat__label">Taken from clients</span>
+        </div>
+        <div class="portal-stat">
+          <span class="portal-stat__figure"><?= e(money($sms['cost'], false)) ?></span>
+          <span class="portal-stat__label">What those units cost you</span>
+        </div>
+      </div>
+
+      <?php if ($sms['months']): ?>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th class="num">Taken</th>
+                <th class="num">Cost</th>
+                <th class="num">Margin</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($sms['months'] as $m): ?>
+                <tr>
+                  <td><?= e(date('F Y', strtotime($m['period'] . '-01'))) ?></td>
+                  <td class="num"><?= e(money($m['revenue'], false)) ?></td>
+                  <td class="num text-muted"><?= e(money($m['cost'], false)) ?></td>
+                  <td class="num"><strong><?= e(money($m['margin'], false)) ?></strong></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
+
+      <p class="text-sm text-muted">
+        Cost is worked out at <?= e(money($sms['cost_per_unit'], false)) ?> a
+        unit, the average of everything you have bought from us.
+        <a href="<?= e(url('/partners/sms/sales')) ?>">See the sales themselves</a>.
+      </p>
+    </div>
+  <?php endif; ?>
+
   <?php // The terms say they invoice us monthly, so each month needs to be
         // something they can actually put in front of their accountant. ?>
   <?php if (!empty($months)): ?>

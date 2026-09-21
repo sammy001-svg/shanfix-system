@@ -11,6 +11,8 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
+use App\Services\BulkSms\Accounts;
+use App\Services\BulkSms\ResellerEarnings;
 use App\Services\Commission;
 use App\Services\Notifier;
 use App\Services\Payouts;
@@ -137,7 +139,43 @@ class PartnerController extends Controller
             'pages'   => $pages,
             'total'   => $total,
             'company' => Settings::company(),
+            // Reselling SMS is the other half of what a partner makes, and
+            // it is a different kind of money: their client pays them
+            // directly, so it is already theirs and we owe none of it. It
+            // is shown here so the two are in one place, and labelled so
+            // nobody adds them together and asks us for the total.
+            'sms'     => $this->smsTrade($me),
         ], 'partner');
+    }
+
+    /**
+     * What this partner has made reselling SMS, or null when they have
+     * never had an SMS account.
+     */
+    private function smsTrade(array $me): ?array
+    {
+        if (!Settings::bool('bulk_sms_enabled', true)) {
+            return null;
+        }
+
+        // false, not true: looking at an earnings page should not quietly
+        // open an SMS account for a partner who has never asked for one.
+        $account = Accounts::forPartner((int) $me['id'], false);
+
+        if (!$account) {
+            return null;
+        }
+
+        $all = ResellerEarnings::summaryFor($account);
+
+        if ($all['sales'] === 0) {
+            return null;
+        }
+
+        return $all + [
+            'month'  => ResellerEarnings::summaryFor($account, date('Y-m-01 00:00:00')),
+            'months' => ResellerEarnings::byMonth($account, 6),
+        ];
     }
 
     // -- Registering a customer ---------------------------------------------

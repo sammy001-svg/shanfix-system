@@ -16,14 +16,30 @@ use App\Services\BulkSms\Purchases;
 <div class="portal-wrap">
   <?php include __DIR__ . '/_nav.php'; ?>
 
+  <?php // Takings on their own read as profit and are not. What their
+        // clients paid, what those units cost them, and the difference —
+        // shown together, because any one of the three alone misleads. ?>
   <div class="portal-stats">
     <div class="portal-stat">
       <div class="portal-stat__figure"><?= count($waiting) ?></div>
       <div class="portal-stat__label">Waiting on you</div>
     </div>
     <div class="portal-stat">
-      <div class="portal-stat__figure"><?= e(money($earned)) ?></div>
-      <div class="portal-stat__label">Confirmed this month</div>
+      <div class="portal-stat__figure"><?= e(money($month['revenue'])) ?></div>
+      <div class="portal-stat__label">Taken this month</div>
+      <div class="portal-stat__note">What your clients paid you</div>
+    </div>
+    <div class="portal-stat">
+      <div class="portal-stat__figure"><?= e(money($month['cost'])) ?></div>
+      <div class="portal-stat__label">Those units cost you</div>
+      <div class="portal-stat__note">
+        At <?= e(money($month['cost_per_unit'])) ?> a unit, your average buying price
+      </div>
+    </div>
+    <div class="portal-stat">
+      <div class="portal-stat__figure"><?= e(money($month['margin'])) ?></div>
+      <div class="portal-stat__label">Your margin this month</div>
+      <div class="portal-stat__note">Yours already — we do not pay this out</div>
     </div>
     <div class="portal-stat">
       <div class="portal-stat__figure"><?= e(Present::units($account['sms_units'])) ?></div>
@@ -31,6 +47,41 @@ use App\Services\BulkSms\Purchases;
       <div class="portal-stat__note">What you can hand over</div>
     </div>
   </div>
+
+  <?php if ($months): ?>
+    <div class="portal-card">
+      <div class="portal-card__head"><div class="portal-card__title">Month by month</div></div>
+      <p class="text-sm text-muted">
+        <?= e(money($allTime['margin'])) ?> margin on
+        <?= e(Present::units($allTime['units'])) ?> units, all time.
+      </p>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th class="num">Units sold</th>
+              <th class="num">Taken</th>
+              <th class="num">Cost</th>
+              <th class="num">Margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($months as $m): ?>
+              <tr>
+                <td><?= e(date('F Y', strtotime($m['period'] . '-01'))) ?></td>
+                <td class="num"><?= e(Present::units($m['units'])) ?></td>
+                <td class="num"><?= e(money($m['revenue'])) ?></td>
+                <td class="num text-muted"><?= e(money($m['cost'])) ?></td>
+                <td class="num"><strong><?= e(money($m['margin'])) ?></strong></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <?php endif; ?>
 
   <div class="portal-card">
     <div class="portal-card__head"><div class="portal-card__title">Waiting to be confirmed</div></div>

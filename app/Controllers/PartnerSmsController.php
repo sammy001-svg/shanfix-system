@@ -11,6 +11,7 @@ use App\Core\Settings;
 use App\Services\BulkSms\Accounts;
 use App\Services\BulkSms\Purchases;
 use App\Services\BulkSms\Reports;
+use App\Services\BulkSms\ResellerEarnings;
 use App\Services\BulkSms\Wallet;
 
 /**
@@ -331,11 +332,12 @@ class PartnerSmsController extends SmsPortalBase
                   WHERE p.seller_account_id = :s AND p.status <> 'pending'
                   ORDER BY p.id DESC LIMIT 30",
                 ['s' => $account['id']]),
-            'earned'  => (float) Database::scalar(
-                "SELECT COALESCE(SUM(amount), 0) FROM bulk_purchases
-                  WHERE seller_account_id = :s AND status = 'completed'
-                    AND completed_at >= :month",
-                ['s' => $account['id'], 'month' => date('Y-m-01 00:00:00')]),
+            // Turnover on its own reads as profit and is not: it is what
+            // their clients paid them, before what the units cost. The
+            // month and the whole trade, both worked out properly.
+            'month'   => ResellerEarnings::summaryFor($account, date('Y-m-01 00:00:00')),
+            'allTime' => ResellerEarnings::summaryFor($account),
+            'months'  => ResellerEarnings::byMonth($account),
         ]);
     }
 
