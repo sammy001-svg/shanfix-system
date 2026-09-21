@@ -62,6 +62,16 @@ eq "reception: sees revenue" "$(curl -s -b "$JAR" "$BASE/dashboard" | grep -c 'C
 eq "reception: NOT the margin" "$(curl -s -b "$JAR" "$BASE/dashboard" | grep -c 'Net this month')"     "0"
 signin finance Role@2026
 eq "finance: sees the margin" "$(curl -s -b "$JAR" "$BASE/dashboard" | grep -c 'Net this month')"      "1"
+# The newsletter list is people's email addresses, given for one purpose.
+# Marketing may read and export it; the print floor and general staff
+# have no reason to.
+signin production Role@2026
+eq "production: no newsletter list"  "$(code /newsletter)"        "403"
+eq "production: no export either"    "$(code /newsletter/export)" "403"
+signin staff Role@2026
+eq "staff: no newsletter list"       "$(code /newsletter)"        "403"
+signin sales Role@2026
+eq "sales: can read the list"        "$(code /newsletter)"        "200"
 
 echo ""
 echo "=== 4. Two roles grant the union of both ==="
