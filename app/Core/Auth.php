@@ -167,6 +167,25 @@ class Auth
         // to a channel they set up themselves.
         'chat.moderate'     => ['admin', 'manager'],
 
+        // Live chat with people on the website. Whoever may hold a
+        // conversation with a customer may answer one here — but what
+        // they actually SEE is narrowed further by which departments
+        // they belong to, in live_department_staff. The permission opens
+        // the inbox; membership decides what is in it.
+        //
+        // Designers, production and general staff are left out: a
+        // stranger asking about prices should reach somebody who can
+        // answer about prices.
+        'livechat.use'      => ['admin', 'manager', 'finance', 'sales', 'reception'],
+
+        // Seeing every department regardless of membership, for whoever
+        // is watching the queue as a whole rather than working it.
+        'livechat.view_all' => ['admin', 'manager'],
+
+        // Creating departments, moving staff between them, and the
+        // greeting and office hours the public sees.
+        'livechat.manage'   => ['admin', 'manager'],
+
         // The company WhatsApp is one number answered by many people.
         // Everyone client-facing can read and reply; production and general
         // staff have no reason to be inside a customer's conversation.

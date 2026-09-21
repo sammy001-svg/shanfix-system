@@ -32,6 +32,9 @@ use App\Controllers\JobController;
 use App\Controllers\JobRequestController;
 use App\Controllers\LetterController;
 use App\Controllers\JobFileController;
+use App\Controllers\LiveChatApiController;
+use App\Controllers\LiveChatController;
+use App\Controllers\LiveChatAdminController;
 use App\Controllers\LeadController;
 use App\Controllers\MeetingController;
 use App\Controllers\NotificationController;
@@ -114,6 +117,17 @@ foreach ([
         $r->options($path, [BulkSmsApiController::class, 'preflight']);
     }
 }
+
+// Live chat with people on the website — the widget on site/ talks to
+// this. Public by nature: no session and no CSRF, because the caller has
+// not signed in to anything. The conversation's own token stands in for
+// a session, and every action here is rate limited per address.
+$r->get ('/api/chat/hello', [LiveChatApiController::class, 'hello']);
+$r->post('/api/chat/start', [LiveChatApiController::class, 'start']);
+$r->post('/api/chat/send',  [LiveChatApiController::class, 'send']);
+$r->get ('/api/chat/poll',  [LiveChatApiController::class, 'poll']);
+$r->post('/api/chat/close', [LiveChatApiController::class, 'close']);
+$r->post('/api/chat/rate',  [LiveChatApiController::class, 'rate']);
 
 // Bulk SMS delivery reports from Onfon. Public: the caller is Onfon's
 // server, optionally proving itself with ?token=. The .php address is the
@@ -1170,6 +1184,33 @@ $r->group(['auth'], function ($r) {
     $r->get('/reports/ageing',        [ReportController::class, 'ageing'],          ['permission:reports.view']);
     $r->get('/reports/ageing/export', [ReportController::class, 'ageingExport'],    ['permission:reports.view']);
     $r->get('/reports/statement',     [ReportController::class, 'exportStatement'], ['permission:reports.view']);
+
+    // -- Live chat with website visitors
+    //
+    // The permission opens the desk; which departments somebody belongs
+    // to decides what is on it. Departments are managed separately, by
+    // whoever runs the place rather than whoever works the queue.
+    $r->group(['permission:livechat.manage'], function ($r) {
+        $r->get ('/livechat/departments',                  [LiveChatAdminController::class, 'index']);
+        $r->post('/livechat/departments',                  [LiveChatAdminController::class, 'save'],     ['csrf']);
+        $r->post('/livechat/departments/{id}/staff',       [LiveChatAdminController::class, 'setStaff'], ['csrf']);
+        $r->post('/livechat/departments/{id}/delete',      [LiveChatAdminController::class, 'delete'],   ['csrf']);
+    });
+
+    $r->group(['permission:livechat.use'], function ($r) {
+        $r->get ('/livechat',                   [LiveChatController::class, 'index']);
+        $r->get ('/livechat/poll',              [LiveChatController::class, 'poll']);
+        $r->get ('/livechat/waiting',           [LiveChatController::class, 'waitingCount']);
+        $r->get ('/livechat/{id}',              [LiveChatController::class, 'show']);
+
+        $r->post('/livechat/{id}/reply',        [LiveChatController::class, 'reply'],     ['csrf']);
+        $r->post('/livechat/{id}/claim',        [LiveChatController::class, 'claim'],     ['csrf']);
+        $r->post('/livechat/{id}/release',      [LiveChatController::class, 'release'],   ['csrf']);
+        $r->post('/livechat/{id}/hand',         [LiveChatController::class, 'handTo'],    ['csrf']);
+        $r->post('/livechat/{id}/transfer',     [LiveChatController::class, 'transfer'],  ['csrf']);
+        $r->post('/livechat/{id}/close',        [LiveChatController::class, 'close'],     ['csrf']);
+        $r->post('/livechat/{id}/reopen',       [LiveChatController::class, 'reopen'],    ['csrf']);
+    });
 
     // -- Chat
     // Discussion attached to a job, client, document or artwork request.

@@ -349,6 +349,20 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php // Live chat with people on the website. Distinct from Team
+            // Chat above, which is colleagues talking to each other —
+            // this one is a stranger on the marketing site who wants an
+            // answer now, so the badge counts only those still waiting
+            // for a human rather than everything unread. ?>
+      <?php if (can('livechat.use')): ?>
+        <a class="nav-link <?= is_active_nav('/livechat') ? 'is-active' : '' ?>" href="<?= url('/livechat') ?>">
+          <?= icon('inbox', 'nav-link__icon') ?> Live Chat
+          <span id="livechat-waiting-badge"
+                class="nav-link__badge hidden"
+                data-url="<?= url('/livechat/waiting') ?>"></span>
+        </a>
+      <?php endif; ?>
+
       <?php if (can('chat.use')): ?>
         <a class="nav-link <?= is_active_nav('/chat') ? 'is-active' : '' ?>" href="<?= url('/chat') ?>">
           <?= icon('message', 'nav-link__icon') ?> Team Chat

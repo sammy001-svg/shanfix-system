@@ -499,8 +499,12 @@ echo "=== 16d. There is a way back to the website ==="
 # behind it. Somebody who arrives at a sign-in page by mistake has no
 # way back except the browser's button, which does nothing if they
 # typed the address or followed a link from an email.
+# Asserted on what the visitor is actually promised rather than on a
+# class name: the link was .login__back before the sign-in page was
+# rebuilt as a split layout and .auth__back after, and the guarantee
+# never changed.
 for p in /login /signin /portal/login /partners/login; do
-  has "$p offers a way back" "$(get $p)" "login__back"
+  has "$p offers a way back" "$(get $p)" "Back to"
 done
 
 echo ""

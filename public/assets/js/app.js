@@ -1284,6 +1284,36 @@
   }
 
   /* ------------------------------------------------------------------
+     Waiting live chats
+     ------------------------------------------------------------------
+     Counts only the people still waiting for a human, not everything
+     unread. A number here means somebody is sitting on our website with
+     an unanswered question, which is worth interrupting for; a count of
+     everything would be a number nobody looks at twice.
+     ------------------------------------------------------------------ */
+  function initLiveChatBadge() {
+    const badge = $('#livechat-waiting-badge');
+    if (!badge) return;
+
+    const url = badge.dataset.url;
+    if (!url) return;
+
+    const refresh = () => {
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!d.ok) return;
+          badge.textContent = d.waiting > 99 ? '99+' : d.waiting;
+          badge.classList.toggle('hidden', !d.waiting);
+        })
+        .catch(() => {});
+    };
+
+    refresh();
+    setInterval(refresh, 20000);
+  }
+
+  /* ------------------------------------------------------------------
      Client picker: fill phone when a client is chosen (STK form)
      ------------------------------------------------------------------ */
   /**
@@ -1431,6 +1461,7 @@
     initWhatsApp();
     initGuestRows();
     initUnreadPoll();
+    initLiveChatBadge();
     initLinkedSelects();
     initRoleMatrix();
     initTheme();
