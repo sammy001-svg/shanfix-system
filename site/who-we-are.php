@@ -1,19 +1,12 @@
 <?php
 require_once 'includes/db_connect.php';
 
-// Pull live testimonials from DB; fall back to one static entry
-$testimonials = [];
-try {
-    $t = $pdo->query("SELECT * FROM testimonials WHERE is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 6");
-    $testimonials = $t->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {}
-if (empty($testimonials)) {
-    $testimonials = [
-        ['quote' => 'Shanfix didn\'t just build our platform — they completely revolutionised our digital business model. Their engineering depth and premium aesthetic are unmatched.', 'author' => 'Sarah Jenkins', 'company' => 'Global Retail Enterprises', 'role' => 'CTO', 'rating' => 5],
-        ['quote' => 'Professional, fast, and highly responsive. The team delivered our school management system on time and within budget. Highly recommend.', 'author' => 'David Omondi', 'company' => 'Nairobi Academy', 'role' => 'Principal', 'rating' => 5],
-        ['quote' => 'Our POS system from Shanfix has transformed how we run all our branches. Real-time sync across locations is a game changer.', 'author' => 'Alice Wambui', 'company' => 'Wambui Supermarkets', 'role' => 'Operations Manager', 'rating' => 5],
-    ];
-}
+// Client quotes, as staff entered them under Testimonials in the system.
+// This used to fall back to three quotes written into this file whenever
+// there were none — none of them from a real client. Now no quotes means
+// no testimonials section.
+require_once __DIR__ . '/includes/system.php';
+$testimonials = system_testimonials(6);
 
 // Team members
 $team = [

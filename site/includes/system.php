@@ -128,6 +128,37 @@ function system_services(int $limit = 0): array
  * @return array{categories: list<array{id:int,name:string}>,
  *               products: list<array<string,mixed>>}
  */
+function system_testimonials(int $limit = 6): array
+{
+    // Client quotes, as staff entered them under Testimonials in the
+    // system. Nothing here means nothing is shown: the pages that call
+    // this hide their testimonials section rather than make one up, which
+    // is what they used to do.
+    if (!system_ready()) {
+        return [];
+    }
+
+    try {
+        $rows = \App\Core\Database::all(
+            'SELECT quote, author, role, company, rating
+               FROM site_testimonials
+              WHERE is_active = 1
+              ORDER BY sort_order, id
+              LIMIT ' . max(1, (int) $limit)
+        );
+    } catch (\Throwable) {
+        return [];
+    }
+
+    return array_map(static fn(array $r): array => [
+        'quote'   => (string) $r['quote'],
+        'author'  => (string) $r['author'],
+        'role'    => (string) ($r['role'] ?? ''),
+        'company' => (string) ($r['company'] ?? ''),
+        'rating'  => max(1, min(5, (int) $r['rating'])),
+    ], $rows);
+}
+
 function system_inventory(): array
 {
     $empty = ['categories' => [], 'products' => []];

@@ -5752,3 +5752,15 @@ a.portal-list__row:hover { background: var(--surface-2); }
   .lc--empty .chat__list { display: flex; }
   .lc--empty .chat__panel { display: none; }
 }
+
+
+/* ---------------------------------------------------------------------
+   Testimonials (the website's client quotes)
+   --------------------------------------------------------------------- */
+.tm-row { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.tm-row:last-child { border-bottom: 0; }
+.tm-row--off { opacity: .6; }
+.tm-row__stars { color: #E0A848; font-size: 13px; letter-spacing: 1px; }
+.tm-row__quote { margin: 6px 0; font-size: 14px; line-height: 1.55; color: var(--ink); }
+.tm-row__who { font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tm-row__actions { display: flex; gap: 4px; margin-top: 8px; }

@@ -34,6 +34,7 @@ use App\Controllers\LetterController;
 use App\Controllers\JobFileController;
 use App\Controllers\LiveChatApiController;
 use App\Controllers\NewsletterController;
+use App\Controllers\TestimonialController;
 use App\Controllers\LiveChatController;
 use App\Controllers\LiveChatAdminController;
 use App\Controllers\LeadController;
@@ -1219,6 +1220,14 @@ $r->group(['auth'], function ($r) {
         $r->post('/livechat/{id}/transfer',     [LiveChatController::class, 'transfer'],  ['csrf']);
         $r->post('/livechat/{id}/close',        [LiveChatController::class, 'close'],     ['csrf']);
         $r->post('/livechat/{id}/reopen',       [LiveChatController::class, 'reopen'],    ['csrf']);
+    });
+
+    // -- Client testimonials shown on the website
+    $r->group(['permission:testimonials.manage'], function ($r) {
+        $r->get ('/testimonials',             [TestimonialController::class, 'index']);
+        $r->post('/testimonials',             [TestimonialController::class, 'save'],   ['csrf']);
+        $r->post('/testimonials/{id}/toggle', [TestimonialController::class, 'toggle'], ['csrf']);
+        $r->post('/testimonials/{id}/delete', [TestimonialController::class, 'delete'], ['csrf']);
     });
 
     // -- Newsletter subscribers from the website footer

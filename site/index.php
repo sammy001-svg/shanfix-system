@@ -31,14 +31,10 @@ if ($staticBanners) {
     ];
 }
 
-// What clients say. The section further down has always checked for
-// $testimonials, but nothing on this page ever loaded them, so it could
-// not show once. Same query as who-we-are.php.
-$testimonials = [];
-try {
-    $t = $pdo->query("SELECT * FROM testimonials WHERE is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 6");
-    $testimonials = $t->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) { /* table may not exist yet */ }
+// What clients say, as staff entered them under Testimonials in the
+// system. None means the section below is not shown at all.
+require_once __DIR__ . '/includes/system.php';
+$testimonials = system_testimonials(6);
 
 ?>
 <?php

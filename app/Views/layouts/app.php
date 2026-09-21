@@ -363,6 +363,12 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php if (can('testimonials.manage')): ?>
+        <a class="nav-link <?= is_active_nav('/testimonials') ? 'is-active' : '' ?>" href="<?= url('/testimonials') ?>">
+          <?= icon('star', 'nav-link__icon') ?> Testimonials
+        </a>
+      <?php endif; ?>
+
       <?php if (can('newsletter.view')): ?>
         <a class="nav-link <?= is_active_nav('/newsletter') ? 'is-active' : '' ?>" href="<?= url('/newsletter') ?>">
           <?= icon('mail', 'nav-link__icon') ?> Newsletter

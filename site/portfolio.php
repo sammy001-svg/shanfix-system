@@ -88,32 +88,25 @@ include 'includes/header.php';
         <?php endforeach; ?>
     </section>
 
-    <!-- Testimonial Ribbon (DB-driven) -->
     <?php
-    $testimonial = null;
-    try {
-        $t = $pdo->query("SELECT * FROM testimonials WHERE is_active=1 ORDER BY sort_order ASC, id ASC LIMIT 1");
-        $testimonial = $t->fetch(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {}
-    $testimonial = $testimonial ?: [
-        'quote'   => 'Shanfix didn\'t just build our platform; they completely revolutionized our digital business model. Their premium aesthetic and engineering depth are unmatched.',
-        'author'  => 'Sarah Jenkins',
-        'company' => 'Global Retail Enterprises',
-        'role'    => 'CTO',
-        'rating'  => 5,
-    ];
+    // One client quote, from Testimonials in the system. This used to fall
+    // back to a made-up one; with none entered, the ribbon is left out.
+    require_once __DIR__ . '/includes/system.php';
+    $testimonial = system_testimonials(1)[0] ?? null;
     $starSvg = '<svg viewBox="0 0 24 24"><path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z"/></svg>';
     ?>
+    <?php if ($testimonial): ?>
     <section class="testimonial-ribbon">
         <div class="container tr-content" data-aos="zoom-in">
             <div class="tr-stars">
-                <?= str_repeat($starSvg, (int)($testimonial['rating'] ?? 5)) ?>
+                <?= str_repeat($starSvg, $testimonial['rating']) ?>
             </div>
             <blockquote class="tr-quote">"<?= htmlspecialchars($testimonial['quote']) ?>"</blockquote>
             <p class="tr-author"><?= htmlspecialchars($testimonial['author']) ?></p>
-            <p class="tr-company"><?= htmlspecialchars(trim(($testimonial['role'] ?? '') . ', ' . ($testimonial['company'] ?? ''), ', ')) ?></p>
+            <p class="tr-company"><?= htmlspecialchars(trim($testimonial['role'] . ', ' . $testimonial['company'], ', ')) ?></p>
         </div>
     </section>
+    <?php endif; ?>
 
 </main>
 
