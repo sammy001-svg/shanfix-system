@@ -193,8 +193,8 @@ a {
 .top-header {
   position: relative;
   z-index: 1001;
-  background: #59e00a;
-  color: var(--color-gray-900);
+  background: #0C2B4A;
+  color: rgba(255, 255, 255, 0.82);
   font-size: 0.875rem;
   padding: 0.75rem 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
@@ -224,7 +224,7 @@ a {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--color-gray-900);
+  color: rgba(255, 255, 255, 0.82);
   text-decoration: none;
   transition: var(--transition-base);
 }
@@ -241,7 +241,7 @@ a {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--color-white);
+  color: rgba(255, 255, 255, 0.82);
   background: var(--color-gray-900);
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
@@ -310,7 +310,7 @@ a {
   left: 0;
   right: 0;
   z-index: 1000;
-  background: #083f0c;
+  background: #0C2B4A;
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   box-shadow: var(--shadow-sm);
@@ -382,7 +382,7 @@ a {
     left: 0;
     width: 100%;
     height: calc(100vh - var(--header-height-mobile));
-    background: #083f0c;
+    background: #0C2B4A;
     flex-direction: column;
     padding: var(--spacing-xl) var(--spacing-md);
     gap: var(--spacing-md);
@@ -1180,7 +1180,7 @@ section {
 }
 
 .feature-card {
-  background: #083f0c;
+  background: #0C2B4A;
   padding: var(--spacing-xl);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
@@ -1231,7 +1231,7 @@ section {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: #59e00a;
+  color: #17874A;
   font-weight: 600;
   text-decoration: none;
   transition: var(--transition-base);
@@ -1282,7 +1282,7 @@ section {
   width: 80px;
   height: 80px;
   margin: 0 auto var(--spacing-lg);
-  color: #083f0c; /* Dark Forest Green */
+  color: #0C2B4A; /* Dark Forest Green */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1435,15 +1435,15 @@ section {
    =================================== */
 
 .services {
-  background: #59e00a;
+  background: #F6F9FB;
 }
 
 .services .section-title {
-  color: #083f0c;
+  color: #16202B;
 }
 
 .services .section-subtitle {
-  color: #1f2937;
+  color: #5A6B7D;
 }
 
 .services-grid {
@@ -1517,7 +1517,7 @@ section {
 
 .service-btn {
   display: inline-block;
-  background-color: #083f0c; /* Dark green as requested */
+  background-color: #0C2B4A; /* Dark green as requested */
   color: #ffffff;
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius-md);
@@ -1530,8 +1530,8 @@ section {
 
 .service-btn:hover {
   background-color: var(--color-white);
-  color: #083f0c;
-  border-color: #083f0c;
+  color: #0C2B4A;
+  border-color: #0C2B4A;
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
@@ -2092,13 +2092,13 @@ section {
 }
 
 .feature-inner-icon {
-  color: #083f0c;
+  color: #0C2B4A;
   margin-right: 10px;
   font-weight: bold;
 }
 
 .feature-icon-circle {
-  background: #083f0c;
+  background: #0C2B4A;
   color: white;
   width: 30px;
   height: 30px;
@@ -2117,7 +2117,7 @@ section {
 .feature-inner-title {
   display: block;
   font-size: 1.1rem;
-  color: #083f0c;
+  color: #0C2B4A;
   margin-bottom: 5px;
   font-weight: bold;
 }
@@ -3572,3 +3572,7 @@ textarea.form-control {
   font-size: 0.9rem;
   cursor: pointer;
 }
+
+/* Jumping to a section (Explore Services, #services) should land below
+   the sticky header, not hide the heading underneath it. */
+section[id] { scroll-margin-top: 140px; }
