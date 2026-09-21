@@ -50,6 +50,7 @@ use App\Controllers\PortalAuthController;
 use App\Controllers\PortalController;
 use App\Controllers\PortalRequestController;
 use App\Controllers\PortalSmsController;
+use App\Controllers\PortalSupportController;
 use App\Controllers\PublicProofController;
 use App\Controllers\PublicStatementController;
 use App\Controllers\PurchaseOrderController;
@@ -417,6 +418,43 @@ $r->group(['client_auth'], function ($r) {
 
     $r->get('/portal/uploads',  [PortalController::class, 'uploads']);
     $r->post('/portal/uploads', [PortalController::class, 'upload'], ['csrf']);
+
+    // -- Job tracking
+    $r->get('/portal/jobs',      [PortalController::class, 'jobs']);
+    $r->get('/portal/jobs/{id}', [PortalController::class, 'job']);
+
+    // -- Job detail briefs (sent by staff, filled in by the client via /brief/{token})
+    $r->get('/portal/briefs', [PortalController::class, 'jobRequests']);
+
+    // -- Receipts
+    $r->get('/portal/receipts',      [PortalController::class, 'receipts']);
+    $r->get('/portal/receipts/{id}', [PortalController::class, 'receipt']);
+
+    // -- Profile
+    $r->get('/portal/profile',  [PortalController::class, 'profile']);
+    $r->post('/portal/profile', [PortalController::class, 'updateProfile'], ['csrf']);
+
+    // -- Quotation acceptance
+    $r->post('/portal/quotations/{id}/accept', [PortalController::class, 'acceptQuotation'], ['csrf']);
+    $r->post('/portal/quotations/{id}/reject', [PortalController::class, 'rejectQuotation'], ['csrf']);
+
+    // -- Proof approval + file serving
+    $r->post('/portal/jobs/{id}/proof',    [PortalController::class, 'approveProof'], ['csrf']);
+    $r->get('/portal/proof-file/{id}',     [PortalController::class, 'proofFile']);
+
+    // -- Support messaging
+    $r->get('/portal/support',  [PortalController::class, 'support']);
+    $r->post('/portal/support', [PortalController::class, 'sendMessage'], ['csrf']);
+
+    // -- Notification feed
+    $r->get('/portal/notifications',          [PortalController::class, 'notifications']);
+    $r->post('/portal/notifications/read-all',[PortalController::class, 'markNotificationsRead'], ['csrf']);
+
+
+    // -- Staff-side portal support thread
+    $r->get('/portal-support',        [PortalSupportController::class, 'index']);
+    $r->get('/portal-support/{id}',   [PortalSupportController::class, 'thread']);
+    $r->post('/portal-support/{id}',  [PortalSupportController::class, 'reply'], ['csrf']);
 
     // -- Bulk SMS, the customer's own side of the platform
     //

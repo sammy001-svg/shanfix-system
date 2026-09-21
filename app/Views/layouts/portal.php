@@ -17,6 +17,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 use App\Core\ClientAuth;
 use App\Core\Settings;
+use App\Services\ClientNotifier;
 
 $portalUser = ClientAuth::user();
 $brand      = Settings::company();
@@ -28,6 +29,11 @@ $on   = static fn(string $p): bool => str_ends_with($here, $p);
 $in   = static fn(string $p): bool => str_contains($here, $p);
 
 $smsOn = Settings::bool('bulk_sms_enabled', true);
+
+// Badge counts — fetched once per page load from indexed queries.
+$portalClientId    = $portalUser ? ($portalUser['client_id'] ?? null) : null;
+$notifUnread       = $portalClientId ? ClientNotifier::unreadCount((int) $portalClientId) : 0;
+$msgUnread         = $portalClientId ? ClientNotifier::unreadMessages((int) $portalClientId) : 0;
 ?>
 <!doctype html>
 <html lang="en">
@@ -118,6 +124,9 @@ $smsOn = Settings::bool('bulk_sms_enabled', true);
       <a class="nav-link <?= $in('/portal/invoices') ? 'is-active' : '' ?>" href="<?= url('/portal/invoices') ?>">
         <?= icon('receipt', 'nav-link__icon') ?> Invoices
       </a>
+      <a class="nav-link <?= $in('/portal/receipts') ? 'is-active' : '' ?>" href="<?= url('/portal/receipts') ?>">
+        <?= icon('check-circle', 'nav-link__icon') ?> Receipts
+      </a>
       <a class="nav-link <?= $on('/portal/statement') ? 'is-active' : '' ?>" href="<?= url('/portal/statement') ?>">
         <?= icon('list', 'nav-link__icon') ?> Statement
       </a>
@@ -126,15 +135,41 @@ $smsOn = Settings::bool('bulk_sms_enabled', true);
       </a>
 
       <div class="nav-group__label">Working with us</div>
+      <a class="nav-link <?= $in('/portal/jobs') ? 'is-active' : '' ?>" href="<?= url('/portal/jobs') ?>">
+        <?= icon('briefcase', 'nav-link__icon') ?> My jobs
+      </a>
       <a class="nav-link <?= $on('/portal/catalogue') ? 'is-active' : '' ?>" href="<?= url('/portal/catalogue') ?>">
         <?= icon('package', 'nav-link__icon') ?> What we do
       </a>
       <a class="nav-link <?= $on('/portal/requests') ? 'is-active' : '' ?>" href="<?= url('/portal/requests') ?>">
         <?= icon('inbox', 'nav-link__icon') ?> My requests
       </a>
+      <a class="nav-link <?= $on('/portal/briefs') ? 'is-active' : '' ?>" href="<?= url('/portal/briefs') ?>">
+        <?= icon('clipboard', 'nav-link__icon') ?> Briefs
+      </a>
       <a class="nav-link <?= $on('/portal/uploads') ? 'is-active' : '' ?>" href="<?= url('/portal/uploads') ?>">
         <?= icon('paperclip', 'nav-link__icon') ?> Send artwork
       </a>
+
+      <div class="nav-group__label">Your account &amp; help</div>
+      <div class="portal-nav-badge-wrap">
+        <a class="nav-link <?= $on('/portal/notifications') ? 'is-active' : '' ?>"
+           href="<?= url('/portal/notifications') ?>">
+          <?= icon('bell', 'nav-link__icon') ?> Notifications
+        </a>
+        <?php if ($notifUnread > 0): ?>
+          <span class="nav-link-badge"><?= $notifUnread > 9 ? '9+' : (int) $notifUnread ?></span>
+        <?php endif; ?>
+      </div>
+      <div class="portal-nav-badge-wrap">
+        <a class="nav-link <?= $on('/portal/support') ? 'is-active' : '' ?>"
+           href="<?= url('/portal/support') ?>">
+          <?= icon('message-circle', 'nav-link__icon') ?> Support
+        </a>
+        <?php if ($msgUnread > 0): ?>
+          <span class="nav-link-badge"><?= $msgUnread > 9 ? '9+' : (int) $msgUnread ?></span>
+        <?php endif; ?>
+      </div>
 
       <?php // Only when we actually sell SMS. A link to a product that is
             // switched off is a promise we cannot keep. ?>
@@ -190,6 +225,19 @@ $smsOn = Settings::bool('bulk_sms_enabled', true);
 
       <div class="topbar__spacer"></div>
 
+      <?php // Bell icon — links to notifications list; badge shows unread count. ?>
+      <div class="topbar-badge-wrap">
+        <a class="icon-btn" href="<?= url('/portal/notifications') ?>"
+           title="Notifications" aria-label="Notifications">
+          <?= icon('bell') ?>
+        </a>
+        <?php if ($notifUnread > 0): ?>
+          <span class="topbar-badge" aria-label="<?= (int) $notifUnread ?> unread">
+            <?= $notifUnread > 9 ? '9+' : (int) $notifUnread ?>
+          </span>
+        <?php endif; ?>
+      </div>
+
       <button class="icon-btn" type="button" data-theme-toggle
               title="Switch between dark and light" aria-label="Switch between dark and light">
         <span data-theme-icon="dark"><?= icon('moon') ?></span>
@@ -204,6 +252,9 @@ $smsOn = Settings::bool('bulk_sms_enabled', true);
         </button>
         <div class="dropdown__menu dropdown__menu--right">
           <div class="dropdown__label"><?= e($portalUser['email']) ?></div>
+          <a class="dropdown__item" href="<?= url('/portal/profile') ?>">
+            <?= icon('user') ?> My profile
+          </a>
           <?php // Out to the company website. It is the front door of this
                 // domain and the portal sits behind it, so without this the
                 // only way across is to edit the address bar. ?>

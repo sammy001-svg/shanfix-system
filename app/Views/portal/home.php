@@ -80,6 +80,38 @@ $tone = static fn(string $s): string => match ($s) {
     </section>
   <?php endif; ?>
 
+  <?php // Pending proof alert — the one action that needs their response before work can continue. ?>
+  <?php if ($pendingProofs > 0): ?>
+    <div class="portal-alert-action" id="pending-proofs-alert">
+      <div class="portal-alert-action__icon"><?= icon('image') ?></div>
+      <div class="portal-alert-action__body">
+        <div class="fw-600">
+          <?= (int) $pendingProofs ?> proof<?= $pendingProofs === 1 ? '' : 's' ?> waiting for your approval
+        </div>
+        <div class="text-sm text-muted">Look them over and let us know if you are happy to proceed.</div>
+      </div>
+      <a class="btn btn--primary" href="<?= url('/portal/jobs') ?>">
+        Review <?= icon('arrow-right') ?>
+      </a>
+    </div>
+  <?php endif; ?>
+
+  <?php // Pending briefs alert ?>
+  <?php if ($pendingBriefs > 0): ?>
+    <div class="portal-alert-action portal-alert-action--blue" id="pending-briefs-alert">
+      <div class="portal-alert-action__icon"><?= icon('file-text') ?></div>
+      <div class="portal-alert-action__body">
+        <div class="fw-600">
+          <?= (int) $pendingBriefs ?> brief<?= $pendingBriefs === 1 ? '' : 's' ?> waiting for your input
+        </div>
+        <div class="text-sm text-muted">We need some details from you before we can start quoting.</div>
+      </div>
+      <a class="btn btn--outline" href="<?= url('/portal/briefs') ?>">
+        Open <?= icon('arrow-right') ?>
+      </a>
+    </div>
+  <?php endif; ?>
+
   <div class="portal-stats">
     <a class="portal-stat" href="<?= url('/portal/quotations') ?>">
       <span class="portal-stat__figure"><?= (int) $summary['quotations'] ?></span>
@@ -93,6 +125,16 @@ $tone = static fn(string $s): string => match ($s) {
       <span class="portal-stat__figure"><?= (int) $summary['invoices'] ?></span>
       <span class="portal-stat__label">Invoices</span>
     </a>
+
+    <?php if ($activeJobs > 0): ?>
+      <a class="portal-stat" href="<?= url('/portal/jobs') ?>">
+        <span class="portal-stat__figure"><?= (int) $activeJobs ?></span>
+        <span class="portal-stat__label">Active jobs</span>
+        <?php if ($pendingProofs > 0): ?>
+          <span class="portal-stat__note"><?= (int) $pendingProofs ?> need your approval</span>
+        <?php endif; ?>
+      </a>
+    <?php endif; ?>
 
     <a class="portal-stat" href="<?= url('/portal/statement') ?>">
       <span class="portal-stat__figure portal-stat__figure--icon"><?= icon('file-text') ?></span>
@@ -177,6 +219,45 @@ $tone = static fn(string $s): string => match ($s) {
         </section>
       <?php endif; ?>
 
+      <?php if ($recentNotifs): ?>
+        <section class="portal-card portal-card--flush">
+          <header class="portal-card__head">
+            <h2 class="portal-card__title">Recent activity</h2>
+            <a class="portal-card__more" href="<?= url('/portal/notifications') ?>">
+              All <?= icon('chevron-right') ?>
+            </a>
+          </header>
+          <ul class="portal-list portal-list--tight">
+            <?php foreach ($recentNotifs as $n): ?>
+              <li>
+                <?php if ($n['link']): ?>
+                  <a class="portal-list__row" href="<?= url(e($n['link'])) ?>">
+                <?php else: ?>
+                  <span class="portal-list__row">
+                <?php endif; ?>
+                  <span class="portal-list__main">
+                    <span class="portal-list__title"><?= e($n['title']) ?></span>
+                    <?php if ($n['body']): ?>
+                      <span class="portal-list__meta"><?= e(str_excerpt((string) $n['body'], 60)) ?></span>
+                    <?php endif; ?>
+                  </span>
+                  <span class="portal-list__side">
+                    <span class="text-xs text-muted"><?= e(fdate($n['created_at'])) ?></span>
+                    <?php if (!$n['read_at']): ?>
+                      <span class="portal-notif-dot" title="New"></span>
+                    <?php endif; ?>
+                  </span>
+                <?php if ($n['link']): ?>
+                  </a>
+                <?php else: ?>
+                  </span>
+                <?php endif; ?>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        </section>
+      <?php endif; ?>
+
       <section class="portal-card">
         <h2 class="portal-card__title mb-12">Anything else?</h2>
         <div class="portal-acts">
@@ -199,6 +280,13 @@ $tone = static fn(string $s): string => match ($s) {
             <span>
               <strong>Your requests</strong>
               <em>What you have asked us, and where it got to</em>
+            </span>
+          </a>
+          <a class="portal-act" href="<?= url('/portal/support') ?>">
+            <?= icon('message-circle') ?>
+            <span>
+              <strong>Send us a message</strong>
+              <em>Ask anything — we reply here in the portal</em>
             </span>
           </a>
         </div>

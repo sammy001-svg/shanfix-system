@@ -9,10 +9,17 @@
  */
 require_once APP_PATH . '/Views/partials/icons.php';
 
-$isInvoice = $type === 'invoice';
-$balance   = (float) $doc['balance'];
-$owing     = $isInvoice && $balance > 0.009;
-$backTo    = $isInvoice ? '/portal/invoices' : '/portal/quotations';
+$isInvoice  = $type === 'invoice';
+$isQuote    = $type === 'quotation';
+$isReceipt  = $type === 'receipt';
+$balance    = (float) $doc['balance'];
+$owing      = $isInvoice && $balance > 0.009;
+$backTo     = $isInvoice ? '/portal/invoices' : ($isReceipt ? '/portal/receipts' : '/portal/quotations');
+
+// Quotation can still be accepted when in sent/viewed status and not expired.
+$canAccept  = $isQuote
+    && in_array((string) $doc['status'], ['sent', 'viewed'], true)
+    && (!$doc['valid_until'] || strtotime((string) $doc['valid_until']) >= strtotime(date('Y-m-d')));
 
 $tone = static fn(string $s): string => match ($s) {
     'paid', 'accepted'                 => 'green',
@@ -114,6 +121,64 @@ $tone = static fn(string $s): string => match ($s) {
         Online payment is not available on this invoice. Call us on
         <?= e($company['phone']) ?> and we will take it from there.
       </p>
+    </section>
+  <?php endif; ?>
+
+  <?php // Quotation acceptance panel. Shown before the line items so the
+        // action is above the fold and the client does not have to scroll. ?>
+  <?php if ($canAccept): ?>
+    <section class="portal-card portal-accept" id="portal-accept-section">
+      <div class="portal-accept__head">
+        <?= icon('check-circle', 'portal-accept__icon') ?>
+        <div>
+          <div class="fw-600">Ready to go ahead?</div>
+          <div class="text-sm text-muted">Accept this quotation and we will start the work.</div>
+        </div>
+      </div>
+
+      <div class="portal-accept__actions">
+        <form method="post" action="<?= url('/portal/quotations/' . $doc['id'] . '/accept') ?>" style="display:inline">
+          <?= csrf_field() ?>
+          <button class="btn btn--primary btn--lg" type="submit" id="accept-quote-btn">
+            <?= icon('check') ?> Accept this quotation
+          </button>
+        </form>
+
+        <details class="portal-accept__decline" id="decline-details">
+          <summary class="btn btn--outline">Decline</summary>
+          <form class="portal-accept__reason" method="post"
+                action="<?= url('/portal/quotations/' . $doc['id'] . '/reject') ?>">
+            <?= csrf_field() ?>
+            <div class="field mt-12">
+              <label class="label" for="reject-reason">Reason (optional)</label>
+              <input class="input" type="text" id="reject-reason" name="reason" maxlength="255"
+                     placeholder="e.g. Budget not approved this quarter">
+            </div>
+            <button class="btn btn--danger" type="submit" id="confirm-decline-btn">
+              Confirm — I am not proceeding
+            </button>
+          </form>
+        </details>
+      </div>
+
+      <p class="text-xs text-muted mb-0 mt-8">
+        Your acceptance is recorded against your name and will be sent to our team immediately.
+        <?php if ($doc['valid_until']): ?>
+          This quotation is valid until <?= e(fdate($doc['valid_until'])) ?>.
+        <?php endif; ?>
+      </p>
+    </section>
+  <?php elseif ($isQuote && $doc['status'] === 'accepted'): ?>
+    <section class="portal-card portal-card--quiet">
+      <div class="flex gap-10 items-center">
+        <span style="color:var(--green-600)"><?= icon('check-circle') ?></span>
+        <div>
+          <div class="fw-600">You accepted this quotation</div>
+          <?php if ($doc['accepted_at']): ?>
+            <div class="text-sm text-muted">Recorded on <?= e(fdate($doc['accepted_at'])) ?></div>
+          <?php endif; ?>
+        </div>
+      </div>
     </section>
   <?php endif; ?>
 
@@ -224,7 +289,9 @@ $tone = static fn(string $s): string => match ($s) {
   <?php endif; ?>
 
   <p class="portal-help">
-    Something not right on this <?= $isInvoice ? 'invoice' : 'quotation' ?>? Call us on
+    Something not right on this
+    <?= $isInvoice ? 'invoice' : ($isReceipt ? 'receipt' : 'quotation') ?>?
+    Call us on
     <a href="tel:<?= e(preg_replace('/[^0-9+]/', '', (string) $company['phone'])) ?>"><?= e($company['phone']) ?></a>.
   </p>
 </div>
