@@ -1330,7 +1330,10 @@ section {
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-md);
-  min-height: 250px; max-height: 400px; background: var(--color-gray-100); /* Adjust based on image aspect ratio, e.g., banner size */
+  /* The banners are made at 1200x450. A fixed 250px-tall box across the
+     full width is nearly 5:1, so every banner lost its top and bottom.
+     Matching their shape shows all of each banner, at any width. */
+  aspect-ratio: 1200 / 450; background: var(--color-gray-100);
 }
 
 .advert-slide {
@@ -3576,3 +3579,33 @@ textarea.form-control {
 /* Jumping to a section (Explore Services, #services) should land below
    the sticky header, not hide the heading underneath it. */
 section[id] { scroll-margin-top: 140px; }
+
+/* ===================================
+   WHY CHOOSE US (homepage)
+   White, so it does not stack a second bright block against the green
+   services section above. Icons reuse .feature-card-icon.
+   =================================== */
+.home-why { background: var(--color-white); }
+.home-why-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--spacing-lg);
+}
+.home-why-card {
+  background: var(--color-white);
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl) var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+.home-why-icon { width: 64px; height: 64px; }
+.home-why-title { font-size: 1.2rem; font-weight: 700; color: var(--color-gray-900); margin: 0 0 0.6rem; }
+.home-why-text { font-size: 1rem; line-height: 1.65; color: var(--color-gray-500); margin: 0; }
+
+/* Closing call to action (homepage) */
+.home-cta { background: #f8fafc; border-top: 1px solid #e5e7eb; }
+.home-cta-inner { text-align: center; }
+.home-cta-buttons { display: flex; gap: var(--spacing-md); justify-content: center; flex-wrap: wrap; margin-top: var(--spacing-xl); }
+
+/* .highlight was only coloured inside the hero; section headings use it too. */
+.section-title .highlight { color: var(--color-primary); }

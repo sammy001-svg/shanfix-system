@@ -30,6 +30,16 @@ if ($staticBanners) {
         ['image_url' => 'assets/Banners-2.jpg', 'title' => 'Bulk SMS Sender Advertisement', 'link_url' => ''],
     ];
 }
+
+// What clients say. The section further down has always checked for
+// $testimonials, but nothing on this page ever loaded them, so it could
+// not show once. Same query as who-we-are.php.
+$testimonials = [];
+try {
+    $t = $pdo->query("SELECT * FROM testimonials WHERE is_active = 1 ORDER BY sort_order ASC, id ASC LIMIT 6");
+    $testimonials = $t->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) { /* table may not exist yet */ }
+
 ?>
 <?php
 $pageSEO = [
@@ -385,6 +395,42 @@ include 'includes/header.php'; ?>
       </div>
     </section>
 
+    <!-- Why choose us
+         Straight after the services, because that is the moment a visitor
+         has seen what we do and is deciding whether to trust us with it.
+         Every reason here is something that is actually true of how we
+         work; there are no invented numbers. -->
+    <section class="home-why">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-title">Why Choose <span class="highlight">Shanfix</span></h2>
+          <p class="section-subtitle">What working with us actually looks like</p>
+        </div>
+        <div class="home-why-grid">
+          <div class="home-why-card">
+            <div class="feature-card-icon home-why-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <h3 class="home-why-title">One team, start to finish</h3>
+            <p class="home-why-text">The people who build your system or print your banners are the same people who support you afterwards. Nothing is handed off.</p>
+          </div>
+          <div class="home-why-card">
+            <div class="feature-card-icon home-why-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 15h3"/></svg></div>
+            <h3 class="home-why-title">Your own client portal</h3>
+            <p class="home-why-text">See your quotations, invoices, statement and job progress online, any time, without having to call and ask.</p>
+          </div>
+          <div class="home-why-card">
+            <div class="feature-card-icon home-why-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg></div>
+            <h3 class="home-why-title">Quoted before we start</h3>
+            <p class="home-why-text">You get a written quotation to approve first, and the price holds once work begins unless you change the brief.</p>
+          </div>
+          <div class="home-why-card">
+            <div class="feature-card-icon home-why-icon"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+            <h3 class="home-why-title">Based in Nairobi</h3>
+            <p class="home-why-text">Local production and local support, so you can reach us quickly and we can reach you.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Latest Blog Posts ─────────────────────────────── -->
     <?php
     $latestPosts = [];
@@ -443,7 +489,7 @@ include 'includes/header.php'; ?>
                 <p class="section-subtitle" style="color:rgba(255,255,255,0.65);">Trusted by businesses and organisations across Kenya</p>
             </div>
             <div class="testimonials-track-wrapper" style="position:relative; overflow:hidden;">
-                <div class="testimonials-track" id="testimonialsTrack" style="display:flex; gap:28px; transition:transform 0.5s cubic-bezier(0.4,0,0.2,1); will-change:transform;">
+                <div class="testimonials-track" id="testimonialsTrack" style="display:flex; gap:28px;<?= count($testimonials) < 3 ? ' justify-content:center;' : '' ?> transition:transform 0.5s cubic-bezier(0.4,0,0.2,1); will-change:transform;">
                     <?php foreach ($testimonials as $t): ?>
                     <div class="testimonial-card" style="flex:0 0 calc(33.333% - 19px); min-width:0; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:32px; backdrop-filter:blur(12px); display:flex; flex-direction:column; gap:16px;">
                         <!-- Stars -->
@@ -494,7 +540,22 @@ include 'includes/header.php'; ?>
     </section>
     <?php endif; ?>
 
-    <?php include 'includes/footer.php'; ?>
+        <!-- The ask. The page used to end on the testimonials and go straight
+         into the footer, so a visitor who had read everything and was
+         ready had nothing to click. Light, so it separates the dark
+         testimonials from the dark footer. -->
+    <section class="home-cta">
+      <div class="container home-cta-inner">
+        <h2 class="section-title">Ready to get <span class="highlight">started</span>?</h2>
+        <p class="section-subtitle">Tell us what you need and we will come back to you with a clear quotation.</p>
+        <div class="home-cta-buttons">
+          <a href="contact.php" class="btn btn-primary">Request a Quote</a>
+          <a href="tel:<?= htmlspecialchars($_brand['phone_tel']) ?>" class="btn btn-secondary">Call <?= htmlspecialchars($_brand['phone']) ?></a>
+        </div>
+      </div>
+    </section>
+
+<?php include 'includes/footer.php'; ?>
 
 
 

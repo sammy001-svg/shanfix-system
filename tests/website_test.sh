@@ -616,6 +616,21 @@ eq "and the site falls back to its own details when the system is down" \
    "$($PHP "$ROOT/tests/helpers/site_brand_fallback.php" "$ROOT/site" 2>/dev/null)" "ok"
 
 echo ""
+echo ""
+echo "=== 16g. The homepage carries its whole case ==="
+# The testimonials section sat on this page guarded by a variable nothing
+# set, so it never showed. These make sure each part of the page actually
+# renders, not merely sits in the source.
+HOME=$(get /)
+has "the carousel is there"              "$HOME" 'class="hero-carousel"'
+has "the services are there"             "$HOME" 'id="services"'
+has "why choose us follows them"         "$HOME" "home-why"
+has "testimonials actually render"       "$HOME" "testimonial-card"
+has "and it ends by asking"              "$HOME" "home-cta"
+# Banners are 1200x450; a fixed-height box cut the phone number off the
+# bottom of the ring back tone advert.
+eq "banners keep their own shape" "$(grep -c 'aspect-ratio: 1200 / 450' "$ROOT/site/index.css")" "1"
+
 echo "=== 17. Deployment keeps what the server owns ==="
 # --delete would otherwise take the site's credentials and anything
 # uploaded through its admin with it on the next deployment.
