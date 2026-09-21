@@ -7,7 +7,7 @@ require_once __DIR__ . '/brand.php';
 // from memory after the first call either way.
 $_brand = site_brand();
 ?>
-<!-- Footer
+<?php /* Footer
      Rebuilt. What changed and why:
        - The newsletter form saves now. It posts to the system's
          /api/newsletter/subscribe; before, the field had no name and the
@@ -17,7 +17,7 @@ $_brand = site_brand();
        - "24/7 Support" is gone. It contradicted the live chat's own
          hours; the real hours are shown instead, from the same settings.
        - No fade-in animations: a footer is where people go looking for a
-         phone number, and it should simply be there. -->
+         phone number, and it should simply be there. */ ?>
 <?php
 $_year   = date('Y');
 $_social = $_brand['social'] ?? [];
