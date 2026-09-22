@@ -144,7 +144,7 @@ class UserOtp
                              . '<p style="margin:20px 0 0;font-size:12px;color:#8A97A6">&copy; ' . date('Y') . ' ' . e($company) . ' Security</p>'
                              . '</div>';
 
-                    $res = $mailer->send($email, $subject, $body, $name);
+                    $res = $mailer->send($email, $name, $subject, $body);
                     if ($res['ok']) {
                         $sent++;
                     } else {
