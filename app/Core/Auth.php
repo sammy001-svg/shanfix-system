@@ -195,6 +195,10 @@ class Auth
         // newsletter.
         'testimonials.manage' => ['admin', 'manager', 'sales'],
 
+        // Everybody's own email. Every role, because everybody has a
+        // mailbox; what each person can open is only ever their own.
+        'mail.use'          => ['admin', 'manager', 'finance', 'hr', 'sales', 'production', 'designer', 'reception', 'staff'],
+
         // The company WhatsApp is one number answered by many people.
         // Everyone client-facing can read and reply; production and general
         // staff have no reason to be inside a customer's conversation.

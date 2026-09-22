@@ -1636,6 +1636,119 @@
     })();
   }
 
+  /* ------------------------------------------------------------------
+     Email
+     ------------------------------------------------------------------ */
+  function initMailbox() {
+    // Ticking messages reveals what can be done to them.
+    const bulk = $('#mbBulk');
+    if (bulk) {
+      const count = $('[data-bulk-count]', bulk);
+      const sync = () => {
+        const n = $$('.mb__pick:checked').length;
+        bulk.hidden = n === 0;
+        count.textContent = n + ' selected';
+      };
+      $$('.mb__pick').forEach((c) => c.addEventListener('change', sync));
+    }
+
+    // Choosing a folder in "Move to…" moves it straight away.
+    $$('[data-move]').forEach((sel) => {
+      sel.addEventListener('change', () => {
+        if (!sel.value) return;
+        const form = sel.form;
+        let doInput = form.querySelector('input[name=do]');
+        if (!doInput) {
+          doInput = document.createElement('input');
+          doInput.type = 'hidden';
+          doInput.name = 'do';
+          form.appendChild(doInput);
+        }
+        doInput.value = 'move';
+        form.submit();
+      });
+    });
+
+    // Pictures from the internet stay hidden until asked for: loading one
+    // tells the sender the message was opened. The page says whether any
+    // were held back; this only swaps the frame for one that loads them.
+    const frame = $('[data-mail-body]');
+    const show = $('[data-show-images]');
+    if (frame && show) {
+      show.addEventListener('click', () => {
+        frame.src = frame.dataset.imagesSrc;
+        show.closest('[data-images-note]').hidden = true;
+      });
+    }
+
+    // Writing.
+    const compose = $('[data-compose]');
+    if (compose) {
+      const ccBtn = $('[data-show-cc]', compose);
+      if (ccBtn) {
+        ccBtn.addEventListener('click', () => {
+          $$('[data-cc-row]', compose).forEach((r) => { r.hidden = false; });
+          ccBtn.hidden = true;
+          $('#c_cc').focus();
+        });
+      }
+
+      const attach = $('[data-attach]', compose);
+      const list = $('[data-attach-list]', compose);
+      if (attach && list) {
+        const original = list.textContent;
+        attach.addEventListener('change', () => {
+          const files = Array.from(attach.files || []);
+          if (!files.length) { list.textContent = original; return; }
+          const mb = files.reduce((t, f) => t + f.size, 0) / 1048576;
+          list.textContent = files.map((f) => f.name).join(', ') + ' (' + mb.toFixed(1) + ' MB)';
+        });
+      }
+
+      // Ctrl+Enter sends, as in Outlook and Gmail. Plain Enter is a new
+      // line: an email is written in paragraphs, unlike a chat.
+      $('#c_text', compose).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          compose.requestSubmit();
+        }
+      });
+
+      // A reply starts above the quoted message, not below it.
+      const text = $('#c_text', compose);
+      if (document.activeElement === text || text.hasAttribute('autofocus')) {
+        text.focus();
+        text.setSelectionRange(0, 0);
+        text.scrollTop = 0;
+      }
+
+      compose.addEventListener('submit', () => {
+        const btn = $('[data-send]', compose);
+        btn.disabled = true;
+        btn.textContent = 'Sending…';
+      });
+    }
+  }
+
+  function initMailBadge() {
+    const badge = $('#mail-unread-badge');
+    if (!badge || !badge.dataset.url) return;
+
+    const refresh = () => {
+      fetch(badge.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!d || !d.ok) return;
+          badge.textContent = d.unread > 99 ? '99+' : d.unread;
+          badge.classList.toggle('hidden', !d.unread);
+        })
+        .catch(() => {});
+    };
+
+    refresh();
+    setInterval(refresh, 90000);
+  }
+
   function initLiveChatBadge() {
     const badge = $('#livechat-waiting-badge');
     if (!badge) return;
@@ -1808,6 +1921,8 @@
     initUnreadPoll();
     initLiveChatBadge();
     initLiveChatDesk();
+    initMailbox();
+    initMailBadge();
     initLinkedSelects();
     initRoleMatrix();
     initTheme();

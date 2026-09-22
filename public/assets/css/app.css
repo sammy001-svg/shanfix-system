@@ -5812,3 +5812,147 @@ a.portal-list__row:hover { background: var(--surface-2); }
   background: var(--surface); color: var(--green-700); font-weight: 600;
   font-size: 12.5px; cursor: pointer; text-align: left;
 }
+
+/* ---------------------------------------------------------------------
+   Email — each member of staff's own mailbox
+   ---------------------------------------------------------------------
+   Three columns, as desktop mail clients have taught everybody: folders,
+   the list, the message. On a narrow screen only one shows at a time.
+   --------------------------------------------------------------------- */
+.mb {
+  display: grid;
+  grid-template-columns: 200px 360px minmax(0, 1fr);
+  height: calc(100vh - var(--topbar-h) - 150px);
+  min-height: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.content:has(> .alert) .mb { height: calc(100vh - var(--topbar-h) - 215px); }
+
+.mb__folders {
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 10px 8px;
+  overflow-y: auto;
+}
+.mb__folder {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: 8px;
+  color: var(--ink); font-size: 13.5px; text-decoration: none;
+}
+.mb__folder .icon { width: 16px; height: 16px; color: var(--slate-500); flex: 0 0 auto; }
+.mb__folder:hover { background: var(--navy-50); text-decoration: none; }
+.mb__folder.is-on { background: var(--surface); font-weight: 650; box-shadow: inset 2px 0 0 var(--green-600); }
+.mb__folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb__count {
+  background: var(--green-600); color: #fff; font-size: 11px; font-weight: 700;
+  padding: 1px 7px; border-radius: 999px;
+}
+
+.mb__list { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.mb__search { padding: 10px; border-bottom: 1px solid var(--border); }
+.mb__search .input { padding: 7px 10px; font-size: 13px; }
+.mb__bulk {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--surface-2);
+}
+.mb__bulk-n { font-size: 12px; color: var(--slate-500); margin-right: auto; }
+.mb__rows { overflow-y: auto; flex: 1; min-height: 0; }
+
+.mb__row { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.mb__row:hover { background: var(--navy-50); }
+.mb__row.is-on { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--green-600); }
+.mb__pick { margin-top: 3px; accent-color: var(--green-700); flex: 0 0 auto; }
+.mb__row-link { flex: 1; min-width: 0; color: inherit; text-decoration: none; display: block; }
+.mb__row-link:hover { text-decoration: none; }
+.mb__row-top { display: flex; gap: 8px; align-items: baseline; }
+.mb__from {
+  flex: 1; min-width: 0; font-size: 13.5px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mb__when { font-size: 11.5px; color: var(--slate-500); flex: 0 0 auto; }
+.mb__subject {
+  display: block; font-size: 13px; color: var(--slate-600); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mb__row.is-unread .mb__from,
+.mb__row.is-unread .mb__subject { font-weight: 700; color: var(--ink); }
+.mb__row.is-unread { box-shadow: inset 3px 0 0 var(--navy-600, #1D4B76); }
+.mb__row.is-unread.is-on { box-shadow: inset 3px 0 0 var(--green-600); }
+.mb__clip .icon { width: 12px; height: 12px; vertical-align: -1px; color: var(--slate-500); }
+.mb__flag { color: var(--amber-700); margin-right: 3px; }
+.mb__pager {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 8px 10px; border-top: 1px solid var(--border);
+}
+
+.mb__reader { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.mb__toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.mb__inline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.mb__move { width: auto; min-width: 130px; }
+.mb__back { display: none; }
+.mb__head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+.mb__title { font-size: 18px; font-weight: 700; margin: 0 0 12px; color: var(--ink); overflow-wrap: anywhere; }
+.mb__meta { display: flex; align-items: center; gap: 11px; font-size: 13px; }
+.mb__date { margin-left: auto; white-space: nowrap; align-self: flex-start; }
+.mb__avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--navy-900, #0C2B4A); color: #fff; font-weight: 700;
+}
+.mb__files { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 20px; border-bottom: 1px solid var(--border); }
+.mb__file {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 260px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 12.5px; color: var(--ink); text-decoration: none;
+}
+.mb__file:hover { border-color: var(--green-600); text-decoration: none; }
+.mb__file .icon { width: 14px; height: 14px; color: var(--slate-500); flex: 0 0 auto; }
+.mb__file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb__images {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 20px; font-size: 12.5px; color: var(--slate-600);
+  background: var(--amber-100); border-bottom: 1px solid var(--border);
+}
+.mb__images .icon { width: 15px; height: 15px; }
+/* White whatever the theme: an email is designed for a white page. */
+.mb__body { flex: 1; min-height: 0; width: 100%; border: 0; background: #fff; }
+
+/* Writing */
+.mb-compose { max-width: 980px; }
+.mb-compose__row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mb-compose__row .input { flex: 1; }
+.mb-compose__label { width: 64px; flex: 0 0 auto; font-size: 13px; font-weight: 600; color: var(--slate-600); }
+.mb-compose__text { width: 100%; min-height: 320px; font-size: 14px; line-height: 1.6; margin-top: 4px; }
+.mb-compose__foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.mb-compose__foot [data-send] { margin-left: auto; }
+.mb-compose__attach { cursor: pointer; }
+
+@media (max-width: 1100px) {
+  .mb { grid-template-columns: 170px minmax(0, 1fr); }
+  .mb__reader { display: none; }
+  .mb--reading { grid-template-columns: minmax(0, 1fr); }
+  .mb--reading .mb__folders, .mb--reading .mb__list { display: none; }
+  .mb--reading .mb__reader { display: flex; }
+  .mb__back { display: inline-flex; }
+}
+@media (max-width: 700px) {
+  .mb { grid-template-columns: minmax(0, 1fr); }
+  .mb__folders { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 6px; }
+  .mb:not(.mb--reading) { grid-template-rows: auto minmax(0, 1fr); }
+  .mb__folder { white-space: nowrap; }
+  .mb-compose__row { flex-wrap: wrap; }
+  .mb-compose__label { width: 100%; }
+}
+
+/* The bar is display:flex, which would otherwise override [hidden]. */
+.mb__bulk[hidden] { display: none; }
+/* Any element in the mail screens marked hidden stays hidden, whatever
+   display its own class gives it. */
+.mb [hidden], .mb-compose [hidden] { display: none !important; }

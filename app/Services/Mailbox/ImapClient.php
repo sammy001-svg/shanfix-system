@@ -18,13 +18,15 @@ use RuntimeException;
  * append, delete — against a cPanel (Dovecot) server. It is not a general
  * IMAP library and does not try to be.
  *
- * Everything that goes to the server is either a fixed keyword, a number
- * the code produced, or a string passed through quote(), which switches
- * to a literal for anything that could not be safely quoted. Nothing a
- * user types reaches the wire unescaped.
+ * Every command is built from pieces: fixed keywords, numbers the code
+ * produced, and strings passed through quote(), which returns either a
+ * safely quoted string or a Literal. Nothing a user types reaches the
+ * wire unescaped.
  */
 final class ImapClient
 {
+    private const CRLF = "\r\n";
+
     /** @var resource|null */
     private $socket = null;
 
@@ -32,8 +34,6 @@ final class ImapClient
 
     /** @var string[] upper-cased capability names */
     private array $caps = [];
-
-    private ?string $selected = null;
 
     public function __construct(
         private string $host,
@@ -97,16 +97,15 @@ final class ImapClient
      */
     public function login(string $user, string $password): void
     {
-        $result = $this->command('LOGIN ' . $this->quote($user) . ' ' . $this->quote($password), false);
+        $result = $this->command(['LOGIN ', $this->quote($user), ' ', $this->quote($password)], false);
 
         if ($result['status'] !== 'OK') {
             throw new AuthFailed('The mail server did not accept that email address and password.');
         }
 
         $this->caps = [];
-        $caps = $this->command('CAPABILITY');
 
-        foreach ($caps['untagged'] as $u) {
+        foreach ($this->command('CAPABILITY')['untagged'] as $u) {
             if (stripos($u['text'], 'CAPABILITY ') === 0) {
                 $this->caps = array_map('strtoupper', preg_split('/\s+/', trim(substr($u['text'], 11))) ?: []);
             }
@@ -175,7 +174,7 @@ final class ImapClient
 
             $out[] = [
                 'name'      => $name,
-                'label'     => self::decodeName($name, $delimiter),
+                'label'     => self::label($name, $delimiter, self::role($name, $flags)),
                 'delimiter' => $delimiter,
                 'flags'     => $flags,
                 'role'      => self::role($name, $flags),
@@ -188,7 +187,7 @@ final class ImapClient
     /** @return array{messages:int, unseen:int} */
     public function status(string $folder): array
     {
-        $r = $this->command('STATUS ' . $this->quote($folder) . ' (MESSAGES UNSEEN)');
+        $r = $this->command(['STATUS ', $this->quote($folder), ' (MESSAGES UNSEEN)']);
         $out = ['messages' => 0, 'unseen' => 0];
 
         foreach ($r['untagged'] as $u) {
@@ -206,8 +205,7 @@ final class ImapClient
     /** @return array{exists:int} */
     public function select(string $folder, bool $readOnly = false): array
     {
-        $r = $this->command(($readOnly ? 'EXAMINE ' : 'SELECT ') . $this->quote($folder));
-        $this->selected = $folder;
+        $r = $this->command([$readOnly ? 'EXAMINE ' : 'SELECT ', $this->quote($folder)]);
         $exists = 0;
 
         foreach ($r['untagged'] as $u) {
@@ -221,7 +219,7 @@ final class ImapClient
 
     public function create(string $folder): void
     {
-        $this->command('CREATE ' . $this->quote($folder), false);
+        $this->command(['CREATE ', $this->quote($folder)], false);
     }
 
     // -----------------------------------------------------------------
@@ -229,28 +227,33 @@ final class ImapClient
     // -----------------------------------------------------------------
 
     /**
-     * UIDs in the selected folder matching $text in sender, recipient or
-     * subject — or all of them when $text is empty. Newest first.
+     * UIDs in the selected folder, newest first — all of them, or those
+     * matching $text in sender, recipients or subject.
      *
      * @return int[]
      */
     public function search(string $text = '', bool $unseenOnly = false): array
     {
-        $criteria = [];
+        $text = trim($text);
+        $cmd = ['UID SEARCH '];
+
+        if ($text !== '' && preg_match('/[^\x20-\x7e]/', $text)) {
+            $cmd[] = 'CHARSET UTF-8 ';
+        }
 
         if ($unseenOnly) {
-            $criteria[] = 'UNSEEN';
+            $cmd[] = 'UNSEEN ';
         }
-
-        $text = trim($text);
 
         if ($text !== '') {
-            $q = $this->quote($text);
-            $criteria[] = 'OR OR OR FROM ' . $q . ' TO ' . $q . ' SUBJECT ' . $q . ' CC ' . $q;
+            array_push($cmd,
+                'OR OR OR FROM ', $this->quote($text),
+                ' TO ', $this->quote($text),
+                ' SUBJECT ', $this->quote($text),
+                ' CC ', $this->quote($text));
+        } elseif (!$unseenOnly) {
+            $cmd[] = 'ALL';
         }
-
-        $cmd = 'UID SEARCH ' . ($text !== '' && preg_match('/[^\x20-\x7e]/', $text) ? 'CHARSET UTF-8 ' : '')
-             . ($criteria ? implode(' ', $criteria) : 'ALL');
 
         $uids = [];
 
@@ -281,8 +284,7 @@ final class ImapClient
             return [];
         }
 
-        $set = implode(',', array_map('intval', $uids));
-        $r = $this->command('UID FETCH ' . $set
+        $r = $this->command('UID FETCH ' . self::set($uids)
             . ' (UID FLAGS RFC822.SIZE INTERNALDATE BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE CONTENT-TYPE)])');
 
         $out = [];
@@ -315,7 +317,7 @@ final class ImapClient
         return $out;
     }
 
-    /** The whole message as sent, without marking it read. */
+    /** The whole message as it arrived, without marking it read. */
     public function raw(int $uid): ?string
     {
         $r = $this->command('UID FETCH ' . $uid . ' (UID BODY.PEEK[])');
@@ -334,12 +336,11 @@ final class ImapClient
     /** @param int[] $uids */
     public function flag(array $uids, string $flag, bool $on = true): void
     {
-        if (!$uids) {
+        if (!$uids || !preg_match('/^\\\\[A-Za-z]+$/', $flag)) {
             return;
         }
 
-        $this->command('UID STORE ' . implode(',', array_map('intval', $uids))
-            . ' ' . ($on ? '+' : '-') . 'FLAGS.SILENT (' . $flag . ')');
+        $this->command('UID STORE ' . self::set($uids) . ' ' . ($on ? '+' : '-') . 'FLAGS.SILENT (' . $flag . ')');
     }
 
     /**
@@ -357,14 +358,14 @@ final class ImapClient
             return;
         }
 
-        $set = implode(',', array_map('intval', $uids));
+        $set = self::set($uids);
 
         if ($this->has('MOVE')) {
-            $this->command('UID MOVE ' . $set . ' ' . $this->quote($to));
+            $this->command(['UID MOVE ' . $set . ' ', $this->quote($to)]);
             return;
         }
 
-        $this->command('UID COPY ' . $set . ' ' . $this->quote($to));
+        $this->command(['UID COPY ' . $set . ' ', $this->quote($to)]);
         $this->command('UID STORE ' . $set . ' +FLAGS.SILENT (\\Deleted)');
         $this->command($this->has('UIDPLUS') ? 'UID EXPUNGE ' . $set : 'EXPUNGE');
     }
@@ -376,31 +377,19 @@ final class ImapClient
             return;
         }
 
-        $set = implode(',', array_map('intval', $uids));
+        $set = self::set($uids);
         $this->command('UID STORE ' . $set . ' +FLAGS.SILENT (\\Deleted)');
         $this->command($this->has('UIDPLUS') ? 'UID EXPUNGE ' . $set : 'EXPUNGE');
     }
 
     /** File a message in a folder — how a sent message reaches Sent. */
-    public function append(string $folder, string $raw, array $flags = ['\\Seen']): void
+    public function append(string $folder, string $raw, bool $seen = true): void
     {
-        $tag = $this->nextTag();
-        $this->write($tag . ' APPEND ' . $this->quote($folder)
-            . ($flags ? ' (' . implode(' ', $flags) . ')' : '')
-            . ' {' . strlen($raw) . "}\r\n");
-
-        $line = $this->readLine();
-
-        if (!str_starts_with($line, '+')) {
-            throw new RuntimeException('The mail server would not accept a copy of the message: ' . trim($line));
-        }
-
-        $this->write($raw . "\r\n");
-        $result = $this->readResponse($tag);
-
-        if ($result['status'] !== 'OK') {
-            throw new RuntimeException('Saving a copy of the message failed: ' . $result['text']);
-        }
+        $this->command([
+            'APPEND ', $this->quote($folder), $seen ? ' (\\Seen) ' : ' ',
+            // Always a literal: a message is many lines and any bytes.
+            new Literal($raw),
+        ]);
     }
 
     // -----------------------------------------------------------------
@@ -428,18 +417,40 @@ final class ImapClient
         $leaf = strtolower(preg_replace('/^INBOX[.\/]/i', '', $name) ?? $name);
 
         return match ($leaf) {
-            'sent', 'sent items', 'sent messages', 'sent mail'  => 'sent',
-            'drafts', 'draft'                                   => 'drafts',
+            'sent', 'sent items', 'sent messages', 'sent mail'           => 'sent',
+            'drafts', 'draft'                                            => 'drafts',
             'trash', 'deleted', 'deleted items', 'deleted messages', 'bin' => 'trash',
-            'spam', 'junk', 'junk e-mail', 'junk email'         => 'spam',
-            'archive', 'archives'                               => 'archive',
-            default                                             => null,
+            'spam', 'junk', 'junk e-mail', 'junk email'                  => 'spam',
+            'archive', 'archives'                                        => 'archive',
+            default                                                      => null,
         };
     }
 
-    /** "INBOX.Sent" → "Sent"; modified UTF-7 names decoded for display. */
+    /**
+     * What to call a folder. The ones every mailbox has get their ordinary
+     * names whatever the server calls them — cPanel's "INBOX.spam" is
+     * shown as "Spam" — and everything else keeps its own.
+     */
+    public static function label(string $name, string $delimiter, ?string $role): string
+    {
+        return match ($role) {
+            'inbox'   => 'Inbox',
+            'sent'    => 'Sent',
+            'drafts'  => 'Drafts',
+            'trash'   => 'Trash',
+            'spam'    => 'Spam',
+            'archive' => 'Archive',
+            default   => self::decodeName($name, $delimiter),
+        };
+    }
+
+    /** "INBOX.Sent" -> "Sent"; modified UTF-7 names decoded for display. */
     public static function decodeName(string $name, string $delimiter): string
     {
+        if (strtoupper($name) === 'INBOX') {
+            return 'Inbox';
+        }
+
         $shown = $name;
 
         if ($delimiter !== '' && stripos($name, 'INBOX' . $delimiter) === 0) {
@@ -448,17 +459,23 @@ final class ImapClient
 
         $decoded = @mb_convert_encoding($shown, 'UTF-8', 'UTF7-IMAP');
 
-        return strtoupper($name) === 'INBOX' ? 'Inbox' : (is_string($decoded) && $decoded !== '' ? $decoded : $shown);
+        return is_string($decoded) && $decoded !== '' ? $decoded : $shown;
     }
 
     // -----------------------------------------------------------------
     // The wire
     // -----------------------------------------------------------------
 
+    /** A UID set from integers the code chose — never from user input. */
+    private static function set(array $uids): string
+    {
+        return implode(',', array_map('intval', $uids));
+    }
+
     /**
      * A string as IMAP wants it: quoted when safe, a literal when not.
      *
-     * A literal is used for anything with a line break, a NUL or bytes
+     * A literal is used for anything with a control character or a byte
      * outside printable ASCII — a password with an accented letter, a
      * search for a name in another script — since quoting cannot carry
      * those. A literal's bytes are sent verbatim after the server asks for
@@ -466,11 +483,11 @@ final class ImapClient
      */
     private function quote(string $value): string|Literal
     {
-        if (preg_match('/[ --ÿ]/', $value)) {
+        if (preg_match('/[^\x20-\x7e]/', $value)) {
             return new Literal($value);
         }
 
-        return '"' . str_replace(['\', '"'], ['\\', '\\"'], $value) . '"';
+        return '"' . strtr($value, ['\\' => '\\\\', '"' => '\\"']) . '"';
     }
 
     private function nextTag(): string
@@ -481,9 +498,9 @@ final class ImapClient
     /**
      * Send a command and read the whole reply.
      *
-     * A command is a string, or a list of pieces where some are Literal
-     * objects from quote(). Each literal is announced with its length and
-     * sent only after the server answers "+ go ahead", as IMAP requires.
+     * A command is a string, or a list of pieces some of which are Literal
+     * objects. Each literal is announced with its length and its bytes
+     * are sent only after the server answers "+", as IMAP requires.
      *
      * @param string|array<int, string|Literal> $command
      * @return array{status:string, text:string, untagged:list<array{text:string, literals:string[]}>}
@@ -495,11 +512,10 @@ final class ImapClient
 
         foreach ((array) $command as $piece) {
             if ($piece instanceof Literal) {
-                $this->write($buffer . '{' . strlen($piece->value) . "}
-");
-                $buffer = '';
+                $this->write($buffer . '{' . strlen($piece->value) . '}' . self::CRLF);
 
                 $go = $this->readLine();
+
                 if (!str_starts_with($go, '+')) {
                     throw new RuntimeException('The mail server refused part of a command: ' . trim($go));
                 }
@@ -511,8 +527,7 @@ final class ImapClient
             $buffer .= $piece;
         }
 
-        $this->write($buffer . "
-");
+        $this->write($buffer . self::CRLF);
         $result = $this->readResponse($tag);
 
         if ($mustSucceed && $result['status'] !== 'OK') {
@@ -534,7 +549,7 @@ final class ImapClient
 
             if (str_starts_with($text, $tag . ' ')) {
                 $rest = substr($text, strlen($tag) + 1);
-                $status = strtoupper(strtok($rest, ' ') ?: '');
+                $status = strtoupper((string) strtok($rest, ' '));
 
                 return ['status' => $status, 'text' => trim(substr($rest, strlen($status))), 'untagged' => $untagged];
             }
@@ -542,16 +557,15 @@ final class ImapClient
             if (str_starts_with($text, '* ')) {
                 $untagged[] = ['text' => substr($text, 2), 'literals' => $literals];
             }
-            // "+ ..." continuations outside APPEND are ignored.
         }
     }
 
     /**
-     * One response line, with any literals it carries read in full.
+     * One response, with any literals it carries read in full.
      *
      * A line ending in {N} is followed by exactly N bytes of data, then the
-     * rest of the line. The literal's place in the text is marked with a
-     * reference the tokenizer resolves, so message bodies containing
+     * rest of the line. Each literal's place in the text is marked with
+     * Tokenizer::MARK and its index, so a message body containing
      * parentheses or quotes cannot confuse the parser.
      *
      * @return array{0:string, 1:string[]}
@@ -565,14 +579,12 @@ final class ImapClient
             $line = $this->readLine();
 
             if (preg_match('/\{(\d+)\}\r\n$/', $line, $m)) {
-                $text .= substr($line, 0, -strlen($m[0])) . "\x01" . count($literals) . "\x01";
+                $text .= substr($line, 0, -strlen($m[0])) . Tokenizer::MARK . count($literals) . Tokenizer::MARK;
                 $literals[] = $this->readBytes((int) $m[1]);
                 continue;
             }
 
-            $text .= rtrim($line, "\r\n");
-
-            return [$text, $literals];
+            return [$text . rtrim($line, "\r\n"), $literals];
         }
     }
 
@@ -582,7 +594,7 @@ final class ImapClient
 
         if ($line === false) {
             $meta = stream_get_meta_data($this->socket);
-            throw new RuntimeException($meta['timed_out'] ?? false
+            throw new RuntimeException(($meta['timed_out'] ?? false)
                 ? 'The mail server stopped answering.'
                 : 'The connection to the mail server was lost.');
         }
@@ -598,13 +610,12 @@ final class ImapClient
             $chunk = fread($this->socket, min(65536, $n - strlen($data)));
 
             if ($chunk === false || $chunk === '') {
-                if (feof($this->socket)) {
-                    throw new RuntimeException('The connection closed in the middle of a message.');
-                }
                 $meta = stream_get_meta_data($this->socket);
-                if ($meta['timed_out'] ?? false) {
-                    throw new RuntimeException('The mail server stopped answering in the middle of a message.');
+
+                if (feof($this->socket) || ($meta['timed_out'] ?? false)) {
+                    throw new RuntimeException('The mail server stopped part-way through a message.');
                 }
+
                 continue;
             }
 

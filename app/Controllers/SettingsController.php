@@ -19,7 +19,7 @@ class SettingsController extends Controller
     {
         $tab = (string) $request->query('tab', 'company');
 
-        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'meetings', 'categories'], true)) {
+        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'email', 'meetings', 'categories'], true)) {
             $tab = 'company';
         }
 
@@ -351,6 +351,66 @@ class SettingsController extends Controller
         }
 
         Response::to('/settings?tab=payments');
+    }
+
+    /**
+     * The company mail server that every member of staff's mailbox uses.
+     *
+     * Only the server: each person connects their own address and password
+     * from their own mailbox page, and nobody here ever sees those.
+     */
+    public function saveMailServer(Request $request): void
+    {
+        $sec = static fn(string $v): string => in_array($v, ['ssl', 'tls', 'none'], true) ? $v : 'ssl';
+        $host = static fn(string $v): string => preg_replace('/[^a-z0-9.\-]/i', '', trim($v)) ?? '';
+
+        $imapHost = $host((string) $request->input('mail_imap_host', ''));
+        $smtpHost = $host((string) $request->input('mail_smtp_host', '')) ?: $imapHost;
+
+        Settings::setMany([
+            'mail_enabled'       => $request->input('mail_enabled') ? '1' : '0',
+            'mail_imap_host'     => $imapHost,
+            'mail_imap_port'     => (string) max(1, min(65535, $request->int('mail_imap_port') ?: 993)),
+            'mail_imap_security' => $sec((string) $request->input('mail_imap_security', 'ssl')),
+            'mail_smtp_host'     => $smtpHost,
+            'mail_smtp_port'     => (string) max(1, min(65535, $request->int('mail_smtp_port') ?: 465)),
+            'mail_smtp_security' => $sec((string) $request->input('mail_smtp_security', 'ssl')),
+            'mail_max_attach_mb' => (string) max(1, min(50, $request->int('mail_max_attach_mb') ?: 20)),
+        ]);
+
+        if ($request->input('check')) {
+            $problems = [];
+
+            try {
+                $imap = new \App\Services\Mailbox\ImapClient($imapHost, Settings::int('mail_imap_port', 993),
+                    (string) Settings::get('mail_imap_security', 'ssl'), 10);
+                $imap->connect();
+                $imap->logout();
+            } catch (\Throwable $e) {
+                $problems[] = 'Incoming (IMAP): ' . $e->getMessage();
+            }
+
+            $smtpSec = (string) Settings::get('mail_smtp_security', 'ssl');
+            $errno = 0;
+            $errstr = '';
+            $sock = @stream_socket_client(($smtpSec === 'ssl' ? 'ssl://' : 'tcp://') . $smtpHost . ':' . Settings::int('mail_smtp_port', 465),
+                $errno, $errstr, 10);
+            if (!$sock || !str_starts_with((string) fgets($sock), '220')) {
+                $problems[] = 'Outgoing (SMTP): could not reach ' . $smtpHost . ($errstr ? ' — ' . $errstr : '');
+            }
+            if ($sock) {
+                @fwrite($sock, "QUIT\r\n");
+                @fclose($sock);
+            }
+
+            $problems
+                ? Session::error('Saved, but: ' . implode(' ', $problems))
+                : Session::success('Saved. Both the incoming and outgoing mail servers answered.');
+        } else {
+            Session::success('Saved.');
+        }
+
+        Response::to('/settings?tab=email');
     }
 
     /**

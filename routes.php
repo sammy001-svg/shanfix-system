@@ -34,6 +34,7 @@ use App\Controllers\LetterController;
 use App\Controllers\JobFileController;
 use App\Controllers\LiveChatApiController;
 use App\Controllers\NewsletterController;
+use App\Controllers\MailController;
 use App\Controllers\TestimonialController;
 use App\Controllers\LiveChatController;
 use App\Controllers\LiveChatAdminController;
@@ -1142,6 +1143,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/notifications/{id}/cancel',   [NotificationController::class, 'cancel']);
         $r->post('/settings/messaging',          [SettingsController::class, 'saveMessaging']);
         $r->post('/settings/meetings',           [SettingsController::class, 'saveMeetings']);
+        $r->post('/settings/email',              [SettingsController::class, 'saveMailServer']);
         $r->post('/settings/messaging/test',     [NotificationController::class, 'sendTest']);
 
         // -- Backups
@@ -1224,6 +1226,24 @@ $r->group(['auth'], function ($r) {
         $r->post('/livechat/{id}/transfer',     [LiveChatController::class, 'transfer'],  ['csrf']);
         $r->post('/livechat/{id}/close',        [LiveChatController::class, 'close'],     ['csrf']);
         $r->post('/livechat/{id}/reopen',       [LiveChatController::class, 'reopen'],    ['csrf']);
+    });
+
+    // -- Each member of staff's own mailbox
+    //
+    // No route here takes a user id: every one works on the signed-in
+    // person's own mailbox, which is the whole of its privacy model.
+    $r->group(['permission:mail.use'], function ($r) {
+        $r->get ('/mail',                                [MailController::class, 'index']);
+        $r->get ('/mail/setup',                          [MailController::class, 'setup']);
+        $r->get ('/mail/compose',                        [MailController::class, 'compose']);
+        $r->get ('/mail/unread',                         [MailController::class, 'unread']);
+        $r->get ('/mail/message/{uid}/body',             [MailController::class, 'body']);
+        $r->get ('/mail/message/{uid}/attachment/{index}', [MailController::class, 'attachment']);
+
+        $r->post('/mail/setup',      [MailController::class, 'connect'],    ['csrf']);
+        $r->post('/mail/disconnect', [MailController::class, 'disconnect'], ['csrf']);
+        $r->post('/mail/send',       [MailController::class, 'send'],       ['csrf']);
+        $r->post('/mail/action',     [MailController::class, 'action'],     ['csrf']);
     });
 
     // -- Client testimonials shown on the website

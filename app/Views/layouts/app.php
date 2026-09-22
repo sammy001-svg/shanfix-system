@@ -363,6 +363,13 @@ if ($me && can('jobs.view')) {
         </a>
       <?php endif; ?>
 
+      <?php if (can('mail.use')): ?>
+        <a class="nav-link <?= is_active_nav('/mail') ? 'is-active' : '' ?>" href="<?= url('/mail') ?>">
+          <?= icon('mail', 'nav-link__icon') ?> Email
+          <span id="mail-unread-badge" class="nav-link__badge hidden" data-url="<?= url('/mail/unread') ?>"></span>
+        </a>
+      <?php endif; ?>
+
       <?php if (can('testimonials.manage')): ?>
         <a class="nav-link <?= is_active_nav('/testimonials') ? 'is-active' : '' ?>" href="<?= url('/testimonials') ?>">
           <?= icon('star', 'nav-link__icon') ?> Testimonials

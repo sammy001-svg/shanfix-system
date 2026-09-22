@@ -77,6 +77,9 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     <a class="tab <?= $tab === 'messaging'  ? 'is-active' : '' ?>" href="<?= e($tabUrl('messaging')) ?>">
       <?= icon('send') ?> Email &amp; SMS
     </a>
+    <a class="tab <?= $tab === 'email'      ? 'is-active' : '' ?>" href="<?= e($tabUrl('email')) ?>">
+      <?= icon('inbox') ?> Email server
+    </a>
     <a class="tab <?= $tab === 'meetings'   ? 'is-active' : '' ?>" href="<?= e($tabUrl('meetings')) ?>">
       <?= icon('video') ?> Meetings
     </a>
@@ -1124,6 +1127,76 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
       </p>
     </div>
   </div>
+
+<?php elseif ($tab === 'email'): ?>
+
+  <?php $sel = static fn(string $k, string $v, string $d): string => ((string) setting($k, $d)) === $v ? 'selected' : ''; ?>
+  <form method="post" action="<?= url('/settings/email') ?>" class="card">
+    <?= csrf_field() ?>
+    <div class="card__head">
+      <div>
+        <div class="card__title">Company mail server</div>
+        <div class="text-sm text-muted">Used by every member of staff's own mailbox under Email in the sidebar.</div>
+      </div>
+    </div>
+    <div class="card__body">
+      <p class="text-sm text-muted mb-16">
+        Only the server goes here. Each person connects their own address and
+        password from their own Email page; nobody, including administrators,
+        can open another person's mailbox through the system. For cPanel the
+        server is usually <strong>mail.yourdomain.com</strong>, with IMAP on 993
+        and SMTP on 465, both SSL — the same details cPanel shows under
+        Email Accounts → Connect Devices.
+      </p>
+
+      <label class="check mb-16">
+        <input type="checkbox" name="mail_enabled" value="1" <?= \App\Core\Settings::bool('mail_enabled', true) ? 'checked' : '' ?>>
+        <span class="check__text">Staff can use email inside the system</span>
+      </label>
+
+      <div class="form-grid form-grid--2">
+        <div class="field">
+          <label class="label" for="mail_imap_host">Incoming server (IMAP)</label>
+          <input class="input" id="mail_imap_host" name="mail_imap_host" value="<?= e(setting('mail_imap_host', '')) ?>" placeholder="mail.shanfixtechnology.com">
+        </div>
+        <div class="field">
+          <label class="label" for="mail_imap_port">Port and security</label>
+          <div style="display:flex; gap:8px">
+            <input class="input" type="number" id="mail_imap_port" name="mail_imap_port" value="<?= e(setting('mail_imap_port', '993')) ?>" style="max-width:110px">
+            <select class="input" name="mail_imap_security">
+              <option value="ssl" <?= $sel('mail_imap_security', 'ssl', 'ssl') ?>>SSL</option>
+              <option value="tls" <?= $sel('mail_imap_security', 'tls', 'ssl') ?>>STARTTLS</option>
+              <option value="none" <?= $sel('mail_imap_security', 'none', 'ssl') ?>>None (not recommended)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="mail_smtp_host">Outgoing server (SMTP)</label>
+          <input class="input" id="mail_smtp_host" name="mail_smtp_host" value="<?= e(setting('mail_smtp_host', '')) ?>" placeholder="Same as incoming if left empty">
+        </div>
+        <div class="field">
+          <label class="label" for="mail_smtp_port">Port and security</label>
+          <div style="display:flex; gap:8px">
+            <input class="input" type="number" id="mail_smtp_port" name="mail_smtp_port" value="<?= e(setting('mail_smtp_port', '465')) ?>" style="max-width:110px">
+            <select class="input" name="mail_smtp_security">
+              <option value="ssl" <?= $sel('mail_smtp_security', 'ssl', 'ssl') ?>>SSL</option>
+              <option value="tls" <?= $sel('mail_smtp_security', 'tls', 'ssl') ?>>STARTTLS</option>
+              <option value="none" <?= $sel('mail_smtp_security', 'none', 'ssl') ?>>None (not recommended)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="mail_max_attach_mb">Largest attachments per message (MB)</label>
+          <input class="input" type="number" min="1" max="50" id="mail_max_attach_mb" name="mail_max_attach_mb" value="<?= e(setting('mail_max_attach_mb', '20')) ?>">
+          <span class="field-hint">Keep under your host's limit (cPanel's default is 50MB).</span>
+        </div>
+      </div>
+    </div>
+    <div class="card__foot">
+      <button class="btn btn--primary" type="submit">Save</button>
+      <button class="btn btn--outline" type="submit" name="check" value="1">Save and check the server</button>
+    </div>
+  </form>
 
 <?php elseif ($tab === 'meetings'): ?>
 
