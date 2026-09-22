@@ -79,20 +79,47 @@ page() { curl -s -b "$JAR" -c "$JAR" "$BASE$1"; }
 code() { curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$BASE$1"; }
 post() { local p="$1"; shift; curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE$p" "$@"; }
 
+# Staff sign-in asks for a one-time code when user_otp_enabled is on. The
+# suites complete that step the way a person would — with a code issued
+# for the purpose — so they keep signing in, and the code step itself is
+# exercised on every run rather than switched off for testing.
+#
+# Codes are limited per person per hour, and a full run signs in far more
+# often than that, so the person's old codes are cleared first. This is
+# the test database only; config.sh refuses to run against anything else.
+login_as() {
+  local email="$1" password="$2" t where uid otp
+  uid=$(q "SELECT id FROM users WHERE email='$email';")
+  [ -n "$uid" ] && q "DELETE FROM user_otps WHERE user_id=$uid;"
+
+  t=$(curl -s -c "$JAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+  where=$(curl -s -o /dev/null -w '%{redirect_url}' -b "$JAR" -c "$JAR" -X POST "$BASE/login" \
+       --data-urlencode "_token=$t" --data-urlencode "email=$email" --data-urlencode "password=$password")
+
+  case "$where" in
+    */login/otp*)
+      otp=$($PHP -r '
+        require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+        App\Core\Config::load(CONFIG_PATH . "/config.php");
+        App\Core\Database::connect(App\Core\Config::get("db"));
+        $r = App\Services\UserOtp::issue((int) $argv[1], $argv[2]);
+        echo $r["code"] ?? "";
+      ' "$uid" "$email")
+      t=$(curl -s -b "$JAR" -c "$JAR" "$BASE/login/otp" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
+      curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login/otp" \
+           --data-urlencode "_token=$t" --data-urlencode "code=$otp"
+      ;;
+  esac
+}
+
 signin() {
   JAR="$D/jar_$1.txt"; rm -f "$JAR"
-  local t
-  t=$(curl -s -c "$JAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-  curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" \
-       --data "_token=$t&email=$1@shanfix.co.ke&password=$2"
+  login_as "$1@shanfix.co.ke" "$2"
 }
 
 signin_admin() {
   JAR="$D/jar_admin.txt"; rm -f "$JAR"
-  local t
-  t=$(curl -s -c "$JAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-  curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" \
-       --data "_token=$t&email=$ADMIN_EMAIL&password=$ADMIN_PASS"
+  login_as "$ADMIN_EMAIL" "$ADMIN_PASS"
 }
 
 # The tally every suite prints last.
@@ -115,3 +142,16 @@ case "$DB" in
     exit 1
     ;;
 esac
+# -- Nothing a test does may reach a real person ----------------------
+#
+# The test database holds a real SMS API key, and with no sms_base_url set
+# the SMS service falls back to the live gateway. Anything that sends a
+# text — including the login code, which does not consult the SMS on/off
+# switch — would then text a real phone. That happened on 22 Sep 2026 and
+# was stopped only by a certificate error on this machine.
+#
+# So every suite starts with SMS pointed at a closed local port. A suite
+# that tests sending SMS points it at its own fake gateway afterwards.
+q "INSERT INTO settings (setting_key, setting_value) VALUES ('sms_base_url','http://127.0.0.1:9')
+   ON DUPLICATE KEY UPDATE setting_value='http://127.0.0.1:9';" 2>/dev/null
+

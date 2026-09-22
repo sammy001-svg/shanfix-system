@@ -16,7 +16,7 @@ signin() {
   JAR="$D/crawl_$1.txt"; rm -f "$JAR"
   local t
   t=$(curl -s -c "$JAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-  curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" --data "_token=$t&email=$1@shanfix.co.ke&password=$2"
+  login_as "$1@shanfix.co.ke" "$2"
 }
 
 # A real id per resource, so the {id} pages are exercised against

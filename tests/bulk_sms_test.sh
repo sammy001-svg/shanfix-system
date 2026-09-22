@@ -383,7 +383,7 @@ $MYSQL -e "DELETE FROM users WHERE email='smssales@shanfix.co.ke';
            VALUES ('SMSTEST Sales','smssales@shanfix.co.ke','$HASH','sales',1);"
 JAR="$D/jar_smssales.txt"; rm -f "$JAR"
 ST=$(curl -s -c "$JAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" --data "_token=$ST&email=smssales@shanfix.co.ke&password=$SALESPASS"
+login_as "smssales@shanfix.co.ke" "$SALESPASS"
 
 eq "sales can see the platform"     "$(code /bulk-sms)" "200"
 eq "and a customer's messages"      "$(code /bulk-sms/messages)" "200"

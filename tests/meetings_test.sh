@@ -15,8 +15,7 @@ tok() { curl -s -b "$JAR" -c "$JAR" "$BASE$1" | grep -o 'name="_token" value="[^
 
 $MYSQL -e "DELETE FROM activity_log WHERE action='login_failed';"
 T=$(tok /login)
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" \
-  --data "_token=$T&email=admin@shanfix.co.ke&password=Shanfix@2026"
+login_as "admin@shanfix.co.ke" "Shanfix@2026"
 
 TITLE="Meeting test $(date +%s)"
 WHEN=$(date -d '+90 minutes' '+%Y-%m-%dT%H:%M')

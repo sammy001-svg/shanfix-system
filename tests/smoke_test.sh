@@ -60,6 +60,7 @@ check "/dashboard" 302 "GET /dashboard (unauthenticated -> redirect)"
 TOKEN=$(token "/login")
 [ -z "$TOKEN" ] && { echo "  could not read CSRF token"; exit 1; }
 post "/login" "_token=$TOKEN&email=admin@shanfix.co.ke&password=Shanfix@2026" "POST /login (correct password)"
+login_as "admin@shanfix.co.ke" "Shanfix@2026"
 
 check "/dashboard" 200 "GET /dashboard (authenticated)"
 
@@ -221,6 +222,7 @@ echo "=== Quick open ==="
 # The suite signed out further up; these need a session again.
 TOKEN=$(token "/login")
 post "/login" "_token=$TOKEN&email=admin@shanfix.co.ke&password=Shanfix@2026" "signed back in" > /dev/null 2>&1
+login_as "admin@shanfix.co.ke" "Shanfix@2026"
 # Ctrl-K, type, arrow down, Enter. It answers from the same data as the
 # search page and must honour the same permissions — a JSON route is not
 # a way around them.

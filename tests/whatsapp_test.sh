@@ -45,8 +45,7 @@ php -r '
 ' > /dev/null 2>&1
 
 T=$(tok /login)
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" \
-  --data "_token=$T&email=admin@shanfix.co.ke&password=Shanfix@2026"
+login_as "admin@shanfix.co.ke" "Shanfix@2026"
 
 WA="254712345678"
 NOW=$(date +%s)
@@ -150,7 +149,7 @@ probe() {
   local jar="$D/wa_$1.txt"; rm -f "$jar"
   local t
   t=$(curl -s -c "$jar" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-  curl -s -o /dev/null -b "$jar" -c "$jar" -X POST "$BASE/login" --data "_token=$t&email=wa$1@shanfix.co.ke&password=Role@2026"
+  JAR=$jar login_as "wa$1@shanfix.co.ke" "Role@2026"
   curl -s -o /dev/null -w '%{http_code}' -b "$jar" "$BASE/whatsapp"
   rm -f "$jar"
 }

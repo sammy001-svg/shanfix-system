@@ -202,8 +202,7 @@ q "INSERT INTO live_department_staff (department_id,user_id) VALUES ($SALES_DEPT
 
 JAR="$LJ"; rm -f "$JAR"
 T=$(curl -s -c "$JAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" \
-     --data "_token=$T&email=salesonly@shanfix.co.ke&password=$ADMIN_PASS" > /dev/null
+login_as "salesonly@shanfix.co.ke" "$ADMIN_PASS"
 
 eq "a sales agent reaches the sales one"      "$(code "/livechat/$CID")"     "200"
 ne "but not one belonging to another department" "$(code "/livechat/$SUP_CID")" "200"

@@ -16,7 +16,7 @@ post() { curl -s -o /tmp/j.html -w "%{http_code}" -b "$JAR" -c "$JAR" -X POST "$
 echo ""
 echo "=== Setup: sign in, client, invoice ==="
 T=$(tok /login)
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" --data "_token=$T&email=admin@shanfix.co.ke&password=Shanfix@2026"
+login_as "admin@shanfix.co.ke" "Shanfix@2026"
 eq "signed in" "$(code /dashboard)" "200"
 
 T=$(tok /clients/create)

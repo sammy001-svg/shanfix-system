@@ -99,7 +99,7 @@ echo "=== 5. Payment reversal restores the balance ==="
 PID=$($MYSQL -N -e "SELECT id FROM payments WHERE document_id=$DOC_ID LIMIT 1;")
 JAR=$(dirname "$0")/rev.txt; rm -f "$JAR"
 TOK=$(curl -s -c "$JAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" --data "_token=$TOK&email=admin@shanfix.co.ke&password=Shanfix@2026"
+login_as "admin@shanfix.co.ke" "Shanfix@2026"
 TOK=$(curl -s -b "$JAR" -c "$JAR" "$BASE/payments" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
 curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/payments/$PID/reverse" --data "_token=$TOK"
 assert "payment cancelled" "$($MYSQL -N -e "SELECT status FROM payments WHERE id=$PID;")" "cancelled"

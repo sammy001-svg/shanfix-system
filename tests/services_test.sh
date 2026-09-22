@@ -13,8 +13,7 @@ tok() { curl -s -b "$JAR" -c "$JAR" "$BASE$1" | grep -o 'name="_token" value="[^
 
 $MYSQL -e "DELETE FROM activity_log WHERE action='login_failed';"
 T=$(tok /login)
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" \
-  --data "_token=$T&email=admin@shanfix.co.ke&password=Shanfix@2026"
+login_as "admin@shanfix.co.ke" "Shanfix@2026"
 
 SID=$(q "SELECT id FROM services ORDER BY id LIMIT 1;")
 $MYSQL -e "DELETE FROM service_jobs WHERE service_id=$SID;"
@@ -73,7 +72,7 @@ $MYSQL -e "DELETE FROM users WHERE email='svcstaff@shanfix.co.ke';
   INSERT INTO user_roles (user_id,role) SELECT id,'staff' FROM users WHERE email='svcstaff@shanfix.co.ke';"
 SJAR="$D/svcstaff.txt"; rm -f "$SJAR"
 T2=$(curl -s -c "$SJAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-curl -s -o /dev/null -b "$SJAR" -c "$SJAR" -X POST "$BASE/login" --data "_token=$T2&email=svcstaff@shanfix.co.ke&password=Role@2026"
+JAR=$SJAR login_as "svcstaff@shanfix.co.ke" "Role@2026"
 JOB2=$(q "SELECT id FROM jobs WHERE stage IN ('ready','delivered') AND id <> $JOB ORDER BY id LIMIT 1;")
 T2=$(curl -s -b "$SJAR" -c "$SJAR" "$BASE/services/$SID" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
 eq "staff refused" "$(curl -s -o /dev/null -w '%{http_code}' -b "$SJAR" -c "$SJAR" -X POST "$BASE/services/$SID/examples" \

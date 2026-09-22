@@ -19,7 +19,7 @@ post() { curl -s -o /tmp/n.html -w "%{http_code}" -b "$JAR" -c "$JAR" -X POST "$
 echo ""
 echo "=== Setup ==="
 T=$(tok /login)
-curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$BASE/login" --data "_token=$T&email=admin@shanfix.co.ke&password=Shanfix@2026"
+login_as "admin@shanfix.co.ke" "Shanfix@2026"
 eq "signed in" "$(code /dashboard)" "200"
 
 # Point SMTP at the local capture server, enable both channels.
@@ -185,7 +185,7 @@ HASH=$(php -r "echo password_hash('SalesPass1', PASSWORD_DEFAULT);")
 $MYSQL -e "INSERT INTO users (name,email,password_hash,role,is_active) VALUES ('Sales Two','sales2@shanfix.co.ke','$HASH','sales',1);"
 SJ=/tmp/sales2.txt; rm -f $SJ
 T=$(curl -s -c $SJ "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
-curl -s -o /dev/null -b $SJ -c $SJ -X POST "$BASE/login" --data "_token=$T&email=sales2@shanfix.co.ke&password=SalesPass1"
+JAR=$SJ login_as "sales2@shanfix.co.ke" "SalesPass1"
 eq "sales can see the log"        "$(curl -s -o /dev/null -w '%{http_code}' -b $SJ "$BASE/notifications")" "200"
 eq "sales BLOCKED from settings"  "$(curl -s -o /dev/null -w '%{http_code}' -b $SJ "$BASE/settings?tab=messaging")" "403"
 T=$(curl -s -b $SJ -c $SJ "$BASE/notifications" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
