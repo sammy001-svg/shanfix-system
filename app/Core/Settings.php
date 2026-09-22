@@ -16,6 +16,9 @@ class Settings
         'kopokopo_api_key',
         'smtp_password',
         'sms_api_key',
+        // Anybody holding the relay password can push traffic through the
+        // relay at our expense.
+        'webrtc_turn_password',
         // The WhatsApp token can send as the company for as long as it is
         // valid, and the app secret is what proves an incoming webhook
         // really came from Meta. Both belong under the same protection.

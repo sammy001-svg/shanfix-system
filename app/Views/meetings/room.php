@@ -53,6 +53,15 @@ $isGuest = str_contains($base, '/join/');
     </section>
 
     <aside class="room__side">
+      <?php // Who is here. Without it nobody can tell whether the others
+            // have joined, or whether a silence is an empty room. ?>
+      <div class="roster">
+        <div class="roster__title">In the room</div>
+        <ul class="roster__list" data-roster>
+          <li class="roster__me"><span class="roster__dot"></span><?= e($meName) ?> (you)</li>
+        </ul>
+      </div>
+
       <div class="room__side-head">
         <?= icon('edit') ?>
         <div>
@@ -98,4 +107,11 @@ $isGuest = str_contains($base, '/join/');
      data-me="<?= e($meName) ?>"
      data-last-note="<?= (int) ($notes ? end($notes)['id'] : 0) ?>"
      data-ice="<?= e(json_encode($ice, JSON_UNESCAPED_SLASHES)) ?>"
+     data-last-signal="<?= (int) ($lastSignal ?? 0) ?>"
      hidden></div>
+
+<?php // Each person's voice plays from its own element here, apart from the
+      // shared screen. They used to share one player with the screen, so a
+      // voice arriving replaced the picture, and a presenter who had muted
+      // it to avoid hearing their own screen heard nobody at all. ?>
+<div data-audio hidden></div>

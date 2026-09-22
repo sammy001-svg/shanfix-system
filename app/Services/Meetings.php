@@ -212,7 +212,8 @@ class Meetings
 
         if ($turn !== '') {
             $servers[] = [
-                'urls'       => $turn,
+                // Settings may hold several, comma separated (UDP, TCP, TLS).
+                'urls'       => array_values(array_filter(array_map('trim', explode(',', $turn)))),
                 'username'   => (string) Settings::get('webrtc_turn_username', ''),
                 'credential' => (string) Settings::get('webrtc_turn_password', ''),
             ];
@@ -233,7 +234,11 @@ class Meetings
         $from = trim((string) $request->input('from', ''));
         $kind = (string) $request->input('kind', '');
 
-        if ($from === '' || !in_array($kind, ['hello', 'offer', 'answer', 'ice', 'bye'], true)) {
+        // 'unshare' is its own message rather than a 'bye': stopping a screen
+        // share must not hang up the audio that is still running. 'here' is
+        // the heartbeat that lets a browser which vanished without a 'bye'
+        // drop out of everybody's list.
+        if ($from === '' || !in_array($kind, ['hello', 'here', 'offer', 'answer', 'ice', 'bye', 'unshare'], true)) {
             Response::json(['ok' => false, 'error' => 'Bad signal.'], 400);
         }
 
@@ -246,6 +251,23 @@ class Meetings
         ]);
 
         Response::json(['ok' => true]);
+    }
+
+    /**
+     * Where a browser arriving now should start reading the postbox.
+     *
+     * Reading from the beginning replayed every hello from people who had
+     * long since left, and the newcomer then set up connections to peers
+     * that no longer existed. Everybody still present answers the
+     * newcomer's own hello, so nothing before it is needed.
+     */
+    public static function lastSignalId(int $meetingId): int
+    {
+        return (int) Database::scalar(
+            'SELECT COALESCE(MAX(id), 0) FROM meeting_signals WHERE meeting_id = :m',
+            ['m' => $meetingId],
+            0
+        );
     }
 
     /** Hand a browser everything addressed to it since it last asked. */

@@ -781,6 +781,26 @@
     const cfg = $('[data-room]');
     if (!cfg) return;
 
+    // What the room used to get wrong, and this now does instead:
+    //
+    //  - It only connected people once somebody shared a screen, so in an
+    //    ordinary meeting with microphones on nobody heard anybody. Now
+    //    everybody is connected to everybody as they arrive, and tracks
+    //    are added to those connections whenever they are switched on.
+    //  - Both sides could offer at once and one would throw. It now uses
+    //    "perfect negotiation": one side of each pair is polite and gives
+    //    way when offers cross.
+    //  - Signals were handled concurrently, so a network candidate could be
+    //    applied before the description it belonged to, and be dropped.
+    //    They are now handled one at a time, in order, and early
+    //    candidates wait for their description.
+    //  - Voices played through the same element as the shared screen, so a
+    //    voice arriving replaced the picture, and a presenter (whose player
+    //    was muted to avoid their own echo) heard nobody. Each voice now has
+    //    its own <audio> element.
+    //  - Polls overlapped (setInterval, 1.5s, no matter how long a poll
+    //    took) and could deliver the same signal twice.
+
     const base   = cfg.dataset.base;
     const meName = cfg.dataset.me;
     const ice    = JSON.parse(cfg.dataset.ice || '[]');
@@ -795,24 +815,17 @@
     const shareLabel = $('[data-share-label]');
     const micBtn     = $('[data-toggle-mic]');
     const micLabel   = $('[data-mic-label]');
+    const rosterEl   = $('[data-roster]');
+    const audioBox   = $('[data-audio]');
 
-    /** peer id -> RTCPeerConnection */
+    /** peer id -> { pc, polite, makingOffer, ignoreOffer, pending, name, screenSenders } */
     const peers = {};
-
-    /**
-     * Everyone we know is in the room, whether or not we have a connection
-     * to them yet.
-     *
-     * Needed because arriving and sharing happen in either order. Someone
-     * who joins before the screen goes up must still be offered it, and
-     * without a roster the presenter has nobody to call.
-     */
-    const known = new Set();
 
     let localScreen = null;
     let localMic    = null;
-    let sinceSignal = 0;
     let sharing     = false;
+    let watching    = null;   // whose screen is on the stage
+    let sinceSignal = parseInt(cfg.dataset.lastSignal || '0', 10);
 
     function say(msg, tone) {
       statusEl.textContent = msg || '';
@@ -840,45 +853,147 @@
       });
     }
 
-    /* -- connections ------------------------------------------------- */
+    /* -- who is here ---------------------------------------------------- */
 
-    function connectionTo(peerId) {
-      if (peers[peerId]) return peers[peerId];
+    function renderRoster() {
+      // The first item is always "you"; everything after it is redrawn.
+      while (rosterEl.children.length > 1) rosterEl.removeChild(rosterEl.lastChild);
+
+      Object.keys(peers).forEach((id) => {
+        const li = document.createElement('li');
+        const dot = document.createElement('span');
+        const state = peers[id].pc.connectionState;
+        dot.className = 'roster__dot' + (state === 'failed' ? ' roster__dot--bad' : '');
+        li.appendChild(dot);
+        li.appendChild(document.createTextNode(peers[id].name));   // never innerHTML
+        rosterEl.appendChild(li);
+      });
+
+      if (!Object.keys(peers).length && !sharing) {
+        say('You are the only one here so far.');
+      }
+    }
+
+    /* -- the stage and the voices -------------------------------------- */
+
+    function showStage(stream, muted) {
+      stage.srcObject = stream;
+      stage.muted = muted;
+      stage.hidden = false;
+      stageIdle.hidden = true;
+    }
+
+    function clearStage() {
+      stage.srcObject = null;
+      stage.hidden = true;
+      stageIdle.hidden = false;
+      watching = null;
+    }
+
+    function playVoice(peerId, track) {
+      const el = document.createElement('audio');
+      el.autoplay = true;
+      el.dataset.peer = peerId;
+      el.dataset.track = track.id;
+      el.srcObject = new MediaStream([track]);
+      audioBox.appendChild(el);
+      el.play().catch(() => {
+        // A browser that refuses to play sound until the page is touched.
+        say('Click anywhere in the room to hear the others.', 'warn');
+        document.addEventListener('click', () => el.play().catch(() => {}), { once: true });
+      });
+      track.addEventListener('ended', () => el.remove());
+    }
+
+    /* -- connections ---------------------------------------------------- */
+
+    function peer(id, name) {
+      if (peers[id]) {
+        if (name) peers[id].name = name;
+        return peers[id];
+      }
 
       const pc = new RTCPeerConnection({ iceServers: ice });
-      peers[peerId] = pc;
+      const p = {
+        pc: pc,
+        // One side of each pair gives way when offers cross. Which one is
+        // decided by comparing ids, so both sides agree without talking.
+        polite: myPeer < id,
+        makingOffer: false,
+        ignoreOffer: false,
+        pending: [],
+        name: name || 'Someone',
+        screenSenders: [],
+        seen: Date.now(),
+      };
+      peers[id] = p;
 
-      pc.onicecandidate = (e) => {
-        if (e.candidate) signal('ice', peerId, e.candidate);
+      pc.onicecandidate = (e) => { if (e.candidate) signal('ice', id, e.candidate); };
+
+      // Whenever a track is added or removed, the browser asks for a new
+      // offer. This is the only place offers are made.
+      pc.onnegotiationneeded = async () => {
+        try {
+          p.makingOffer = true;
+          await pc.setLocalDescription();
+          signal('offer', id, pc.localDescription);
+        } catch (e) {
+          /* the next negotiationneeded will try again */
+        } finally {
+          p.makingOffer = false;
+        }
       };
 
-      // Whatever the other side sends becomes what we show.
       pc.ontrack = (e) => {
-        stage.srcObject = e.streams[0];
-        stage.hidden = false;
-        stageIdle.hidden = true;
-        say('Watching a shared screen.', 'ok');
+        const track = e.track;
+
+        if (track.kind === 'audio') {
+          playVoice(id, track);
+          return;
+        }
+
+        // Video is only ever a shared screen. A presenter keeps looking at
+        // their own; everybody else watches whoever shares.
+        if (sharing) return;
+        watching = id;
+        showStage(new MediaStream([track]), true);   // its sound plays via playVoice
+        say('Watching ' + p.name + "'s screen.", 'ok');
+        track.addEventListener('ended', () => { if (watching === id) { clearStage(); say(''); } });
       };
 
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'failed') {
           // Almost always both ends behind strict NAT with no relay set up.
-          say('Could not connect directly to the other person. A TURN relay may be needed — see Settings.', 'warn');
+          say('Could not connect to ' + p.name + '. Your administrator can add a TURN relay under Settings → Meetings.', 'warn');
         }
+        renderRoster();
       };
 
-      // Anything we are already sending goes to a newcomer too.
-      if (localScreen) localScreen.getTracks().forEach((t) => pc.addTrack(t, localScreen));
-      if (localMic)    localMic.getTracks().forEach((t) => pc.addTrack(t, localMic));
+      // Whatever we are already sending goes to a newcomer too.
+      if (localMic) localMic.getTracks().forEach((t) => pc.addTrack(t, localMic));
+      if (localScreen) {
+        localScreen.getTracks().forEach((t) => p.screenSenders.push(pc.addTrack(t, localScreen)));
+      }
 
-      return pc;
+      renderRoster();
+      return p;
     }
 
-    async function offerTo(peerId) {
-      const pc = connectionTo(peerId);
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      signal('offer', peerId, offer);
+    function drop(id) {
+      const p = peers[id];
+      if (!p) return;
+      p.pc.close();
+      delete peers[id];
+      audioBox.querySelectorAll('audio[data-peer="' + id + '"]').forEach((el) => el.remove());
+      if (watching === id) { clearStage(); say(''); }
+      renderRoster();
+    }
+
+    /* -- signals, one at a time and in order ------------------------------ */
+
+    let queue = Promise.resolve();
+    function enqueue(sig) {
+      queue = queue.then(() => handle(sig)).catch(() => { /* one bad signal must not stop the rest */ });
     }
 
     async function handle(sig) {
@@ -887,58 +1002,95 @@
 
       try { payload = sig.payload ? JSON.parse(sig.payload) : null; } catch (e) { return; }
 
-      if (sig.kind === 'hello') {
-        known.add(from);
+      if (sig.kind === 'bye') { drop(from); return; }
 
+      // Anything a peer sends is proof they are still here.
+      if (peers[from]) peers[from].seen = Date.now();
+
+      // The heartbeat. From somebody we have not met — their hello was
+      // missed — it introduces them as well.
+      if (sig.kind === 'here') {
+        peer(from, payload && payload.name).seen = Date.now();
+        return;
+      }
+
+      if (sig.kind === 'hello') {
+        peer(from, payload && payload.name);
         // Answer a room-wide hello so the newcomer learns we are here too.
         // Only broadcasts get a reply — answering a directed one would have
         // the two of us greeting each other for ever.
         if (!sig.to_peer) signal('hello', from, { name: meName });
-
-        // If our screen is already up, they should be seeing it.
-        if (sharing) offerTo(from);
         return;
       }
 
-      if (sig.kind === 'offer') {
-        const pc = connectionTo(from);
-        await pc.setRemoteDescription(new RTCSessionDescription(payload));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        signal('answer', from, answer);
-        return;
-      }
+      if (sig.kind === 'unshare') { if (watching === from) { clearStage(); say(''); } return; }
 
-      if (sig.kind === 'answer') {
-        const pc = peers[from];
-        if (pc) await pc.setRemoteDescription(new RTCSessionDescription(payload));
+      // An offer from somebody whose hello we missed is still an offer.
+      const p = peer(from);
+      const pc = p.pc;
+
+      if (sig.kind === 'offer' || sig.kind === 'answer') {
+        const collision = sig.kind === 'offer' && (p.makingOffer || pc.signalingState !== 'stable');
+        p.ignoreOffer = !p.polite && collision;
+        if (p.ignoreOffer) return;
+
+        await pc.setRemoteDescription(payload);   // the polite side rolls back implicitly
+
+        // Candidates that arrived before this description can be used now.
+        const early = p.pending.splice(0);
+        for (const c of early) { try { await pc.addIceCandidate(c); } catch (e) { /* stale */ } }
+
+        if (sig.kind === 'offer') {
+          await pc.setLocalDescription();
+          signal('answer', from, pc.localDescription);
+        }
         return;
       }
 
       if (sig.kind === 'ice') {
-        const pc = peers[from];
-        // A candidate can arrive before the description it belongs to;
-        // failing here is normal and not worth surfacing.
-        if (pc) { try { await pc.addIceCandidate(payload); } catch (e) { /* ignore */ } }
-        return;
-      }
-
-      if (sig.kind === 'bye') {
-        known.delete(from);
-        if (peers[from]) { peers[from].close(); delete peers[from]; }
-        if (!Object.keys(peers).length) {
-          stage.hidden = true;
-          stageIdle.hidden = false;
-          say('');
-        }
+        if (!pc.remoteDescription) { p.pending.push(payload); return; }
+        try { await pc.addIceCandidate(payload); } catch (e) { if (!p.ignoreOffer) { /* stale */ } }
       }
     }
 
-    /* -- sharing ------------------------------------------------------ */
+    /* -- the microphone -------------------------------------------------- */
+
+    function micOn(on) {
+      micLabel.textContent = on ? 'Mute microphone' : 'Unmute microphone';
+      micBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      micBtn.classList.toggle('is-on', on);
+    }
+
+    micBtn.addEventListener('click', async () => {
+      if (localMic) {
+        // Muting pauses the track rather than removing it, so nobody has to
+        // renegotiate and unmuting is instant.
+        const track = localMic.getAudioTracks()[0];
+        track.enabled = !track.enabled;
+        micOn(track.enabled);
+        say(track.enabled ? 'Your microphone is on.' : 'You are muted.', track.enabled ? 'ok' : '');
+        return;
+      }
+
+      try {
+        localMic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        say('No microphone available, or permission was refused.', 'warn');
+        return;
+      }
+
+      micOn(true);
+      say('Your microphone is on.', 'ok');
+      Object.keys(peers).forEach((id) => {
+        localMic.getTracks().forEach((t) => peers[id].pc.addTrack(t, localMic));
+      });
+    });
+
+    /* -- sharing --------------------------------------------------------- */
 
     async function startSharing() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        say('This browser cannot share a screen. Chrome, Edge or Firefox can.', 'warn');
+        say('This browser cannot share a screen. Chrome, Edge or Firefox on a computer can.', 'warn');
         return;
       }
 
@@ -954,69 +1106,48 @@
       shareLabel.textContent = 'Stop sharing';
       shareBtn.classList.add('is-on');
 
-      stage.srcObject = localScreen;
-      stage.muted = true;               // never play your own audio back
-      stage.hidden = false;
-      stageIdle.hidden = true;
+      showStage(localScreen, true);   // never play your own audio back
       say('You are sharing your screen.', 'ok');
 
       // Stopping from the browser's own bar must tidy up here too.
       localScreen.getVideoTracks()[0].addEventListener('ended', stopSharing);
 
-      // Call everyone already in the room. connectionTo() attaches whatever
-      // we are sending, so the tracks come along with the offer.
-      known.forEach((id) => offerTo(id));
-
-      // And announce ourselves, in case somebody arrived without us hearing.
-      signal('hello', null, { name: meName });
+      Object.keys(peers).forEach((id) => {
+        const p = peers[id];
+        localScreen.getTracks().forEach((t) => p.screenSenders.push(p.pc.addTrack(t, localScreen)));
+      });
     }
 
     function stopSharing() {
+      if (!sharing) return;
+      sharing = false;
+
+      // Take the screen off every connection but leave the connection up:
+      // the microphone may still be running over it.
+      Object.keys(peers).forEach((id) => {
+        const p = peers[id];
+        p.screenSenders.forEach((s) => { try { p.pc.removeTrack(s); } catch (e) { /* already gone */ } });
+        p.screenSenders = [];
+      });
+
       if (localScreen) {
         localScreen.getTracks().forEach((t) => t.stop());
         localScreen = null;
       }
 
-      sharing = false;
       shareLabel.textContent = 'Share my screen';
       shareBtn.classList.remove('is-on');
-      stage.hidden = true;
-      stageIdle.hidden = false;
+      clearStage();
       say('');
-      signal('bye', null, {});
+      signal('unshare', null, {});
     }
 
     shareBtn.addEventListener('click', () => (sharing ? stopSharing() : startSharing()));
 
-    micBtn.addEventListener('click', async () => {
-      if (localMic) {
-        localMic.getTracks().forEach((t) => t.stop());
-        localMic = null;
-        micLabel.textContent = 'Turn on microphone';
-        micBtn.setAttribute('aria-pressed', 'false');
-        micBtn.classList.remove('is-on');
-        return;
-      }
+    /* -- polling ---------------------------------------------------------- */
 
-      try {
-        localMic = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (e) {
-        say('No microphone available, or permission was refused.', 'warn');
-        return;
-      }
-
-      micLabel.textContent = 'Mute microphone';
-      micBtn.setAttribute('aria-pressed', 'true');
-      micBtn.classList.add('is-on');
-
-      Object.keys(peers).forEach((id) => {
-        localMic.getTracks().forEach((t) => peers[id].addTrack(t, localMic));
-        offerTo(id);
-      });
-    });
-
-    /* -- polling ------------------------------------------------------ */
-
+    // One poll at a time: the next starts only when the last has finished,
+    // so a slow response can never be overtaken and delivered twice.
     function pollSignals() {
       fetch(base + '/signals?peer=' + encodeURIComponent(myPeer) + '&since=' + sinceSignal, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -1026,9 +1157,10 @@
         .then((data) => {
           if (!data.ok) return;
           sinceSignal = data.last || sinceSignal;
-          (data.signals || []).forEach(handle);
+          (data.signals || []).forEach(enqueue);
         })
-        .catch(() => { /* a dropped poll is not worth reporting */ });
+        .catch(() => { /* a dropped poll is not worth reporting */ })
+        .then(() => setTimeout(pollSignals, 1200));
     }
 
     let lastNote = parseInt(cfg.dataset.lastNote || '0', 10);
@@ -1070,35 +1202,54 @@
         .then((r) => r.json())
         .then((data) => {
           if (!data.ok) return;
-          (data.notes || []).forEach((n) => { renderNote(n); lastNote = n.id; });
+          (data.notes || []).forEach((n) => {
+            // Our own note is drawn when it is saved; skip it coming back.
+            if (Number(n.id) > lastNote) { renderNote(n); lastNote = Number(n.id); }
+          });
         })
         .catch(() => {});
     }
 
     const noteForm = $('[data-note-form]');
+    const noteText = noteForm.querySelector('[name=body]');
 
-    noteForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-
-      const body = noteForm.querySelector('[name=body]').value.trim();
+    function sendNote() {
+      const body = noteText.value.trim();
       if (!body) return;
 
       const kind = (noteForm.querySelector('[name=kind]:checked') || {}).value || 'note';
 
       post('/notes', { body: body, kind: kind }).then((data) => {
-        if (data.ok && data.note) { renderNote(data.note); lastNote = data.note.id; }
-        noteForm.querySelector('[name=body]').value = '';
+        if (data.ok && data.note && Number(data.note.id) > lastNote) { renderNote(data.note); lastNote = Number(data.note.id); }
+        noteText.value = '';
       });
+    }
+
+    noteForm.addEventListener('submit', (e) => { e.preventDefault(); sendNote(); });
+
+    // Enter adds the note; Shift+Enter is a new line.
+    noteText.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNote(); }
     });
 
     // Announce ourselves, then keep listening.
+    renderRoster();
     signal('hello', null, { name: meName });
-    setInterval(pollSignals, 1500);
+    pollSignals();
+
+    // A browser that vanishes without a 'bye' — a crash, a lost network, a
+    // closed laptop — would otherwise stay in everybody's list for good.
+    // Each tab checks in every 10 seconds; anybody silent for 35 is gone.
+    setInterval(() => signal('here', null, { name: meName }), 10000);
+    setInterval(() => {
+      const cutoff = Date.now() - 35000;
+      Object.keys(peers).forEach((id) => { if (peers[id].seen < cutoff) drop(id); });
+    }, 5000);
     setInterval(pollNotes, 4000);
     noteBox.scrollTop = noteBox.scrollHeight;
 
-    // Leaving without saying so leaves everyone else watching a frozen
-    // picture, so tell them on the way out.
+    // Leaving without saying so leaves everyone else talking to nobody, so
+    // tell them on the way out.
     window.addEventListener('beforeunload', () => {
       navigator.sendBeacon(
         base + '/signal',
@@ -1107,7 +1258,13 @@
     });
 
     const leave = $('[data-leave]');
-    if (leave) leave.addEventListener('click', (e) => { e.preventDefault(); stopSharing(); window.close(); });
+    if (leave) {
+      leave.addEventListener('click', (e) => {
+        e.preventDefault();
+        stopSharing();
+        signal('bye', null, {}).then(() => window.close());
+      });
+    }
   }
 
   /** Another blank row of guest fields on the meeting form. */

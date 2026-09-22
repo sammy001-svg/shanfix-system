@@ -78,6 +78,21 @@ eq "alpha is not sent its own" "$(curl -s -b "$JAR" "$BASE/meetings/$MID/signals
 eq "a nonsense signal is refused" \
    "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/meetings/$MID/signal" --data "_token=$(tok "/meetings/$MID/room")&from=alpha&kind=nonsense")" "400"
 
+
+# What the room rebuild relies on from the server. Sending audio and
+# video themselves can only be proved in a browser; these pin down the
+# parts of it that live here.
+T=$(tok "/meetings/$MID/room")
+eq "a heartbeat is accepted (so a vanished browser drops off the list)" \
+   "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/meetings/$MID/signal" --data "_token=$T&from=alpha&kind=here&payload=%7B%7D")" "200"
+eq "stopping a share is its own signal, not a hang-up" \
+   "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST "$BASE/meetings/$MID/signal" --data "_token=$T&from=alpha&kind=unshare&payload=%7B%7D")" "200"
+# A newcomer used to read the postbox from the start, and set up
+# connections to everybody who had ever said hello, present or not.
+LAST=$(q "SELECT COALESCE(MAX(id),0) FROM meeting_signals WHERE meeting_id=$MID;")
+has "the room tells a newcomer where to start reading" "$(page "/meetings/$MID/room")" "data-last-signal=\"$LAST\""
+has "and shows who is in the room" "$(page "/meetings/$MID/room")" "data-roster"
+
 echo ""
 echo "=== 6. Reminders before it starts ==="
 $MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key='smtp_enabled';
@@ -124,6 +139,27 @@ eq "the minutes remain" "$(q "SELECT COUNT(*) FROM meeting_notes WHERE meeting_i
 $MYSQL -e "DELETE FROM meetings WHERE id=$MID;
            DELETE FROM notification_locks WHERE lock_key LIKE 'meeting:%';"
 rm -f "$JAR" "$GJAR"
+
+echo ""
+echo "=== 11. The relay for people who cannot connect directly ==="
+# Two people on mobile data often cannot reach each other without a relay.
+# The room pointed at "Settings" for one, and there was no such setting.
+# Settings belong to an administrator, whoever the suite was signed in as.
+signin_admin
+eq "the Meetings settings tab exists" "$(code '/settings?tab=meetings')" "200"
+T=$(tok '/settings?tab=meetings')
+post /settings/meetings --data-urlencode "_token=$T" --data-urlencode 'webrtc_turn_url=http://nope' > /dev/null
+eq "an address that is not turn: is refused" "$(q "SELECT COALESCE(setting_value,'') FROM settings WHERE setting_key='webrtc_turn_url';")" ""
+T=$(tok '/settings?tab=meetings')
+post /settings/meetings --data-urlencode "_token=$T" --data-urlencode 'webrtc_turn_url=turn:relay.test:3478' \
+     --data-urlencode 'webrtc_turn_username=u' --data-urlencode 'webrtc_turn_password=relay-secret-123' > /dev/null
+eq "a relay is saved"                 "$(q "SELECT setting_value FROM settings WHERE setting_key='webrtc_turn_url';")" "turn:relay.test:3478"
+eq "its password is not stored as typed" "$(q "SELECT setting_value='relay-secret-123' FROM settings WHERE setting_key='webrtc_turn_password';")" "0"
+# Asked of the service directly: this suite's meeting was cancelled in section 7.
+has "and the room is given it"        "$($PHP -r 'require getenv("SHANFIX_ROOT")."/app/bootstrap.php"; App\Core\Config::load(CONFIG_PATH."/config.php"); App\Core\Database::connect(App\Core\Config::get("db")); echo json_encode(App\Services\Meetings::iceServers());')" "turn:relay.test:3478"
+T=$(tok '/settings?tab=meetings')
+post /settings/meetings --data-urlencode "_token=$T" --data 'clear_turn=1' > /dev/null
+eq "and it can be removed"            "$(q "SELECT COALESCE(setting_value,'') FROM settings WHERE setting_key='webrtc_turn_url';")" ""
 
 echo ""
 echo "==================================================="

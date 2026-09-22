@@ -95,6 +95,7 @@ class PublicMeetingController extends Controller
             'isHost'   => false,
             'canWrite' => true,
             'ice'      => Meetings::iceServers(),
+            'lastSignal' => Meetings::lastSignalId((int) $meeting['id']),
             'base'     => url('/join/' . $meeting['public_token']),
             // 'blank', not 'public': the public layout is pinned to light
             // because the pages that use it stand for sheets of paper. A

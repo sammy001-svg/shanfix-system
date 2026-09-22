@@ -311,6 +311,7 @@ class MeetingController extends Controller
             'isHost'   => (int) $meeting['host_id'] === (int) Auth::id(),
             'canWrite' => true,
             'ice'      => Meetings::iceServers(),
+            'lastSignal' => Meetings::lastSignalId((int) $meeting['id']),
             'base'     => url('/meetings/' . $meeting['id']),
         ], 'blank');
     }

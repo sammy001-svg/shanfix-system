@@ -77,6 +77,9 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     <a class="tab <?= $tab === 'messaging'  ? 'is-active' : '' ?>" href="<?= e($tabUrl('messaging')) ?>">
       <?= icon('send') ?> Email &amp; SMS
     </a>
+    <a class="tab <?= $tab === 'meetings'   ? 'is-active' : '' ?>" href="<?= e($tabUrl('meetings')) ?>">
+      <?= icon('video') ?> Meetings
+    </a>
     <a class="tab <?= $tab === 'categories' ? 'is-active' : '' ?>" href="<?= e($tabUrl('categories')) ?>">
       <?= icon('layers') ?> Categories
     </a>
@@ -1121,6 +1124,62 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
       </p>
     </div>
   </div>
+
+<?php elseif ($tab === 'meetings'): ?>
+
+  <?php
+    $turnUrl  = (string) setting('webrtc_turn_url', '');
+    $turnUser = (string) setting('webrtc_turn_username', '');
+    // Only whether one is saved: the page has no need to decrypt it.
+    $turnPass = \App\Core\Settings::hasSecret('webrtc_turn_password') ? 'saved' : '';
+  ?>
+  <form method="post" action="<?= url('/settings/meetings') ?>" class="card">
+    <?= csrf_field() ?>
+    <div class="card__head">
+      <div>
+        <div class="card__title">Meeting relay (TURN)</div>
+        <div class="text-sm text-muted">
+          <?= $turnUrl === '' ? 'Not set up: meetings connect directly only.' : 'Set up: meetings fall back on the relay when needed.' ?>
+        </div>
+      </div>
+    </div>
+    <div class="card__body">
+      <p class="text-sm text-muted mb-16">
+        Meetings connect people directly where they can. Two people on
+        mobile data, or behind strict office networks, often cannot reach
+        each other directly, and the room then says it could not connect.
+        A relay passes their audio and screen between them instead.
+        Relays are rented from a provider (for example Cloudflare, Metered
+        or Twilio), who gives you the address, username and password to
+        put here. Shared cPanel hosting cannot run one itself.
+      </p>
+
+      <div class="form-grid form-grid--2">
+        <div class="field field--full">
+          <label class="label" for="webrtc_turn_url">Relay addresses</label>
+          <textarea class="textarea" id="webrtc_turn_url" name="webrtc_turn_url" rows="3"
+                    placeholder="turn:relay.example.com:3478&#10;turns:relay.example.com:5349"><?= e(str_replace(',', "\n", $turnUrl)) ?></textarea>
+          <span class="field-hint">One per line, each starting turn: or turns:, exactly as your provider gives them.</span>
+        </div>
+        <div class="field">
+          <label class="label" for="webrtc_turn_username">Username</label>
+          <input class="input" id="webrtc_turn_username" name="webrtc_turn_username" value="<?= e($turnUser) ?>" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="label" for="webrtc_turn_password">Password</label>
+          <input class="input" type="password" id="webrtc_turn_password" name="webrtc_turn_password"
+                 autocomplete="new-password" placeholder="<?= $turnPass !== '' ? 'Saved — type only to change it' : '' ?>">
+        </div>
+      </div>
+    </div>
+    <div class="card__foot">
+      <button class="btn btn--primary" type="submit">Save relay</button>
+      <?php if ($turnUrl !== ''): ?>
+        <button class="btn btn--ghost" type="submit" name="clear_turn" value="1"
+                onclick="return confirm('Remove the relay? People who cannot connect directly will not be able to join.')">Remove relay</button>
+      <?php endif; ?>
+    </div>
+  </form>
 
 <?php else: ?>
 

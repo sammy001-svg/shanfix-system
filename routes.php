@@ -1138,6 +1138,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/notifications/{id}/retry',    [NotificationController::class, 'retry']);
         $r->post('/notifications/{id}/cancel',   [NotificationController::class, 'cancel']);
         $r->post('/settings/messaging',          [SettingsController::class, 'saveMessaging']);
+        $r->post('/settings/meetings',           [SettingsController::class, 'saveMeetings']);
         $r->post('/settings/messaging/test',     [NotificationController::class, 'sendTest']);
 
         // -- Backups

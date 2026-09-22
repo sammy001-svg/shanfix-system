@@ -2960,6 +2960,30 @@ a.card:active { transform: translateY(-1px) scale(.998); }
   min-height: 0;
 }
 
+/* Who is in the room. Without it a silence could be an empty room or a
+   broken microphone, and nobody could tell which. */
+.roster {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.roster__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--slate-500);
+  margin-bottom: 8px;
+}
+.roster__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.roster__list li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.roster__me { color: var(--slate-500); }
+.roster__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green-600);
+  flex: 0 0 auto;
+}
+.roster__dot--bad { background: var(--amber-700); }
+
 .room__side-head {
   display: flex;
   align-items: center;

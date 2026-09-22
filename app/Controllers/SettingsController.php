@@ -19,7 +19,7 @@ class SettingsController extends Controller
     {
         $tab = (string) $request->query('tab', 'company');
 
-        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'categories'], true)) {
+        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'meetings', 'categories'], true)) {
             $tab = 'company';
         }
 
@@ -351,6 +351,56 @@ class SettingsController extends Controller
         }
 
         Response::to('/settings?tab=payments');
+    }
+
+    /**
+     * The relay that meetings fall back on when two people cannot reach
+     * each other directly.
+     *
+     * On mobile data in Kenya that is common rather than rare: carriers
+     * put many subscribers behind one address, and two such people cannot
+     * be connected without a relay in between. Without one, the room says
+     * "could not connect" and there is nothing a user can do about it.
+     *
+     * The password is only replaced when a new one is typed, so saving the
+     * other fields does not wipe it.
+     */
+    public function saveMeetings(Request $request): void
+    {
+        $url = trim((string) $request->input('webrtc_turn_url', ''));
+
+        // Several addresses may be given, one per line or comma separated,
+        // as providers usually offer UDP, TCP and TLS variants.
+        $urls = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $url) ?: [])));
+
+        foreach ($urls as $u) {
+            if (!preg_match('~^turns?:[^\s]+$~i', $u)) {
+                Session::error('Relay address "' . $u . '" should start with turn: or turns: — for example turn:relay.example.com:3478');
+                Response::to('/settings?tab=meetings');
+            }
+        }
+
+        $values = [
+            'webrtc_turn_url'      => implode(',', $urls),
+            'webrtc_turn_username' => mb_substr(trim((string) $request->input('webrtc_turn_username', '')), 0, 200),
+        ];
+
+        $password = (string) $request->input('webrtc_turn_password', '');
+
+        if ($password !== '') {
+            $values['webrtc_turn_password'] = $password;
+        }
+
+        if ($request->input('clear_turn')) {
+            $values = ['webrtc_turn_url' => '', 'webrtc_turn_username' => '', 'webrtc_turn_password' => ''];
+        }
+
+        Settings::setMany($values);
+
+        Session::success($values['webrtc_turn_url'] === ''
+            ? 'Saved. Meetings will connect directly only.'
+            : 'Saved. Meetings will use the relay when a direct connection fails.');
+        Response::to('/settings?tab=meetings');
     }
 
     public function saveMessaging(Request $request): void
