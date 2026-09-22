@@ -26,6 +26,70 @@
   }
 
   /* ------------------------------------------------------------------
+     Sidebar groups
+
+     The markup is <details>, so opening and closing already works with
+     the scripts off. This adds the two things it cannot do by itself:
+     remembering what you left open between pages, and telling you that
+     something is waiting inside a section you have shut.
+
+     The section holding the page you are on is opened by the server and
+     is left alone here — reopening it from a stored value would fight
+     the highlight.
+     ------------------------------------------------------------------ */
+  function initNavGroups() {
+    const groups = $$('.nav-group[data-nav-group]');
+    if (!groups.length) return;
+
+    const key = (g) => 'sf.nav.' + g.dataset.navGroup;
+
+    // A private window, or storage the browser has turned off, must not
+    // cost us the menu.
+    const remember = (g) => {
+      try { localStorage.setItem(key(g), g.open ? '1' : '0'); } catch (e) { /* nothing to do */ }
+    };
+    const recall = (g) => {
+      try { return localStorage.getItem(key(g)); } catch (e) { return null; }
+    };
+
+    /* A shut section borrows the badges of the links inside it: if any of
+       them is showing a number, the section shows a dot. Badges arrive
+       later over fetch, so this runs again whenever the nav changes
+       rather than only at load. */
+    const syncDots = () => {
+      groups.forEach((g) => {
+        const waiting = $$('.nav-link__badge', g).some(
+          (b) => !b.classList.contains('hidden') && b.textContent.trim() !== ''
+        );
+        g.classList.toggle('has-waiting', waiting);
+      });
+    };
+
+    groups.forEach((g) => {
+      const holdsCurrentPage = !!$('.nav-link.is-active', g);
+
+      if (!holdsCurrentPage && recall(g) !== null) {
+        g.open = recall(g) === '1';
+      }
+
+      g.addEventListener('toggle', () => { remember(g); syncDots(); });
+    });
+
+    syncDots();
+
+    const nav = $('.sidebar__nav');
+    if (nav && window.MutationObserver) {
+      new MutationObserver(syncDots).observe(nav, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ['class'],
+      });
+    }
+  }
+
+  /* ------------------------------------------------------------------
      Dropdowns
      ------------------------------------------------------------------ */
   function initDropdowns() {
@@ -1901,6 +1965,7 @@
      ------------------------------------------------------------------ */
   document.addEventListener('DOMContentLoaded', function () {
     initSidebar();
+    initNavGroups();
     initDropdowns();
     initModals();
     initFlashDismiss();

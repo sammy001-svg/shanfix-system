@@ -289,29 +289,76 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 
 .sidebar__nav { padding: 10px 10px 28px; flex: 1; }
 
-/* Section group headers — each one gets a hairline above it that reads as
-   a separator between sections. The first one sits directly under the brand
-   so it has a little extra top-room instead of a line. */
+/* Collapsible section — a <details>, so the open/closed state costs no
+   JavaScript. The header is the <summary>; the links live in a sibling
+   wrapper so the caret can spin and the list can be indented under it.
+
+   The header is styled as a row of the menu rather than as a caption,
+   because now that the sections collapse it is what most people click. */
+.nav-group { margin-top: 1px; }
+
 .nav-group__label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .10em;
-  color: rgba(255,255,255,.35);
-  padding: 20px 10px 5px;
-  margin-top: 4px;
-  border-top: 1px solid rgba(255,255,255,.07);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r);
+  color: rgba(255,255,255,.68);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;              /* Firefox draws its own marker */
+  transition: background .12s, color .12s;
 }
-/* No separator on the very first group label — it sits right under the brand. */
-.sidebar__nav > .nav-group__label:first-of-type,
-.sidebar__nav > *:first-child.nav-group__label {
-  border-top: 0;
-  padding-top: 10px;
-  margin-top: 0;
+.nav-group__label::-webkit-details-marker { display: none; }
+.nav-group__label:hover { color: #fff; background: rgba(255,255,255,.09); }
+.nav-group__label:focus-visible {
+  outline: 2px solid var(--green-500);
+  outline-offset: -2px;
+  color: #fff;
 }
+.nav-group[open] > .nav-group__label { color: rgba(255,255,255,.92); }
+
+.nav-group__icon { width: 16px; height: 16px; flex: 0 0 16px; opacity: .6; }
+.nav-group__label:hover .nav-group__icon,
+.nav-group[open] > .nav-group__label .nav-group__icon { opacity: .9; }
+
+.nav-group__text { flex: 1; min-width: 0; }
+
+/* Points down when the section is open, right when it is shut. */
+.nav-group__caret {
+  width: 13px; height: 13px;
+  flex: 0 0 13px;
+  opacity: .45;
+  transform: rotate(-90deg);
+  transition: transform .16s var(--ease), opacity .12s;
+}
+.nav-group[open] > .nav-group__label .nav-group__caret { transform: rotate(0deg); }
+.nav-group__label:hover .nav-group__caret { opacity: .8; }
+
+/* A shut section still has to be able to say something is waiting inside
+   it, or closing one hides the very badge it was meant to surface. The
+   dot is switched on from app.js when a link in the section carries a
+   visible badge, and it is pointless while the section is open — you can
+   see the badges themselves. */
+.nav-group__dot {
+  width: 6px; height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--green-500);
+  display: none;
+}
+.nav-group.has-waiting:not([open]) > .nav-group__label .nav-group__dot { display: block; }
+
+/* The children sit in from their heading, with a rule running down the
+   group so it is obvious where it ends. */
+.nav-group__items {
+  margin: 2px 0 8px 19px;
+  padding-left: 9px;
+  border-left: 1px solid rgba(255,255,255,.10);
+}
+.nav-group__items .nav-link { font-size: 13px; }
 
 .nav-link {
   display: flex;
