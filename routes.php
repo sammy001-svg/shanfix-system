@@ -89,9 +89,12 @@ $r = $app->router();
 // front door wherever the system is deployed without the site beside it.
 $r->get('/',       [AuthController::class, 'choose']);
 $r->get('/signin', [AuthController::class, 'choose']);
-$r->get('/login',  [AuthController::class, 'showLogin'], ['guest']);
-$r->post('/login', [AuthController::class, 'login'],     ['guest', 'csrf']);
-$r->post('/logout', [AuthController::class, 'logout'],   ['csrf']);
+$r->get('/login',             [AuthController::class, 'showLogin'], ['guest']);
+$r->post('/login',            [AuthController::class, 'login'],     ['guest', 'csrf']);
+$r->get('/login/otp',         [AuthController::class, 'showOtp'],   ['guest']);
+$r->post('/login/otp',        [AuthController::class, 'verifyOtp'], ['guest', 'csrf']);
+$r->post('/login/otp/resend', [AuthController::class, 'resendOtp'], ['guest', 'csrf']);
+$r->post('/logout',           [AuthController::class, 'logout'],    ['csrf']);
 
 // KopoKopo webhook — no session, no CSRF. Authenticated by HMAC signature.
 $r->post('/webhooks/kopokopo', [PaymentController::class, 'kopokopoCallback']);

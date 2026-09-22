@@ -121,6 +121,73 @@ class Mailer
         }
     }
 
+    /**
+     * Send a message that has already been built, to every recipient given.
+     *
+     * For the staff mailbox, which needs what send() does not offer: several
+     * recipients across To, Cc and Bcc, reply headers, and — so the message
+     * can be filed in the sender's Sent folder afterwards — the exact bytes
+     * that went out. Bcc recipients receive it without appearing in it,
+     * because they are envelope recipients only and never in the headers.
+     *
+     * @param string[] $recipients bare addresses
+     *
+     * @return array{ok:bool, error?:string, refused?:string[]}
+     */
+    public function sendRaw(string $envelopeFrom, array $recipients, string $raw): array
+    {
+        if ($this->host === '') {
+            return ['ok' => false, 'error' => 'No outgoing mail server is set up.'];
+        }
+
+        $recipients = array_values(array_unique(array_filter(
+            $recipients,
+            static fn($r) => filter_var($r, FILTER_VALIDATE_EMAIL)
+        )));
+
+        if (!$recipients) {
+            return ['ok' => false, 'error' => 'There is nobody valid to send this to.'];
+        }
+
+        $this->transcript = [];
+        $refused = [];
+
+        try {
+            $this->connect();
+            $this->handshake();
+            $this->authenticate();
+
+            $this->command('MAIL FROM:<' . $envelopeFrom . '>', [250]);
+
+            // One refused address should not stop the others going.
+            foreach ($recipients as $r) {
+                try {
+                    $this->command('RCPT TO:<' . $r . '>', [250, 251]);
+                } catch (\Throwable) {
+                    $refused[] = $r;
+                }
+            }
+
+            if (count($refused) === count($recipients)) {
+                throw new \RuntimeException('The mail server refused every recipient: ' . implode(', ', $refused));
+            }
+
+            $this->command('DATA', [354]);
+            $this->write(preg_replace('/^\./m', '..', $raw) . self::CRLF . '.' . self::CRLF);
+            $this->expect([250]);
+
+            $this->command('QUIT', [221, 250]);
+            $this->disconnect();
+
+            return ['ok' => true, 'refused' => $refused];
+        } catch (\Throwable $e) {
+            $this->disconnect();
+            Logger::error('Mailbox send failed: ' . $e->getMessage(), ['host' => $this->host]);
+
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     /** Connect and authenticate without sending, to prove the settings work. */
     public function test(): array
     {

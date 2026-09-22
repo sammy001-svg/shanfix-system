@@ -11,6 +11,9 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
 
+use App\Core\Settings;
+use App\Services\UserOtp;
+
 class AuthController extends Controller
 {
     /**
@@ -62,9 +65,9 @@ class AuthController extends Controller
             $v->redirectBack('/login');
         }
 
-        $result = Auth::attempt($email, $password, $request->ip());
+        $result = Auth::verifyCredentials($email, $password, $request->ip());
 
-        // The failure itself is recorded inside Auth::attempt, which also
+        // The failure itself is recorded inside Auth::verifyCredentials, which also
         // counts it towards the lockout — every caller gets both.
         if (!$result['ok']) {
             Session::error($result['message']);
@@ -72,35 +75,155 @@ class AuthController extends Controller
             Response::to('/login');
         }
 
-        // Only after the password checked out — never issue a persistent
-        // token off the back of a failed attempt.
-        //
-        // Staying signed in is a convenience on top of a login that has
-        // already succeeded, so it must never be able to fail the login
-        // itself. Without this guard a server that has not yet run the
-        // remember_tokens migration turns a correct password into a 500,
-        // which reads to the person typing it as a rejected password.
+        $user = $result['user'];
+
+        // Send OTP to email and phone if enabled
+        if (Settings::bool('user_otp_enabled', true)) {
+            $issued = UserOtp::issue((int) $user['id'], $user['email']);
+
+            if (!$issued['ok']) {
+                Session::error($issued['error']);
+                Session::flashInput(['email' => $email]);
+                Response::to('/login');
+            }
+
+            UserOtp::send($user, $issued['code']);
+
+            Session::put('auth_otp_user_id', (int) $user['id']);
+            Session::put('auth_otp_remember', $request->bool('remember'));
+            Session::put('auth_otp_email', $user['email']);
+            Session::put('auth_otp_phone', $user['phone'] ?? '');
+
+            Session::success('Credentials verified. An OTP code has been sent to your email and phone.');
+            Response::to('/login/otp');
+        }
+
+        // Fallback if OTP is disabled globally
         if ($request->bool('remember')) {
             try {
-                Auth::remember((int) $result['user']['id']);
+                Auth::remember((int) $user['id']);
             } catch (\Throwable $e) {
                 Logger::warning('Could not store remember-me token: ' . $e->getMessage());
             }
         }
 
-        ActivityLog::record('login', 'user', (int) $result['user']['id'], $result['user']['name'] . ' signed in');
+        Auth::login($user);
+        ActivityLog::record('login', 'user', (int) $user['id'], $user['name'] . ' signed in');
 
         $intended = Session::get('intended_url');
         Session::forget('intended_url');
 
-        Session::success('Welcome back, ' . explode(' ', $result['user']['name'])[0] . '.');
+        Session::success('Welcome back, ' . explode(' ', $user['name'])[0] . '.');
 
-        // Only follow an internal path.
         if (is_string($intended) && str_starts_with($intended, '/') && !str_starts_with($intended, '//')) {
             Response::redirect($intended);
         }
 
         Response::to('/dashboard');
+    }
+
+    public function showOtp(Request $request): void
+    {
+        $userId = (int) Session::get('auth_otp_user_id', 0);
+
+        if (!$userId) {
+            Response::to('/login');
+        }
+
+        $this->view('auth/otp', [
+            'title'    => 'Enter OTP Code',
+            'email'    => (string) Session::get('auth_otp_email', ''),
+            'phone'    => (string) Session::get('auth_otp_phone', ''),
+            'minutes'  => UserOtp::minutes(),
+            'authKind' => 'staff',
+        ], 'auth');
+    }
+
+    public function verifyOtp(Request $request): void
+    {
+        $userId = (int) Session::get('auth_otp_user_id', 0);
+
+        if (!$userId) {
+            Response::to('/login');
+        }
+
+        $code = (string) $request->input('code', '');
+
+        if (trim($code) === '') {
+            Session::error('Please enter the 6-digit OTP code sent to your email/SMS.');
+            Response::to('/login/otp');
+        }
+
+        $checked = UserOtp::verify($userId, $code);
+
+        if (!$checked['ok']) {
+            Session::error($checked['error']);
+            Response::to('/login/otp');
+        }
+
+        $user = Database::first('SELECT * FROM users WHERE id = :id AND is_active = 1 LIMIT 1', ['id' => $userId]);
+
+        if (!$user) {
+            Session::error('This account is not active or available.');
+            Session::forget('auth_otp_user_id');
+            Response::to('/login');
+        }
+
+        $remember = (bool) Session::get('auth_otp_remember', false);
+
+        Session::forget('auth_otp_user_id');
+        Session::forget('auth_otp_remember');
+        Session::forget('auth_otp_email');
+        Session::forget('auth_otp_phone');
+
+        if ($remember) {
+            try {
+                Auth::remember((int) $user['id']);
+            } catch (\Throwable $e) {
+                Logger::warning('Could not store remember-me token: ' . $e->getMessage());
+            }
+        }
+
+        Auth::login($user);
+        ActivityLog::record('login', 'user', (int) $user['id'], $user['name'] . ' signed in with OTP');
+
+        $intended = Session::get('intended_url');
+        Session::forget('intended_url');
+
+        Session::success('Welcome back, ' . explode(' ', $user['name'])[0] . '.');
+
+        if (is_string($intended) && str_starts_with($intended, '/') && !str_starts_with($intended, '//')) {
+            Response::redirect($intended);
+        }
+
+        Response::to('/dashboard');
+    }
+
+    public function resendOtp(Request $request): void
+    {
+        $userId = (int) Session::get('auth_otp_user_id', 0);
+
+        if (!$userId) {
+            Response::to('/login');
+        }
+
+        $user = Database::first('SELECT * FROM users WHERE id = :id AND is_active = 1 LIMIT 1', ['id' => $userId]);
+
+        if (!$user) {
+            Response::to('/login');
+        }
+
+        $issued = UserOtp::issue((int) $user['id'], $user['email']);
+
+        if (!$issued['ok']) {
+            Session::error($issued['error']);
+            Response::to('/login/otp');
+        }
+
+        UserOtp::send($user, $issued['code']);
+
+        Session::success('A new OTP verification code has been sent to your email and phone.');
+        Response::to('/login/otp');
     }
 
     public function logout(Request $request): void

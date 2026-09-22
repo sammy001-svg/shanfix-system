@@ -288,6 +288,50 @@ class Auth
     }
 
     /**
+     * Check password and account state without logging the user in yet.
+     * Used by 2FA / OTP step.
+     */
+    public static function verifyCredentials(string $email, string $password, string $ip): array
+    {
+        $max     = (int) Config::get('security.max_login_attempts', 5);
+        $minutes = (int) Config::get('security.lockout_minutes', 15);
+
+        $lockout = self::lockoutState(strtolower($email), $ip, $max, $minutes);
+
+        if ($lockout !== null) {
+            return ['ok' => false, 'message' => $lockout];
+        }
+
+        $user = Database::first(
+            'SELECT * FROM users WHERE email = :email LIMIT 1',
+            ['email' => strtolower($email)]
+        );
+
+        $hash  = $user['password_hash'] ?? '$2y$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidi';
+        $valid = password_verify($password, $hash);
+
+        if (!$user || !$valid) {
+            self::recordFailure(strtolower($email), $ip);
+            return ['ok' => false, 'message' => 'Invalid email or password.'];
+        }
+
+        if ((int) $user['is_active'] !== 1) {
+            return ['ok' => false, 'message' => 'This account has been deactivated. Contact your administrator.'];
+        }
+
+        if (password_needs_rehash($user['password_hash'], PASSWORD_DEFAULT)) {
+            Database::update('users', [
+                'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            ], ['id' => $user['id']]);
+        }
+
+        self::clearFailures(strtolower($email), $ip);
+
+        return ['ok' => true, 'user' => $user];
+    }
+
+
+    /**
      * The audit-log description for a failed sign-in.
      *
      * The counter below matches on this exact text, so the two must be
