@@ -625,7 +625,7 @@ HOME=$(get /)
 has "the carousel is there"              "$HOME" 'class="hero-carousel"'
 has "the services are there"             "$HOME" 'id="services"'
 has "why choose us follows them"         "$HOME" "home-why"
-has "testimonials actually render"       "$HOME" "testimonial-card"
+# Testimonials are covered in 16i: they show only when staff have entered real ones.
 has "and it ends by asking"              "$HOME" "home-cta"
 # Banners are 1200x450; a fixed-height box cut the phone number off the
 # bottom of the ring back tone advert.
@@ -666,6 +666,29 @@ curl -s -X POST "$BASE/newsletter/unsubscribe" --data-urlencode "t=$TOKN" > /dev
 eq  "pressing the button unsubscribes"        "$(q "SELECT status FROM newsletter_subscribers WHERE email='$NL';")" "unsubscribed"
 
 $MYSQL -e "DELETE FROM newsletter_subscribers WHERE email LIKE '%footer.test.%@example.com';"
+
+echo ""
+echo "=== 16i. Testimonials are real, or there are none ==="
+# The site used to show "Sarah Jenkins, CTO, Global Retail Enterprises"
+# and two more quotes written into the page code — none from a real
+# client. Testimonials now come only from what staff enter in the system,
+# and with none entered the sections are left out, not made up.
+$MYSQL -e "DELETE FROM site_testimonials WHERE author LIKE 'Suite Client%';"
+LIVE=$(q "SELECT COUNT(*) FROM site_testimonials WHERE is_active=1;")
+for p in / /who-we-are.php /portfolio.php; do
+  eq "$p shows no placeholder quote" "$(get $p | grep -c 'Sarah Jenkins\|David Omondi\|Alice Wambui')" "0"
+done
+if [ "$LIVE" = "0" ]; then
+  eq "with none entered, the homepage has no testimonials section" "$(get / | grep -c 'testimonial-card')" "0"
+fi
+$MYSQL -e "INSERT INTO site_testimonials (quote, author, company, rating, is_active, sort_order)
+           VALUES ('SUITEQUOTE Banners arrived on time.', 'Suite Client', 'Suite Co', 5, 1, 0);"
+for p in / /who-we-are.php /portfolio.php; do
+  has "$p shows a quote staff entered" "$(get $p)" "SUITEQUOTE"
+done
+$MYSQL -e "UPDATE site_testimonials SET is_active=0 WHERE author='Suite Client';"
+eq "and hides it when switched off" "$(get / | grep -c 'SUITEQUOTE')" "0"
+$MYSQL -e "DELETE FROM site_testimonials WHERE author LIKE 'Suite Client%';"
 
 echo "=== 17. Deployment keeps what the server owns ==="
 # --delete would otherwise take the site's credentials and anything

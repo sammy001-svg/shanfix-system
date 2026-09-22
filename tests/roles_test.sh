@@ -72,6 +72,9 @@ signin staff Role@2026
 eq "staff: no newsletter list"       "$(code /newsletter)"        "403"
 signin sales Role@2026
 eq "sales: can read the list"        "$(code /newsletter)"        "200"
+eq "sales: can manage testimonials"  "$(code /testimonials)"      "200"
+signin production Role@2026
+eq "production: cannot publish testimonials" "$(code /testimonials)" "403"
 
 echo ""
 echo "=== 4. Two roles grant the union of both ==="
