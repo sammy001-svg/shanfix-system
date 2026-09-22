@@ -5614,7 +5614,21 @@ a.portal-list__row:hover { background: var(--surface-2); }
 
    Flat colours throughout, as everywhere else in the system.
    --------------------------------------------------------------------- */
-.lc { grid-template-columns: 290px minmax(0, 1fr) 264px; }
+.lc {
+  grid-template-columns: 290px minmax(0, 1fr) 264px;
+  /* The shared .chat height assumes the chat is the only thing on the
+     page. The desk also has its heading above it, which pushed the reply
+     box and its Send button off the bottom of the screen. This leaves
+     room for the heading, and never shrinks below something usable. */
+  height: calc(100vh - var(--topbar-h) - 150px);
+  min-height: 460px;
+}
+/* After any action the desk shows a message above itself ("Moved", 
+   "Closed"), which would push the reply box down again. */
+.content:has(> .alert) .lc { height: calc(100vh - var(--topbar-h) - 215px); }
+.lc .chat__panel { min-height: 0; }
+.lc .chat__messages { flex: 1 1 auto; min-height: 0; }
+.lc .chat__composer { flex: 0 0 auto; }
 .lc--empty { grid-template-columns: 290px minmax(0, 1fr); }
 
 /* The queue's tabs sit in the list head, which is a flex row already. */
@@ -5663,6 +5677,7 @@ a.portal-list__row:hover { background: var(--surface-2); }
 .lc__msg-at { color: var(--slate-400); }
 
 .lc__msg-body {
+  white-space: pre-wrap;
   padding: 9px 13px;
   border-radius: 12px;
   font-size: 13.5px;
@@ -5788,3 +5803,12 @@ a.portal-list__row:hover { background: var(--surface-2); }
 .tm-row__quote { margin: 6px 0; font-size: 14px; line-height: 1.55; color: var(--ink); }
 .tm-row__who { font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .tm-row__actions { display: flex; gap: 4px; margin-top: 8px; }
+
+/* Shown on the desk when the queue changed while somebody was typing,
+   instead of reloading and losing what they had written. */
+.lc__notice {
+  display: block; width: calc(100% - 24px); margin: 10px 12px 0;
+  padding: 8px 10px; border: 1px solid var(--green-600); border-radius: 8px;
+  background: var(--surface); color: var(--green-700); font-weight: 600;
+  font-size: 12.5px; cursor: pointer; text-align: left;
+}

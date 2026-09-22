@@ -146,6 +146,16 @@ post "/livechat/$CID/reply" --data "_token=$TOK" --data-urlencode "message=Anyth
 eq "a later reply does not rewrite how long they waited" \
    "$(q "SELECT first_reply_at FROM live_conversations WHERE id=$CID;")" "$FIRST"
 
+# The desk was built without a script: replies needed a page load, Enter
+# did not send, and nothing new appeared until a refresh. Typing and
+# pressing Enter is only provable in a browser; this pins the hooks the
+# script needs, and that a reply posted the way the script posts it
+# answers JSON rather than redirecting.
+has "the desk hands its script a poll address" "$(page "/livechat/$CID")" "data-desk"
+TOK=$(tok "/livechat/$CID")
+DESKREPLY=$(curl -s -b "$JAR" -c "$JAR" -X POST "$BASE/livechat/$CID/reply" -H "X-Requested-With: XMLHttpRequest" -H "Accept: application/json" --data "_token=$TOK" --data-urlencode "message=Sent by the desk script.")
+has "a reply sent from the desk answers without a reload" "$DESKREPLY" '"ok":true'
+
 echo ""
 echo "=== 4. A private note is private ==="
 

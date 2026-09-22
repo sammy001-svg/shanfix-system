@@ -1448,6 +1448,194 @@
      an unanswered question, which is worth interrupting for; a count of
      everything would be a number nobody looks at twice.
      ------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------
+     Live chat desk (staff side)
+     ------------------------------------------------------------------
+     The desk was built without a script, so a reply needed a full page
+     load, nothing new appeared until somebody pressed refresh, Enter did
+     not send despite the box saying it would, and choosing a saved reply
+     did nothing. This is all of that.
+     ------------------------------------------------------------------ */
+  function initLiveChatDesk() {
+    const desk = $('[data-desk]');
+    if (!desk) return;
+
+    const pollUrl = desk.dataset.poll;
+    const panel   = $('[data-conversation]', desk);
+    let seenActive  = parseInt(desk.dataset.active || '0', 10);
+    let seenWaiting = parseInt(desk.dataset.waiting || '0', 10);
+
+    const list  = $('#lcMessages');
+    const form  = $('#lcReply');
+    const body  = $('#lcBody');
+    const note  = form ? form.querySelector('[name=note]') : null;
+    const btn   = form ? form.querySelector('button[type=submit], button:not([type])') : null;
+    const convo = panel ? panel.dataset.conversation : null;
+
+    let lastId = 0;
+    if (list) {
+      list.querySelectorAll('[data-mid]').forEach((el) => {
+        lastId = Math.max(lastId, parseInt(el.dataset.mid, 10) || 0);
+      });
+      list.scrollTop = list.scrollHeight;
+    }
+
+    function draw(m) {
+      if (list.querySelector('[data-mid="' + m.id + '"]')) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'lc__msg lc__msg--' + m.sender + (m.note ? ' lc__msg--note' : '');
+      wrap.dataset.mid = m.id;
+
+      if (m.sender !== 'system') {
+        const who = document.createElement('div');
+        who.className = 'lc__msg-who';
+        who.appendChild(document.createTextNode(m.who || (m.sender === 'staff' ? 'Us' : 'Visitor')));
+        if (m.note) {
+          const tag = document.createElement('span');
+          tag.className = 'lc__note-tag';
+          tag.textContent = 'private note';
+          who.appendChild(tag);
+        }
+        const at = document.createElement('span');
+        at.className = 'lc__msg-at';
+        at.textContent = m.at || '';
+        who.appendChild(at);
+        wrap.appendChild(who);
+      }
+
+      const text = document.createElement('div');
+      text.className = 'lc__msg-body';
+      text.textContent = m.body;        // textContent, never innerHTML
+      wrap.appendChild(text);
+
+      const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+      list.appendChild(wrap);
+      if (nearBottom || m.sender === 'staff') list.scrollTop = list.scrollHeight;
+    }
+
+    /* -- sending -------------------------------------------------------- */
+
+    let sending = false;
+
+    function send() {
+      if (!form || sending) return;
+      const text = body.value.trim();
+      if (!text) { body.focus(); return; }
+
+      sending = true;
+      if (btn) btn.disabled = true;
+
+      const data = new URLSearchParams();
+      data.set('_token', csrf());
+      data.set('message', text);
+      if (note && note.checked) data.set('note', '1');
+
+      fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: data,
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d && d.ok) {
+            body.value = '';
+            if (note) note.checked = false;   // a note is a one-off, never sticky
+            poll();
+          } else {
+            alert((d && d.error) || 'That did not send. Please try again.');
+          }
+        })
+        .catch(() => alert('That did not send. Check your connection and try again.'))
+        .then(() => { sending = false; if (btn) btn.disabled = false; body.focus(); });
+    }
+
+    if (form) {
+      form.addEventListener('submit', (e) => { e.preventDefault(); send(); });
+
+      // Enter sends; Shift+Enter is a new line — what the box says, and
+      // what every chat tool does.
+      body.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+          e.preventDefault();
+          send();
+        }
+      });
+
+      // A saved reply goes into the box to be read and adjusted, not
+      // straight to the customer.
+      const canned = form.querySelector('.lc__canned');
+      if (canned) {
+        canned.addEventListener('change', () => {
+          if (!canned.value) return;
+          body.value = body.value.trim() ? body.value.trimEnd() + '\n' + canned.value : canned.value;
+          canned.value = '';
+          body.focus();
+          body.setSelectionRange(body.value.length, body.value.length);
+        });
+      }
+
+      body.focus();
+    }
+
+    /* -- keeping current ------------------------------------------------ */
+
+    let notice = null;
+
+    function queueChanged() {
+      // Nothing half-typed to lose: just bring the queue up to date.
+      if (!body || !body.value.trim()) { location.reload(); return; }
+
+      if (notice) return;
+      notice = document.createElement('button');
+      notice.type = 'button';
+      notice.className = 'lc__notice';
+      notice.textContent = 'New activity in the queue — show it';
+      notice.addEventListener('click', () => location.reload());
+      const head = $('.chat__list', desk);
+      head.insertBefore(notice, head.children[1] || null);
+    }
+
+    function poll() {
+      const url = pollUrl + (convo ? '?conversation=' + encodeURIComponent(convo) + '&after=' + lastId : '');
+
+      return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!d || !d.ok) return;
+
+          (d.messages || []).forEach((m) => {
+            draw(m);
+            lastId = Math.max(lastId, m.id);
+          });
+
+          // A new conversation, or one becoming active again, changes the
+          // counts. That is when the list on the left is out of date.
+          const c = d.counts || {};
+          if ((c.active || 0) > seenActive || (c.waiting || 0) > seenWaiting) {
+            queueChanged();
+          }
+          seenActive  = c.active  || 0;
+          seenWaiting = c.waiting || 0;
+        })
+        .catch(() => { /* a dropped poll is not worth reporting */ });
+    }
+
+    // Brisk while a conversation is open, gentler on the bare queue, and
+    // slower still when the tab is in the background.
+    (function loop() {
+      poll().then(() => {
+        const delay = document.hidden ? 15000 : (convo ? 3000 : 6000);
+        setTimeout(loop, delay);
+      });
+    })();
+  }
+
   function initLiveChatBadge() {
     const badge = $('#livechat-waiting-badge');
     if (!badge) return;
@@ -1619,6 +1807,7 @@
     initGuestRows();
     initUnreadPoll();
     initLiveChatBadge();
+    initLiveChatDesk();
     initLinkedSelects();
     initRoleMatrix();
     initTheme();

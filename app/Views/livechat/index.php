@@ -65,7 +65,13 @@ $ago = static function (?string $when): string {
   </div>
 </div>
 
-<div class="chat lc<?= $c ? '' : ' lc--empty' ?>">
+<?php // The desk keeps itself current: new messages in the open
+      // conversation appear as they arrive, and the queue refreshes when
+      // something new comes in. data-* hands the script what it needs. ?>
+<div class="chat lc<?= $c ? '' : ' lc--empty' ?>" data-desk
+     data-poll="<?= e(url('/livechat/poll')) ?>"
+     data-active="<?= (int) $counts['active'] ?>"
+     data-waiting="<?= (int) $counts['waiting'] ?>">
 
   <?php // ── The queue ─────────────────────────────────────────────── ?>
   <div class="chat__list">
@@ -198,7 +204,7 @@ $ago = static function (?string $when): string {
                 <span class="lc__msg-at"><?= e(date('H:i', strtotime($m['created_at']))) ?></span>
               </div>
             <?php endif; ?>
-            <div class="lc__msg-body"><?= nl2br(e($m['body'])) ?></div>
+            <div class="lc__msg-body"><?= e($m['body']) ?></div>
           </div>
         <?php endforeach; ?>
       </div>
