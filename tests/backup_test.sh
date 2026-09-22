@@ -8,6 +8,16 @@ source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 ROOT="$ROOT"
 DIR="$ROOT/storage/backups"
 D="$(dirname "$0")"
+
+# The stale-backup warning is emailed as well as shown, and one assertion
+# counts the queued email. smtp_enabled is global, so whether it was on
+# depended on which suite ran before this one. Switched on here for this
+# run — the test SMTP host is a closed local port, so nothing is sent —
+# and put back afterwards.
+SMTP_WAS=$(q "SELECT setting_value FROM settings WHERE setting_key='smtp_enabled';")
+q "UPDATE settings SET setting_value='1' WHERE setting_key='smtp_enabled';"
+put_smtp_back() { q "UPDATE settings SET setting_value='${SMTP_WAS:-0}' WHERE setting_key='smtp_enabled';"; }
+trap put_smtp_back EXIT
 PASS=0; FAIL=0
 
 ok()  { printf "  \033[32mPASS\033[0m %-52s %s\n" "$1" "$2"; PASS=$((PASS+1)); }
