@@ -57,6 +57,17 @@ $ago = static function (?string $when): string {
     </div>
   </div>
   <div class="page-head__actions">
+    <?php // Whether this machine makes a noise when somebody new joins
+          // the queue. It is per person and per browser, not a setting:
+          // one desk in an open-plan room wants it on and the one beside
+          // it does not, and neither should have to ask an administrator.
+          // The office-wide default comes from Settings. ?>
+    <button class="btn btn--outline" type="button" data-chime
+            data-default="<?= setting('livechat_alert_sound', '1') ? '1' : '0' ?>"
+            aria-pressed="false">
+      <span data-chime-on hidden><?= icon('bell') ?> Sound on</span>
+      <span data-chime-off><?= icon('bell') ?> Sound off</span>
+    </button>
     <?php if ($canManage): ?>
       <a class="btn btn--outline" href="<?= e(url('/livechat/departments')) ?>">
         <?= icon('users') ?> Departments

@@ -1520,6 +1520,152 @@
      not send despite the box saying it would, and choosing a saved reply
      did nothing. This is all of that.
      ------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------
+     Being told a visitor is waiting
+
+     The badge in the sidebar is a fine thing to look at and a poor thing
+     to be told by. Since tawk.to came off the website, nothing made a
+     sound when a stranger started a chat — so this does: a short two-note
+     chime, and the tab title flashing until somebody looks.
+
+     Both are deliberately cheap to ignore. The sound can be silenced per
+     person on this machine, the title goes back to normal the moment the
+     tab is focused, and neither ever fires on the first poll of a page
+     — only when the number of people waiting actually goes up. Being
+     chimed at on every navigation is how people turn the sound off for
+     good.
+     ------------------------------------------------------------------ */
+  const chime = (function () {
+    const KEY = 'sf.livechat.sound';
+
+    let audio   = null;    // made on first use: a context built before a
+                           // click is created suspended and stays silent
+    let original = null;   // the real document title, while it is flashing
+    let flashing = null;
+
+    /** Whether this machine should make a noise. */
+    function wanted() {
+      try {
+        const saved = localStorage.getItem(KEY);
+        if (saved !== null) return saved === '1';
+      } catch (e) { /* private window, or storage switched off */ }
+
+      // Nothing chosen here, so fall back to what the office set. The
+      // desk publishes it; away from the desk, assume yes.
+      const el = $('[data-chime]');
+      return !el || el.dataset.default !== '0';
+    }
+
+    function setWanted(on) {
+      try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) { /* as above */ }
+    }
+
+    /**
+     * Two short notes, synthesised rather than fetched.
+     *
+     * A sound file would be one more asset to ship, cache and get wrong
+     * on a slow connection, for about a fifth of a second of audio.
+     *
+     * Browsers refuse to start audio until the person has interacted
+     * with the page. Whoever is working the desk has clicked something,
+     * so in practice it plays; when it does not, resume() is asked and
+     * the failure is swallowed rather than thrown into the console on a
+     * loop.
+     */
+    function play() {
+      if (!wanted()) return;
+
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+
+        if (!audio) audio = new Ctx();
+        if (audio.state === 'suspended') audio.resume().catch(() => {});
+
+        [[660, 0], [880, 0.12]].forEach(([hz, at]) => {
+          const osc  = audio.createOscillator();
+          const gain = audio.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.value = hz;
+
+          // Faded in and out rather than switched: a square edge on a
+          // sine wave is an audible click at the start of every note.
+          const t = audio.currentTime + at;
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+
+          osc.connect(gain).connect(audio.destination);
+          osc.start(t);
+          osc.stop(t + 0.13);
+        });
+      } catch (e) { /* no audio here; the title still flashes */ }
+    }
+
+    /** Alternate the tab title until this tab is looked at. */
+    function flash(text) {
+      if (!document.hidden) return;       // they are already looking
+      if (flashing) return;
+
+      original = document.title;
+      let on = false;
+
+      flashing = setInterval(() => {
+        document.title = (on = !on) ? text : original;
+      }, 1200);
+
+      const stop = () => {
+        if (!flashing) return;
+        clearInterval(flashing);
+        flashing = null;
+        document.title = original;
+        document.removeEventListener('visibilitychange', check);
+        window.removeEventListener('focus', stop);
+      };
+      const check = () => { if (!document.hidden) stop(); };
+
+      document.addEventListener('visibilitychange', check);
+      window.addEventListener('focus', stop);
+    }
+
+    return {
+      wanted: wanted,
+      setWanted: setWanted,
+      /** Somebody new is waiting: make a noise and flash the title. */
+      alert: function (n) {
+        play();
+        flash('(' + n + ') Somebody is waiting');
+      },
+    };
+  })();
+
+  /** The on/off button on the desk. */
+  function initChimeToggle() {
+    const btn = $('[data-chime]');
+    if (!btn) return;
+
+    const on  = $('[data-chime-on]', btn);
+    const off = $('[data-chime-off]', btn);
+
+    const paint = () => {
+      const want = chime.wanted();
+      btn.setAttribute('aria-pressed', want ? 'true' : 'false');
+      on.hidden  = !want;
+      off.hidden = want;
+    };
+
+    btn.addEventListener('click', () => {
+      const want = !chime.wanted();
+      chime.setWanted(want);
+      paint();
+      // Play it back, so "on" is something you hear rather than read.
+      if (want) chime.alert(1);
+    });
+
+    paint();
+  }
+
   function initLiveChatDesk() {
     const desk = $('[data-desk]');
     if (!desk) return;
@@ -1682,6 +1828,9 @@
           // counts. That is when the list on the left is out of date.
           const c = d.counts || {};
           if ((c.active || 0) > seenActive || (c.waiting || 0) > seenWaiting) {
+            // Only a longer queue is worth a noise. A conversation going
+            // from waiting to open is somebody doing their job.
+            if ((c.waiting || 0) > seenWaiting) chime.alert(c.waiting);
             queueChanged();
           }
           seenActive  = c.active  || 0;
@@ -1820,6 +1969,14 @@
     const url = badge.dataset.url;
     if (!url) return;
 
+    // The desk has its own, faster loop and does its own chiming. Two
+    // voices announcing the same visitor is worse than one.
+    const atTheDesk = !!$('[data-desk]');
+
+    // null until the first answer comes back, so opening a page with
+    // three people already waiting is not announced as three arrivals.
+    let seen = null;
+
     const refresh = () => {
       fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
         .then((r) => r.json())
@@ -1827,6 +1984,11 @@
           if (!d.ok) return;
           badge.textContent = d.waiting > 99 ? '99+' : d.waiting;
           badge.classList.toggle('hidden', !d.waiting);
+
+          if (!atTheDesk && seen !== null && d.waiting > seen) {
+            chime.alert(d.waiting);
+          }
+          seen = d.waiting;
         })
         .catch(() => {});
     };
@@ -1985,6 +2147,7 @@
     initGuestRows();
     initUnreadPoll();
     initLiveChatBadge();
+    initChimeToggle();
     initLiveChatDesk();
     initMailbox();
     initMailBadge();

@@ -33,6 +33,9 @@
     timer: null,
     config: null,
     unread: 0,
+    // Whether we have already asked how to reply. Once only: somebody
+    // who ignored the question has answered it.
+    asked: false,
     // Ids of messages this browser drew the moment it sent them, so
     // the poll that hands them back does not draw them again.
     mine: {}
@@ -156,9 +159,23 @@
   // -- Drawing the conversation ----------------------------------------
   function bubble(text, mine, who, isSystem) {
     if (isSystem) {
+      // The out-of-hours notice is shown the moment the widget opens,
+      // and the server writes the same words into the thread so they
+      // survive a reload. On a first visit both arrive and it reads as
+      // a stutter, so the second one is dropped.
+      //
+      // Only that one line is deduped, by marking it rather than by
+      // comparing text: "Passed to Accounts" can legitimately happen
+      // twice in one conversation, and swallowing the second would
+      // leave the visitor wondering where they had been sent.
+      var isOffline = !!(state.config && text && text === state.config.offline);
+
+      if (isOffline && el.body.querySelector('[data-sfc-offline]')) { return; }
+
       var s = document.createElement('div');
       s.className = 'sfc-msg sfc-msg--sys';
       s.textContent = text;
+      if (isOffline) { s.setAttribute('data-sfc-offline', '1'); }
       el.body.appendChild(s);
       scroll();
       return;
@@ -233,6 +250,76 @@
     scroll();
   }
 
+  /**
+   * Ask for an address, when we have no other way of answering.
+   *
+   * Only ever after the message has been sent, and only when the office
+   * is shut and they gave us nothing to reply to. A form in front of the
+   * question sends people away; a question already asked and answered
+   * "we will write back — where to?" does not.
+   *
+   * Shown once. Somebody who ignores it has decided, and asking twice
+   * would be nagging a person who is trying to leave.
+   */
+  function askHowToReply() {
+    if (state.asked) { return; }
+    state.asked = true;
+
+    var ask = document.createElement('div');
+    ask.className = 'sfc-ask';
+    ask.innerHTML =
+      '<div class="sfc-ask-q"></div>' +
+      '<div class="sfc-ask-row">' +
+        '<input class="sfc-in sfc-ask-em" type="email" maxlength="160" ' +
+          'placeholder="you@example.com" aria-label="Your email address">' +
+        '<button type="button" class="sfc-ask-go">Send</button>' +
+      '</div>';
+
+    // Deliberately not the offline message again — they have just read
+    // that twice. This asks the one thing still outstanding.
+    ask.querySelector('.sfc-ask-q').textContent = 'Where shall we send the reply?';
+
+    var input = ask.querySelector('.sfc-ask-em');
+    var go    = ask.querySelector('.sfc-ask-go');
+
+    function submitEmail() {
+      var email = input.value.trim();
+
+      // Checked here only to save a round trip and give an instant
+      // answer; the server checks it again and is the one that decides.
+      if (!email || email.indexOf('@') < 1 || email.length > 160) {
+        input.focus();
+        input.classList.add('is-bad');
+        return;
+      }
+
+      go.disabled = true;
+      input.classList.remove('is-bad');
+
+      post('contact', { token: state.token, email: email })
+        .then(function (d) {
+          if (!d || !d.ok) {
+            go.disabled = false;
+            input.classList.add('is-bad');
+            return;
+          }
+          ask.remove();
+          // The server writes a line into the thread saying where the
+          // reply will go, so there is nothing to say here — it arrives
+          // on the next poll like any other message.
+        })
+        .catch(function () { go.disabled = false; });
+    }
+
+    go.addEventListener('click', submitEmail);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); submitEmail(); }
+    });
+
+    el.body.appendChild(ask);
+    scroll();
+  }
+
   // -- Sending ---------------------------------------------------------
   function submit() {
     var message = el.text.value.trim();
@@ -263,6 +350,12 @@
         state.mine[d.id] = true;
         remember(d.token);
         loop();
+
+        // Out of hours with no way of reaching them: their question
+        // would otherwise sit here until they thought to come back and
+        // look. Asked after the fact, so it never stands between the
+        // person and the thing they wanted to say.
+        if (!d.open && !d.knows) { askHowToReply(); }
       }).catch(function () {
         bubble('We could not reach the office just now. Please try again.', false, null, true);
       });

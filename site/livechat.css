@@ -241,6 +241,47 @@
 }
 .sfc-in:focus { outline: 2px solid var(--sfc-green); outline-offset: -1px; }
 
+/* ── "Where shall we reply?" ───────────────────────────────────────── */
+/* Shown after the message has been sent, when the office is shut and we
+   have no address for them. Set apart from the thread so it reads as the
+   office asking a question rather than as another message. */
+.sfc-ask {
+  margin: 10px 0 4px;
+  padding: 12px;
+  border: 1px solid var(--sfc-line);
+  border-left: 3px solid var(--sfc-green);
+  border-radius: 10px;
+  background: var(--sfc-panel);
+}
+
+.sfc-ask-q {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sfc-muted);
+  margin-bottom: 9px;
+}
+
+.sfc-ask-row { display: flex; gap: 7px; align-items: stretch; }
+
+.sfc-ask-row .sfc-in { margin-bottom: 0; }
+
+.sfc-ask-em.is-bad { border-color: #C0392B; }
+
+.sfc-ask-go {
+  flex: 0 0 auto;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--sfc-green);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sfc-ask-go:hover { background: var(--sfc-navy); }
+.sfc-ask-go:disabled { opacity: .6; cursor: default; }
+
 /* ── The composer ─────────────────────────────────────────────────── */
 .sfc-foot {
   display: flex;

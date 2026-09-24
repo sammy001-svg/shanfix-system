@@ -2279,6 +2279,12 @@ fieldset:last-of-type { margin-bottom: 0; }
 .check-row input[disabled] { opacity: .6; cursor: not-allowed; }
 .check-row:has(input[disabled]) { cursor: default; background: var(--surface-2); }
 
+/* Two or three controls that belong on one line — a time range, a number
+   with its unit, a row of day ticks. */
+.field-row { display: flex; align-items: center; gap: 10px; }
+.field-row--wrap { flex-wrap: wrap; gap: 8px 16px; }
+.field-row .input { width: auto; }
+
 .d-block { display: block; }
 
 /* Several roles on one line in the user list. */

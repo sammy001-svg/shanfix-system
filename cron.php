@@ -109,6 +109,34 @@ try {
     }
 
     // -----------------------------------------------------------------
+    // 0b. Somebody on the website is still waiting
+    // -----------------------------------------------------------------
+    // Near the front for the same reason as the campaigns above: this is
+    // the only thing in the run where a person is sitting in front of a
+    // screen right now, deciding how long to give us. Everything below it
+    // is about records, and records can wait a second longer.
+    //
+    // The bell already rang when the conversation started. This is the
+    // second line: a chat nobody has picked up after livechat_alert_after
+    // minutes, which gets the department's leads by e-mail. Once per
+    // conversation — a repeated alarm is an alarm people learn to ignore.
+    try {
+        $chat = \App\Services\LiveChat\Alerts::sweep();
+
+        foreach ($chat['notes'] as $note) {
+            say('Live chat: ' . $note);
+        }
+
+        if ($chat['escalated'] > 0 && $chat['notes'] === []) {
+            say(sprintf('Live chat: escalated %d waiting conversation(s)', $chat['escalated']));
+        }
+    } catch (\Throwable $e) {
+        // Before migration 045 there is no live chat to sweep, and before
+        // 049 no escalated_at to mark. Neither should stop the run.
+        alert('Live chat sweep failed: ' . $e->getMessage());
+    }
+
+    // -----------------------------------------------------------------
     // 1. Invoice status maintenance
     // -----------------------------------------------------------------
     $overdue = Database::run(

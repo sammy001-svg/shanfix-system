@@ -136,19 +136,41 @@ final class Conversations
         // A closed conversation that gets another message is not closed.
         // Re-opening it as 'waiting' rather than 'open' is deliberate: it
         // needs a human again, so it belongs back in the queue.
-        Database::run(
+        //
+        // escalated_at goes with it. That column means "we have already
+        // shouted about this wait", and this is a new wait — a question
+        // answered last Tuesday and followed up this morning has to be
+        // able to raise the alarm a second time.
+        //
+        // Its own statement, conditional on the row still being closed,
+        // for two reasons. rowCount() then says exactly whether this
+        // message is the one that reopened it, rather than trusting a
+        // status read before the request started — somebody at the desk
+        // may have closed it in between. And it avoids the trap in
+        // writing this as one UPDATE: MySQL evaluates SET clauses left
+        // to right against the values already assigned, so a later
+        // "CASE WHEN status = 'closed'" tests the status this same
+        // statement has just changed and is never true. closed_at was
+        // being left behind on every reopened conversation for exactly
+        // that reason.
+        $reopened = Database::run(
             "UPDATE live_conversations
-                SET last_visitor_at = NOW(),
-                    status = CASE WHEN status = 'closed' THEN 'waiting' ELSE status END,
-                    closed_at = CASE WHEN status = 'closed' THEN NULL ELSE closed_at END
-              WHERE id = :id",
+                SET status = 'waiting', closed_at = NULL, escalated_at = NULL
+              WHERE id = :id AND status = 'closed'",
+            ['id' => $conversation['id']]
+        )->rowCount() > 0;
+
+        Database::run(
+            'UPDATE live_conversations SET last_visitor_at = NOW() WHERE id = :id',
             ['id' => $conversation['id']]
         );
 
         // The id goes back so the widget can recognise its own message
         // when it comes round again on the next poll, and not draw it a
-        // second time underneath the one it already showed.
-        return ['ok' => true, 'id' => $messageId];
+        // second time underneath the one it already showed. 'reopened'
+        // tells the caller this is somebody joining the queue again,
+        // which is worth a bell.
+        return ['ok' => true, 'id' => $messageId, 'reopened' => $reopened];
     }
 
     /**

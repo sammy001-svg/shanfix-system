@@ -134,6 +134,7 @@ $r->post('/api/chat/send',  [LiveChatApiController::class, 'send']);
 $r->get ('/api/chat/poll',  [LiveChatApiController::class, 'poll']);
 $r->post('/api/chat/close', [LiveChatApiController::class, 'close']);
 $r->post('/api/chat/rate',  [LiveChatApiController::class, 'rate']);
+$r->post('/api/chat/contact', [LiveChatApiController::class, 'contact']);
 
 // The newsletter box in the website footer, and the page its unsubscribe
 // link opens. Public and sessionless: signing up needs only an address,
@@ -1211,6 +1212,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/livechat/departments',                  [LiveChatAdminController::class, 'save'],     ['csrf']);
         $r->post('/livechat/departments/{id}/staff',       [LiveChatAdminController::class, 'setStaff'], ['csrf']);
         $r->post('/livechat/departments/{id}/delete',      [LiveChatAdminController::class, 'delete'],   ['csrf']);
+        $r->post('/livechat/settings',                     [LiveChatAdminController::class, 'saveSettings'], ['csrf']);
     });
 
     $r->group(['permission:livechat.use'], function ($r) {

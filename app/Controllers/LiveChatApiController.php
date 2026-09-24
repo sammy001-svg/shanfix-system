@@ -8,6 +8,7 @@ use App\Core\PartnerAuth;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Settings;
+use App\Services\LiveChat\Alerts;
 use App\Services\LiveChat\Conversations;
 use App\Services\LiveChat\Departments;
 
@@ -127,10 +128,22 @@ class LiveChatApiController extends Controller
             }
         }
 
+        // Ring the bell in the office. After the message is safely
+        // stored and never in a way that can fail this request: the
+        // visitor is told their question arrived because it did, whether
+        // or not we managed to tell anybody about it.
+        Alerts::arrived((int) $result['id']);
+
         Response::json([
             'ok'    => true,
             'token' => $result['token'],
             'ref'   => $result['ref'],
+            // Whether anybody is likely to answer. The widget uses it to
+            // decide whether to ask for an e-mail address, so a person
+            // writing to us at midnight is not left waiting for a reply
+            // we have no way of sending.
+            'open'  => Conversations::atTheDesk(),
+            'knows' => $this->canReachThem($result['id']),
             // So the widget can recognise the message it has already
             // drawn when the next poll hands it back.
             'id'    => $result['message_id'],
@@ -147,6 +160,14 @@ class LiveChatApiController extends Controller
 
         if (!$result['ok']) {
             Response::json(['ok' => false, 'error' => $result['error']], 400);
+        }
+
+        // Somebody writing again to a conversation we had closed is back
+        // in the queue, so the office is told as if they had just
+        // arrived. An ordinary message in a conversation already being
+        // handled is not: whoever is handling it is looking at it.
+        if (!empty($result['reopened'])) {
+            Alerts::arrived((int) $conversation['id']);
         }
 
         Response::json(['ok' => true, 'id' => $result['id']]);
@@ -199,6 +220,62 @@ class LiveChatApiController extends Controller
         Response::json(['ok' => true]);
     }
 
+    /**
+     * Leave an address so we can reply when we are back.
+     *
+     * The widget asks for this only when the office is shut and the
+     * visitor gave nothing to reply to, which is the one case where a
+     * message genuinely goes nowhere. Somebody writing at eleven at
+     * night should not discover in the morning that there was never a
+     * way to answer them.
+     *
+     * It only ever fills a blank. Overwriting an address that is already
+     * there would let anybody holding the token redirect where our reply
+     * goes, and the token is kept in a browser we do not control.
+     */
+    public function contact(Request $request): void
+    {
+        $this->on();
+
+        $conversation = $this->mine($request);
+        $this->limitByConversation($conversation, 'other');
+
+        if (trim((string) $conversation['visitor_email']) !== '') {
+            Response::json(['ok' => true, 'already' => true]);
+        }
+
+        $email = trim((string) $request->input('email', ''));
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 160) {
+            Response::json(['ok' => false, 'error' => 'That does not look like an email address.'], 400);
+        }
+
+        $name = trim((string) $request->input('name', ''));
+
+        Database::run(
+            "UPDATE live_conversations
+                SET visitor_email = :e,
+                    visitor_name  = CASE WHEN visitor_name IS NULL OR visitor_name = ''
+                                         THEN :n ELSE visitor_name END
+              WHERE id = :id AND (visitor_email IS NULL OR visitor_email = '')",
+            [
+                'id' => $conversation['id'],
+                'e'  => $email,
+                'n'  => $name !== '' ? mb_substr($name, 0, 100) : null,
+            ]
+        );
+
+        // Written into the thread as well, so whoever picks this up in
+        // the morning sees the address in the conversation rather than
+        // only in a field above it.
+        Conversations::systemSays(
+            (int) $conversation['id'],
+            'We will reply to ' . $email . '.'
+        );
+
+        Response::json(['ok' => true]);
+    }
+
     /** How did we do? */
     public function rate(Request $request): void
     {
@@ -244,6 +321,23 @@ class LiveChatApiController extends Controller
         }
 
         return $found;
+    }
+
+    /**
+     * Whether we have any way of reaching this person afterwards.
+     *
+     * An e-mail address they typed, or an account we matched them to. If
+     * neither, and the office is shut, the widget asks for one.
+     */
+    private function canReachThem(int $conversationId): bool
+    {
+        return (bool) Database::scalar(
+            "SELECT 1 FROM live_conversations
+              WHERE id = :id
+                AND (COALESCE(visitor_email, '') <> '' OR client_user_id IS NOT NULL)",
+            ['id' => $conversationId],
+            0
+        );
     }
 
     /**

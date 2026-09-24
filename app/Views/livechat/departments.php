@@ -35,7 +35,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
   </div>
 <?php endif; ?>
 
-<div class="grid grid--2">
+<div class="grid-2">
   <?php foreach ($departments as $d): ?>
     <?php $mine = $staff[(int) $d['id']] ?? []; ?>
     <div class="card">
@@ -180,4 +180,137 @@ require_once APP_PATH . '/Views/partials/icons.php';
       </p>
     </form>
   </div>
+</div>
+
+<?php // ── When we are here, and who gets told ───────────────────────
+      // These settings have lived only in the database since the chat
+      // was built: seeded by the migration and changeable by nobody
+      // without a MySQL client. They sit on this page rather than under
+      // Settings because this is what somebody opens when they are
+      // thinking about live chat, and because the alert thresholds only
+      // make sense beside the departments they escalate to. ?>
+<div class="card mt-16">
+  <div class="card__head">
+    <div>
+      <div class="card__title">Hours, and being told</div>
+      <div class="card__sub">
+        Outside these hours visitors are told nobody is at the desk and are
+        asked for an email address, so a question at midnight is not lost.
+        Inside them, everybody in a department gets the bell the moment a
+        chat arrives.
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="<?= e(url('/livechat/settings')) ?>">
+    <?= csrf_field() ?>
+
+    <div class="grid-2">
+      <div>
+        <div class="field">
+          <label class="label" for="lcGreeting">The first thing a visitor reads</label>
+          <input class="input" id="lcGreeting" name="livechat_greeting" maxlength="200"
+                 value="<?= e(setting('livechat_greeting', '')) ?>">
+        </div>
+
+        <div class="field">
+          <label class="label" for="lcOffline">And what they read out of hours</label>
+          <textarea class="input" id="lcOffline" name="livechat_offline_message" rows="3"
+                    maxlength="400"><?= e(setting('livechat_offline_message', '')) ?></textarea>
+        </div>
+
+        <div class="field">
+          <label class="label" for="lcFrom">Open between</label>
+          <div class="field-row">
+            <input class="input" id="lcFrom" type="time" name="livechat_hours_from"
+                   value="<?= e(setting('livechat_hours_from', '08:00')) ?>">
+            <span class="text-muted">and</span>
+            <input class="input" type="time" name="livechat_hours_to"
+                   value="<?= e(setting('livechat_hours_to', '17:30')) ?>">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label">On these days</label>
+          <?php
+            $openDays = array_map('intval', array_filter(
+                explode(',', (string) setting('livechat_hours_days', '1,2,3,4,5,6')),
+                'strlen'
+            ));
+            // Monday first, Sunday last: the Kenyan working week, and the
+            // order everybody reads a week in.
+            $dayNames = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu',
+                         5 => 'Fri', 6 => 'Sat', 0 => 'Sun'];
+          ?>
+          <div class="field-row field-row--wrap">
+            <?php foreach ($dayNames as $n => $label): ?>
+              <label class="check">
+                <input type="checkbox" name="days[]" value="<?= $n ?>"
+                       <?= in_array($n, $openDays, true) ? 'checked' : '' ?>>
+                <span class="check__text"><?= $label ?></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="field">
+          <label class="label" for="lcAfter">Tell the department's leads after</label>
+          <div class="field-row">
+            <input class="input" id="lcAfter" type="number" name="livechat_alert_after"
+                   min="1" max="240" style="max-width:110px"
+                   value="<?= (int) setting('livechat_alert_after', 5) ?>">
+            <span class="text-muted">minutes unanswered</span>
+          </div>
+          <p class="text-sm text-muted mt-8">
+            The bell rings for everybody in the department straight away. This
+            is the second line, for a conversation nobody has picked up — once
+            per conversation, not once per cron run.
+          </p>
+        </div>
+
+        <label class="check mb-8">
+          <input type="checkbox" name="livechat_alert_email" value="1"
+                 <?= setting('livechat_alert_email', '1') ? 'checked' : '' ?>>
+          <span class="check__text">Email the leads when it escalates</span>
+        </label>
+
+        <label class="check mb-8">
+          <input type="checkbox" name="livechat_alert_sms" value="1"
+                 <?= setting('livechat_alert_sms', '0') ? 'checked' : '' ?>>
+          <span class="check__text">
+            <strong>Text them as well</strong>
+            <span>Costs a message each time it escalates</span>
+          </span>
+        </label>
+
+        <label class="check mb-8">
+          <input type="checkbox" name="livechat_alert_sound" value="1"
+                 <?= setting('livechat_alert_sound', '1') ? 'checked' : '' ?>>
+          <span class="check__text">
+            <strong>The desk makes a sound when somebody joins the queue</strong>
+            <span>A default only — each person can silence their own from the desk</span>
+          </span>
+        </label>
+
+        <label class="check mb-8">
+          <input type="checkbox" name="livechat_ask_department" value="1"
+                 <?= setting('livechat_ask_department', '1') ? 'checked' : '' ?>>
+          <span class="check__text">Ask the visitor which department they want</span>
+        </label>
+
+        <label class="check mb-8">
+          <input type="checkbox" name="livechat_enabled" value="1"
+                 <?= setting('livechat_enabled', '1') ? 'checked' : '' ?>>
+          <span class="check__text">
+            <strong>Show the chat widget on the website</strong>
+            <span>Unticking it hides the widget; nothing is deleted</span>
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <button class="btn btn--primary mt-16">Save these</button>
+  </form>
 </div>

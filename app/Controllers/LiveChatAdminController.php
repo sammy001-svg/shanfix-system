@@ -8,6 +8,7 @@ use App\Core\Database;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
+use App\Core\Settings;
 use App\Services\LiveChat\Departments;
 
 /**
@@ -160,6 +161,72 @@ class LiveChatAdminController extends Controller
 
         Session::success('Removed. Its conversations were moved to the default department.');
         Response::to('/livechat/departments');
+    }
+
+    /**
+     * The hours, the greeting, and how loudly to be told.
+     *
+     * These were seeded by migration 045 and, until now, changeable only
+     * with a MySQL client. Everything here is a setting the office owns,
+     * so it is written whole: an unticked box is a real answer, and the
+     * form always sends every field.
+     */
+    public function saveSettings(Request $request): void
+    {
+        // An empty greeting is not a choice anybody makes on purpose —
+        // the widget opens with it, so blank means a chat window that
+        // says nothing at all. An empty out-of-hours message is fine:
+        // it means say nothing extra, which is a real preference.
+        $greeting = trim((string) $request->input('livechat_greeting', ''))
+                 ?: 'Hello. How can we help you today?';
+        $offline  = trim((string) $request->input('livechat_offline_message', ''));
+
+        // Days arrive as a list of ticked numbers. An empty list means
+        // the desk is never open, which is a strange thing to want but
+        // not a thing to silently override — the widget then always says
+        // we are away, which is at least true.
+        $days = array_values(array_unique(array_filter(
+            array_map('intval', (array) $request->input('days', [])),
+            static fn(int $d): bool => $d >= 0 && $d <= 6
+        )));
+        sort($days);
+
+        $minutes = (int) $request->input('livechat_alert_after', 5);
+
+        Settings::setMany([
+            'livechat_greeting'        => mb_substr($greeting, 0, 200),
+            'livechat_offline_message' => mb_substr($offline, 0, 400),
+            'livechat_hours_from'      => $this->clock((string) $request->input('livechat_hours_from', ''), '08:00'),
+            'livechat_hours_to'        => $this->clock((string) $request->input('livechat_hours_to', ''), '17:30'),
+            'livechat_hours_days'      => implode(',', $days),
+            // Clamped rather than rejected: a 0 here would mean escalating
+            // a conversation the instant it arrives, which would make the
+            // second-line alarm indistinguishable from the first.
+            'livechat_alert_after'     => (string) max(1, min(240, $minutes)),
+            'livechat_alert_email'     => $request->input('livechat_alert_email') ? '1' : '0',
+            'livechat_alert_sms'       => $request->input('livechat_alert_sms') ? '1' : '0',
+            'livechat_alert_sound'     => $request->input('livechat_alert_sound') ? '1' : '0',
+            'livechat_ask_department'  => $request->input('livechat_ask_department') ? '1' : '0',
+            'livechat_enabled'         => $request->input('livechat_enabled') ? '1' : '0',
+        ]);
+
+        ActivityLog::record('livechat_settings', 'setting', null, 'Changed the live chat settings');
+
+        Session::success(
+            $days === []
+                ? 'Saved — but no days are ticked, so visitors will always be told we are away.'
+                : 'Saved.'
+        );
+
+        Response::to('/livechat/departments');
+    }
+
+    /** A HH:MM from a time field, or the default if it is not one. */
+    private function clock(string $value, string $fallback): string
+    {
+        $value = trim($value);
+
+        return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value) ? $value : $fallback;
     }
 
     // -----------------------------------------------------------------
