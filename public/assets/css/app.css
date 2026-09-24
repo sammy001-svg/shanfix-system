@@ -2288,6 +2288,52 @@ fieldset:last-of-type { margin-bottom: 0; }
 .d-block { display: block; }
 
 /* ---------------------------------------------------------------------
+   HR overview
+
+   The page was written against a handful of classes and variables this
+   stylesheet never had — --bg-subtle, --text-muted, .grid--2col — each
+   with a light-mode hex as its fallback, so the panels came out white
+   on a navy page. These are the few it genuinely needs.
+   --------------------------------------------------------------------- */
+.hr-col { display: flex; flex-direction: column; gap: 18px; }
+
+/* Two figures side by side inside a card: the run and what it came to. */
+.hr-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.hr-tile {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px;
+}
+.hr-tile__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--slate-500);
+}
+.hr-tile__value { font-size: 16px; font-weight: 650; color: var(--ink); margin: 3px 0 5px; }
+.hr-tile__meta  { font-size: 11.5px; color: var(--slate-500); }
+
+.hr-list { list-style: none; padding: 0; margin: 0; }
+.hr-list__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+}
+.hr-list__row + .hr-list__row { border-top: 1px solid var(--border); }
+
+.p-16 { padding: 16px; }
+
+@media (max-width: 560px) {
+  .hr-pair { grid-template-columns: 1fr; }
+}
+
+
+/* ---------------------------------------------------------------------
    Choosing a person's modules and permissions
 
    Thirty-odd modules and eighty permissions. Collapsed by default with

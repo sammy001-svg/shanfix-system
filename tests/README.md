@@ -88,10 +88,16 @@ SHANFIX_URL=http://localhost:8080 SHANFIX_DB=shanfix_ci ./tests/run.sh
 | `partners_test.sh` | the third door, and the commission behind it |
 | `deploy_test.sh` | the address the site answers on, and what a push does |
 
-`crawl.sh` is separate: it walks every GET route in `routes.php` as every
-role and reports anything that is not a page or a redirect. It is looking
-for 500s, so it needs no assertions of its own. Run it after any change
-that touches a view or a controller.
+`crawl_test.sh` is the odd one out: it walks every GET route in
+`routes.php` as every role and reports anything that is not a page or a
+redirect. It is looking for 500s, so it needs no assertions of its own —
+a page that opens is the assertion.
+
+It used to be called `crawl.sh` and sat outside the list of suites, to be
+run by hand. Nobody did, and two pages in the menu — the HR overview and
+the ageing report — stayed broken because of it. Both are exactly what
+this finds, and it finds them in one pass, so it now runs with the rest.
+It is the slowest suite by some way; `bash run.sh crawl` runs it alone.
 
 ## The one thing these suites cannot check
 

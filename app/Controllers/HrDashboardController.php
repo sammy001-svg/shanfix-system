@@ -105,7 +105,7 @@ class HrDashboardController extends Controller
         // 5. Recent HR-related Audit Log
         $recentLogs = Database::all(
             "SELECT a.*, u.name AS user_name
-               FROM activity_logs a
+               FROM activity_log a
           LEFT JOIN users u ON u.id = a.user_id
               WHERE a.entity_type IN ('employee', 'payroll_run', 'equipment')
            ORDER BY a.id DESC LIMIT 8"

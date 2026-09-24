@@ -14,7 +14,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
     </div>
   </div>
   <div class="page-head__actions">
-    <a class="btn btn--secondary" href="<?= url('/reports/ageing/export') ?>">
+    <a class="btn btn--outline" href="<?= url('/reports/ageing/export') ?>">
       <?= icon('download') ?> Export CSV
     </a>
   </div>
@@ -22,7 +22,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
 
 <!-- Stat Cards by Ageing Bucket -->
 <div class="stat-grid mb-24" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-  <a href="<?= url('/reports/ageing?bucket=all') ?>" class="stat <?= $bucket === 'all' ? 'stat--blue' : '' ?>" style="text-decoration:none;">
+  <a href="<?= url('/reports/ageing?bucket=all') ?>" class="stat <?= $bucket === 'all' ? 'stat--navy' : '' ?>" style="text-decoration:none;">
     <div class="stat__value">KES <?= number_format((float) ($totals['total_outstanding'] ?? 0), 2) ?></div>
     <div class="stat__label">Total Receivables</div>
   </a>
@@ -56,7 +56,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
 <!-- Table Card -->
 <div class="card">
   <div class="card__head" style="display:flex; justify-content:space-between; align-items:center;">
-    <h3>Client Breakdown (<?= count($clients) ?> clients with open balances)</h3>
+    <div class="card__title">Client Breakdown (<?= count($clients) ?> clients with open balances)</div>
     <div style="display:flex; gap:6px;">
       <a class="btn btn--sm <?= $bucket === 'all' ? 'btn--primary' : 'btn--ghost' ?>" href="<?= url('/reports/ageing?bucket=all') ?>">All</a>
       <a class="btn btn--sm <?= $bucket === 'not_due' ? 'btn--primary' : 'btn--ghost' ?>" href="<?= url('/reports/ageing?bucket=not_due') ?>">Current</a>
@@ -72,13 +72,13 @@ require_once APP_PATH . '/Views/partials/icons.php';
         <thead>
           <tr>
             <th>Client Name</th>
-            <th style="text-align:right;">Not Due</th>
-            <th style="text-align:right;">1 – 30 Days</th>
-            <th style="text-align:right;">31 – 60 Days</th>
-            <th style="text-align:right;">61 – 90 Days</th>
-            <th style="text-align:right;">90+ Days</th>
-            <th style="text-align:right;">Total Balance</th>
-            <th style="text-align:center;">Actions</th>
+            <th class="num">Not Due</th>
+            <th class="num">1 – 30 Days</th>
+            <th class="num">31 – 60 Days</th>
+            <th class="num">61 – 90 Days</th>
+            <th class="num">90+ Days</th>
+            <th class="num">Total Balance</th>
+            <th class="num">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -86,51 +86,50 @@ require_once APP_PATH . '/Views/partials/icons.php';
             <tr>
               <td>
                 <a href="<?= url('/clients/' . $c['id']) ?>" style="font-weight:600; text-decoration:none;">
-                  <?= esc($c['name']) ?>
+                  <?= e($c['name']) ?>
                 </a>
-                <div style="font-size:11px; color:var(--text-muted);">
+                <div style="font-size:11px; color:var(--slate-500);">
                   <?= (int) $c['unpaid_invoices'] ?> unpaid <?= $c['unpaid_invoices'] == 1 ? 'invoice' : 'invoices' ?>
                   <?php if (!empty($c['phone'])): ?>
-                     · <?= esc($c['phone']) ?>
+                     · <?= e($c['phone']) ?>
                   <?php endif; ?>
                 </div>
               </td>
 
               <!-- Not Due -->
-              <td style="text-align:right; font-size:13px;">
+              <td class="num">
                 <?= (float) $c['not_due'] > 0 ? 'KES ' . number_format((float) $c['not_due'], 2) : '—' ?>
               </td>
 
               <!-- 1 - 30 days -->
-              <td style="text-align:right; font-size:13px; <?= (float) $c['days_0_30'] > 0 ? 'color:var(--amber-color, #d97706); font-weight:600;' : '' ?>">
+              <td class="num" style="<?= (float) $c['days_0_30'] > 0 ? 'color:var(--amber-700);font-weight:600' : '' ?>">
                 <?= (float) $c['days_0_30'] > 0 ? 'KES ' . number_format((float) $c['days_0_30'], 2) : '—' ?>
               </td>
 
               <!-- 31 - 60 days -->
-              <td style="text-align:right; font-size:13px; <?= (float) $c['days_31_60'] > 0 ? 'color:var(--amber-color, #d97706); font-weight:600;' : '' ?>">
+              <td class="num" style="<?= (float) $c['days_31_60'] > 0 ? 'color:var(--amber-700);font-weight:600' : '' ?>">
                 <?= (float) $c['days_31_60'] > 0 ? 'KES ' . number_format((float) $c['days_31_60'], 2) : '—' ?>
               </td>
 
               <!-- 61 - 90 days -->
-              <td style="text-align:right; font-size:13px; <?= (float) $c['days_61_90'] > 0 ? 'color:var(--danger-color, #dc2626); font-weight:600;' : '' ?>">
+              <td class="num" style="<?= (float) $c['days_61_90'] > 0 ? 'color:var(--red-600);font-weight:600' : '' ?>">
                 <?= (float) $c['days_61_90'] > 0 ? 'KES ' . number_format((float) $c['days_61_90'], 2) : '—' ?>
               </td>
 
               <!-- 90+ days -->
-              <td style="text-align:right; font-size:13px; <?= (float) $c['days_90_plus'] > 0 ? 'color:var(--danger-color, #dc2626); font-weight:700;' : '' ?>">
+              <td class="num" style="<?= (float) $c['days_90_plus'] > 0 ? 'color:var(--red-600);font-weight:700' : '' ?>">
                 <?= (float) $c['days_90_plus'] > 0 ? 'KES ' . number_format((float) $c['days_90_plus'], 2) : '—' ?>
               </td>
 
               <!-- Total -->
-              <td style="text-align:right; font-weight:700; font-size:14px;">
-                KES <?= number_format((float) $c['total_outstanding'], 2) ?>
-              </td>
+              <td class="num"><strong>
+KES <?= number_format((float) $c['total_outstanding'], 2) ?></strong></td>
 
               <!-- Actions -->
-              <td style="text-align:center;">
+              <td class="actions">
                 <div style="display:flex; justify-content:center; gap:4px;">
                   <a class="btn btn--sm btn--ghost" href="<?= url('/clients/' . $c['id']) ?>" title="View Profile">Profile</a>
-                  <a class="btn btn--sm btn--secondary" href="<?= url('/clients/' . $c['id'] . '/statement') ?>" title="Statement">Statement</a>
+                  <a class="btn btn--sm btn--outline" href="<?= url('/clients/' . $c['id'] . '/statement') ?>" title="Statement">Statement</a>
                 </div>
               </td>
             </tr>
@@ -138,7 +137,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
         </tbody>
       </table>
     <?php else: ?>
-      <p style="padding:24px; text-align:center; color:var(--text-muted); font-size:14px; margin:0;">
+      <p style="padding:24px; text-align:center; color:var(--slate-500); font-size:14px; margin:0;">
         No clients match the selected ageing bucket filter.
       </p>
     <?php endif; ?>

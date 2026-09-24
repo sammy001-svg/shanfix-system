@@ -153,5 +153,11 @@ rm -f "$D"/crawl_*.txt
 echo ""
 echo "==================================================="
 printf "  %d requests, \033[31m%d broken\033[0m\n" "$TOTAL" "$ERRORS"
+# The same summary line every other suite prints, so run.sh can read this
+# one too. It was written to be run by hand, and never was — which is how
+# a 500 on the HR overview and another on the ageing report sat in the
+# menu unnoticed. The crawler that finds both in one pass was simply not
+# in the list of suites.
+printf "  PASSED: %d   FAILED: %d\n" "$((TOTAL - ERRORS))" "$ERRORS"
 echo "==================================================="
 [ "$ERRORS" -eq 0 ]
