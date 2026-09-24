@@ -2064,6 +2064,193 @@
     paintIcon();
   }
 
+  /* ------------------------------------------------------------------
+     Choosing a person's modules and permissions
+
+     The boxes start as whatever the chosen roles allow and can then be
+     changed one at a time. Everything here is presentation: which boxes
+     are ticked, what disagrees with the role, and the running tallies.
+     The server works the difference out again on save and stores only
+     that, so nothing typed into this page can widen anybody's access on
+     its own.
+
+     What the roles allow comes from the page as data, put there by the
+     same map the server checks against. Writing the answer out twice —
+     once in PHP, once here — is how the screen and the system come to
+     disagree about what Sales means.
+     ------------------------------------------------------------------ */
+  function initAccessPicker() {
+    const card = $('#accessCard');
+    if (!card) return;
+
+    const modules = $$('.access__module', card);
+    const boxes   = $$('.access__perm input[type="checkbox"]', card);
+    const toggle  = $('#customAccess');
+    const panel   = $('#accessModules');
+    const summary = $('[data-access-summary]');
+    const counter = $('[data-access-count]');
+    const primary = document.getElementById('role');
+
+    // { role: [permission, ...] }, from the server.
+    let byRole = {};
+    try {
+      byRole = JSON.parse(($('#rolePermissions') || {}).textContent || '{}');
+    } catch (e) { /* the picker still works, it just cannot compare */ }
+
+    /** Every permission the roles ticked on this form allow. */
+    function fromRoles() {
+      const out = {};
+      const seen = {};
+
+      if (primary && primary.value) seen[primary.value] = true;
+      $$('input[name="roles[]"]:checked', card.closest('form')).forEach((r) => {
+        seen[r.value] = true;
+      });
+
+      Object.keys(seen).forEach((role) => {
+        (byRole[role] || []).forEach((p) => { out[p] = true; });
+      });
+
+      return out;
+    }
+
+    /** Tallies, the added/taken-away marks, and the line at the top. */
+    function paint() {
+      const role = fromRoles();
+      let on = 0, changed = 0;
+
+      boxes.forEach((box) => {
+        const wanted = box.checked;
+        const byTheRole = !!role[box.dataset.perm];
+        const row = box.closest('.access__perm');
+
+        if (wanted) on++;
+
+        row.classList.toggle('is-added', wanted && !byTheRole);
+        row.classList.toggle('is-removed', !wanted && byTheRole);
+
+        if (wanted !== byTheRole) changed++;
+      });
+
+      modules.forEach((m) => {
+        const mine = $$('input[type="checkbox"]', m);
+        const lit  = mine.filter((b) => b.checked).length;
+
+        $('[data-module-tally]', m).textContent = lit + '/' + mine.length;
+        m.classList.toggle('is-full', lit === mine.length && lit > 0);
+        m.classList.toggle('is-part', lit > 0 && lit < mine.length);
+      });
+
+      if (counter) {
+        counter.textContent = on + ' of ' + boxes.length + ' permissions'
+          + (changed ? ' · ' + changed + ' different from the role' : '');
+      }
+
+      if (summary) {
+        summary.textContent = !toggle.checked
+          ? 'Following the role above.'
+          : (changed
+              ? changed + ' ' + (changed === 1 ? 'thing' : 'things') + ' set by hand for this person.'
+              : 'Set by hand, and currently the same as the role.');
+      }
+    }
+
+    /** Put every box back to what the roles allow. */
+    function resetToRole() {
+      const role = fromRoles();
+      boxes.forEach((box) => { box.checked = !!role[box.dataset.perm]; });
+      touched = false;             // back to a picture of the role
+      paint();
+    }
+
+    // Whether anybody has actually moved a box. Until they have, the
+    // ticks are only a picture of the role and should follow it; once
+    // they have, they are decisions and changing the role must not
+    // throw them away.
+    let touched = false;
+
+    boxes.forEach((box) => box.addEventListener('change', () => {
+      touched = true;
+      paint();
+    }));
+
+    $$('[data-access]', card).forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.access === 'none') {
+          boxes.forEach((box) => { box.checked = false; });
+          touched = true;          // clearing the lot is very much a decision
+          paint();
+          return;
+        }
+
+        // Open or shut every module at once, for somebody reading the
+        // whole thing rather than changing one corner of it.
+        if (btn.dataset.access === 'open') {
+          const anyShut = modules.some((m) => !m.open);
+          modules.forEach((m) => { m.open = anyShut; });
+          btn.textContent = anyShut ? 'Close all' : 'Open all';
+          return;
+        }
+
+        resetToRole();
+      });
+    });
+
+    // Opening a module ticks the lot; closing it clears them. The
+    // heading is a <summary>, so this has to be a separate control
+    // rather than a click on the row — clicking the row opens it.
+    modules.forEach((m) => {
+      const tally = $('[data-module-tally]', m);
+      if (!tally) return;
+
+      tally.setAttribute('role', 'button');
+      tally.setAttribute('tabindex', '0');
+      tally.title = 'Tick or clear everything in this module';
+
+      const flip = (e) => {
+        e.preventDefault();
+        e.stopPropagation();       // do not also open or close the module
+        const mine = $$('input[type="checkbox"]', m);
+        const all  = mine.every((b) => b.checked);
+        mine.forEach((b) => { b.checked = !all; });
+        paint();
+      };
+
+      tally.addEventListener('click', flip);
+      tally.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') flip(e);
+      });
+    });
+
+    // Turning tailoring off returns them to the role, so that what the
+    // switch says and what is ticked cannot disagree.
+    if (toggle) {
+      toggle.addEventListener('change', () => {
+        panel.hidden = !toggle.checked;
+        if (!toggle.checked) resetToRole();
+        paint();
+      });
+    }
+
+    // Changing the role moves the boxes with it, unless somebody has
+    // already started setting them by hand — then it only re-marks what
+    // now differs, because those ticks are decisions and not a picture.
+    const watchRoles = () => {
+      if (toggle && toggle.checked && touched) {
+        paint();
+      } else {
+        resetToRole();
+      }
+    };
+
+    if (primary) primary.addEventListener('change', watchRoles);
+    $$('input[name="roles[]"]', card.closest('form')).forEach((r) => {
+      r.addEventListener('change', watchRoles);
+    });
+
+    paint();
+  }
+
   function initRoleMatrix() {
     var select = document.getElementById('role');
     if (!select) return;
@@ -2153,6 +2340,7 @@
     initMailBadge();
     initLinkedSelects();
     initRoleMatrix();
+    initAccessPicker();
     initTheme();
     initCycleDays();
     initQuickOpen();

@@ -79,6 +79,17 @@
                 <?php foreach ($extra as $role): ?>
                   <span class="badge badge--grey"><?= e(label_of($role)) ?></span>
                 <?php endforeach; ?>
+
+                <?php // Somebody whose access was set by hand no longer does
+                      // what their badge says, so the badge alone would
+                      // mislead whoever is auditing this list. ?>
+                <?php $tailored = $exceptions[(int) $u['id']] ?? 0; ?>
+                <?php if ($tailored > 0): ?>
+                  <span class="badge badge--amber"
+                        title="<?= $tailored ?> permission<?= $tailored === 1 ? '' : 's' ?> set by hand for this person">
+                    +<?= $tailored ?> tailored
+                  </span>
+                <?php endif; ?>
               </div>
             </td>
             <td class="num"><?= (int) $u['lead_count'] ?></td>

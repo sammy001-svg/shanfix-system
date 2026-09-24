@@ -231,26 +231,29 @@ class LiveChatAdminController extends Controller
 
     // -----------------------------------------------------------------
 
-    /** Everybody who could answer a chat, whether or not they do yet. */
+    /**
+     * Everybody who could answer a chat, whether or not they do yet.
+     *
+     * Asked of who actually holds livechat.use, not of which roles do:
+     * somebody granted it by hand belongs in this list, and somebody
+     * whose role allows it but who has had it taken away does not.
+     * Ticking either into a department would put conversations in an
+     * inbox they cannot open.
+     */
     private function answerers(): array
     {
-        $roles = Auth::rolesWith('livechat.use');
+        $able = Auth::usersWith('livechat.use');
 
-        if ($roles === []) {
+        if ($able === []) {
             return [];
         }
 
-        // Roles live in user_roles, one row each, so somebody holding
-        // several is matched by any one of them — hence DISTINCT.
-        $slots = implode(',', array_fill(0, count($roles), '?'));
+        $slots = implode(',', array_fill(0, count($able), '?'));
 
         return Database::all(
-            "SELECT DISTINCT u.id, u.name, u.email, u.role
-               FROM users u
-               JOIN user_roles ur ON ur.user_id = u.id
-              WHERE u.is_active = 1 AND ur.role IN ({$slots})
-           ORDER BY u.name",
-            $roles
+            "SELECT id, name, email, role
+               FROM users WHERE id IN ({$slots}) ORDER BY name",
+            array_column($able, 'id')
         );
     }
 

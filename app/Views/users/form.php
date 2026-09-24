@@ -13,6 +13,12 @@ $val = static function (string $key, $fallback = '') use ($user) {
     }
     return $user[$key] ?? $fallback;
 };
+
+// Roles ticked last time round survive a validation error; on a fresh
+// form it is whatever the account already holds. Read here rather than
+// beside the boxes, because the access picker needs them too.
+$heldRoles = old_array('roles', $held ?? []);
+$primary   = $val('role', 'staff');
 ?>
 
 <div class="page-head">
@@ -105,19 +111,142 @@ $val = static function (string $key, $fallback = '') use ($user) {
           </div>
         </div>
       </div>
+
+      <?php
+        // ── What they may open, and what they may do in it ────────────
+        //
+        // A role is still how access is normally decided, and the boxes
+        // below start as whatever the chosen role allows. Tailoring is a
+        // deliberate second step — the switch — because an account on a
+        // role keeps up with what that role comes to mean, and one
+        // tailored by hand does not.
+        //
+        // Nothing here can widen anybody's access on its own. The server
+        // works out the difference from the role again on save and
+        // ignores anything it does not recognise.
+        $custom = Session::old('custom_access', null) !== null
+            ? (bool) Session::old('custom_access')
+            : ($overrides !== []);
+
+        // What to show ticked. After a validation error it is what was
+        // posted; otherwise what the account actually has; and on a new
+        // account, whatever the default role allows.
+        $postedPerms = Session::old('permissions', null);
+
+        if (is_array($postedPerms) && Session::old('custom_access', null) !== null) {
+            $ticked = array_flip($postedPerms);
+        } else {
+            $ticked = array_flip(\App\Core\Auth::effectivePermissions(
+                $heldRoles ?: [$primary],
+                $overrides
+            ));
+        }
+      ?>
+
+      <?php // What each role allows, for the boxes to compare against.
+            // Data, not a script: it is never executed, and it comes from
+            // the same map the server checks, so the screen cannot come to
+            // disagree with the system about what Sales means. ?>
+      <script type="application/json" id="rolePermissions"><?= json_encode(
+          $byRole, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP
+      ) ?></script>
+
+      <div class="card" id="accessCard">
+        <div class="card__head">
+          <div>
+            <div class="card__title">What they can see and do</div>
+            <div class="card__sub" data-access-summary>
+              <?= $custom
+                  ? 'Set by hand for this person.'
+                  : 'Following the role above.' ?>
+            </div>
+          </div>
+        </div>
+
+        <div class="card__body">
+          <label class="check mb-8">
+            <input type="checkbox" name="custom_access" value="1" id="customAccess"
+                   <?= $custom ? 'checked' : '' ?>>
+            <span class="check__text">
+              <strong>Choose the modules and permissions myself</strong>
+              <span>
+                Leave this off and they get exactly what their roles allow, now
+                and whenever those change. Turn it on to add or take away
+                individual things for this person only.
+              </span>
+            </span>
+          </label>
+
+          <?php // Hidden until the switch is on, so the ordinary case —
+                // give somebody a role and be done — stays one decision. ?>
+          <div class="access" id="accessModules" <?= $custom ? '' : 'hidden' ?>>
+            <div class="access__bar">
+              <button class="btn btn--ghost btn--sm" type="button" data-access="role">
+                Back to the role's defaults
+              </button>
+              <button class="btn btn--ghost btn--sm" type="button" data-access="none">
+                Clear everything
+              </button>
+              <button class="btn btn--ghost btn--sm" type="button" data-access="open">
+                Open all
+              </button>
+              <span class="access__count" data-access-count></span>
+            </div>
+
+            <?php foreach ($modules as $prefix => $module): ?>
+              <?php
+                $on = 0;
+                foreach (array_keys($module['permissions']) as $p) {
+                    $on += isset($ticked[$p]) ? 1 : 0;
+                }
+              ?>
+              <?php // Shut to begin with, every one of them. The count on the
+                    // right says what is switched on without opening
+                    // anything, and thirty-three modules laid open is five
+                    // thousand pixels of page nobody reads to the end. It
+                    // also keeps honest: open-if-anything-is-on goes stale
+                    // the moment somebody changes the role, because the
+                    // ticks move and the folds cannot. ?>
+              <details class="access__module" data-module="<?= e($prefix) ?>">
+                <summary class="access__head">
+                  <span class="access__name">
+                    <strong><?= e($module['label']) ?></strong>
+                    <?php if ($module['blurb'] !== ''): ?>
+                      <span class="access__blurb"><?= e($module['blurb']) ?></span>
+                    <?php endif; ?>
+                  </span>
+                  <span class="access__tally" data-module-tally>
+                    <?= $on ?>/<?= count($module['permissions']) ?>
+                  </span>
+                </summary>
+
+                <div class="access__list">
+                  <?php foreach ($module['permissions'] as $permission => $words): ?>
+                    <label class="access__perm">
+                      <input type="checkbox" name="permissions[]" value="<?= e($permission) ?>"
+                             data-perm="<?= e($permission) ?>"
+                             <?= isset($ticked[$permission]) ? 'checked' : '' ?>>
+                      <span>
+                        <strong><?= e($words['label']) ?></strong>
+                        <?php if ($words['hint'] !== ''): ?>
+                          <span class="access__hint"><?= e($words['hint']) ?></span>
+                        <?php endif; ?>
+                      </span>
+                      <code class="access__key"><?= e($permission) ?></code>
+                    </label>
+                  <?php endforeach; ?>
+                </div>
+              </details>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
     </div>
 
     <aside>
       <div class="card">
         <div class="card__head"><div class="card__title">Role &amp; access</div></div>
         <div class="card__body">
-          <?php
-            // Roles ticked last time round survive a validation error; on a
-            // fresh form it is whatever the account already holds.
-            $heldRoles = old_array('roles', $held ?? []);
-            $primary   = $val('role', 'staff');
-          ?>
-
           <div class="field mb-16">
             <label class="label" for="role">Main role <span class="req">*</span></label>
             <select class="select <?= isset($errors['role']) ? 'has-error' : '' ?>" id="role" name="role" required>

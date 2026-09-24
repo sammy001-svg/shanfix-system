@@ -16,6 +16,9 @@ class Auth
     /** roles() is called many times per request; keyed by user id. */
     private static array $roleCache = [];
 
+    /** Per-user permission exceptions, cached for the request like the roles. */
+    private static array $overrideCache = [];
+
     /**
      * Every role the system knows about, and what each is for.
      *
@@ -247,6 +250,205 @@ class Auth
         'settings.manage'   => ['admin'],
         'audit.view'        => ['admin'],
     ];
+
+    /**
+     * The permission map, arranged the way somebody thinks about it.
+     *
+     * The map above is grouped by prefix already — 'jobs.view',
+     * 'jobs.manage' — so the grouping is taken from that rather than
+     * listed twice and left to drift. This only supplies the words:
+     * what to call the module, and one line on what it is for.
+     *
+     * A prefix missing from here still appears on the access screen,
+     * under its own name. That matters more than tidiness: a permission
+     * added to the map and forgotten here is one an administrator can
+     * still see and set, rather than one that silently belongs to
+     * nobody.
+     *
+     * Order is the order of the sidebar, because that is where somebody
+     * looks for a module before they come here to ask who may open it.
+     */
+    public const MODULES = [
+        'dashboard'     => ['Dashboard',        'The figures on the front page'],
+
+        'leads'         => ['Leads',            'Enquiries before they become clients'],
+        'clients'       => ['Clients',          'The client list and everything on it'],
+        'requests'      => ['Job briefs',       'What a client has asked for'],
+        'letters'       => ['Letters',          'Company letters under our name'],
+
+        'documents'     => ['Quotations & invoices', 'Proposals, quotations, invoices and receipts'],
+
+        'artwork'       => ['Artwork',          'Design work, proofs and client approvals'],
+        'jobs'          => ['Job board',        'Work on the production floor'],
+        'delivery'      => ['Delivery notes',   'What left the workshop and who signed for it'],
+
+        'services'      => ['Services',         'The price list'],
+        'subscriptions' => ['Recurring',        'Hosting, domains and retainers'],
+        'inventory'     => ['Inventory',        'Stock on the shelf'],
+        'purchases'     => ['Purchasing',       'Orders to suppliers'],
+
+        'payments'      => ['Payments',         'Money in, and M-Pesa'],
+        'expenses'      => ['Expenses',         'Money out'],
+        'reports'       => ['Reports',          'The numbers, across everything'],
+
+        'partners'      => ['Partners',         'The reseller programme and what they are owed'],
+
+        'mail'          => ['Email',            'Their own mailbox — never anybody else\'s'],
+        'livechat'      => ['Live chat',        'People on the website asking questions'],
+        'whatsapp'      => ['WhatsApp',         'The company WhatsApp number'],
+        'chat'          => ['Team chat',        'Colleagues talking to each other'],
+        'meetings'      => ['Meetings',         'Video calls and their minutes'],
+
+        'sms'           => ['Text our clients', 'Sending a text to every client at once'],
+        'newsletter'    => ['Newsletter',       'The mailing list from the website'],
+        'testimonials'  => ['Testimonials',     'What the website says our clients said'],
+        'bulksms'       => ['SMS platform',     'The product customers and partners send through'],
+
+        'hr'            => ['Staff records',    'Employee records, ID numbers, bank details'],
+        'payroll'       => ['Payroll',          'What everybody is paid'],
+        'equipment'     => ['Equipment',        'The machines and their servicing'],
+
+        'users'         => ['Users & roles',    'Who may sign in, and what they may do'],
+        'settings'      => ['Settings',         'How the whole system behaves'],
+        'audit'         => ['Audit trail',      'Everything anybody did'],
+        'records'       => ['Deleting records', 'Removing anything at all, anywhere'],
+    ];
+
+    /**
+     * What an action is called, in words rather than in dots.
+     *
+     * Read by suffix so a new 'x.view' needs nothing added here, with
+     * exceptions for the ones whose suffix does not say enough on its
+     * own — 'payroll.run' and 'payroll.approve' are different jobs and
+     * "Run" alone would not say so.
+     */
+    private const ACTION_WORDS = [
+        'view'      => ['See it', 'Open the module and read what is in it'],
+        'use'       => ['Use it', 'Open the module and work in it'],
+        'manage'    => ['Add and change', 'Create records and edit existing ones'],
+        'delete'    => ['Delete', 'Remove records for good'],
+        'assign'    => ['Allocate', 'Decide who the work belongs to'],
+        'approve'   => ['Approve', 'Sign off what somebody else prepared'],
+        'pay'       => ['Pay', 'Release the money'],
+        'send'      => ['Send', 'Send a message out'],
+        'create'    => ['Create', 'Bring a new one into existence'],
+        'receive'   => ['Receive', 'Book goods in against an order'],
+        'settings'  => ['Settings', 'Change how it is configured'],
+        'moderate'  => ['Moderate', 'Put people into a channel or take them out'],
+        'cost'      => ['See costs', 'What a job costs us, not only what it sells for'],
+        'run'       => ['Prepare', 'Work out what everybody is owed'],
+        'stk'       => ['Ask for payment', 'Send an M-Pesa prompt to a phone'],
+        'campaign'  => ['Send a campaign', 'Text every client at once — this spends SMS units'],
+        'design'    => ['Do the design', 'Work the artwork queue'],
+        'view_all'  => ['See everybody\'s', 'Not only the ones allocated to them'],
+    ];
+
+    /** The exceptions, where the module changes what a word means. */
+    private const ACTION_OVERRIDES = [
+        'partners.manage'   => ['Change the arrangement', 'Decide applications and move rates'],
+        'partners.pay'      => ['Pay them', 'Release a payout, and see their bank details'],
+        'payroll.approve'   => ['Approve a payroll', 'Sign off what HR prepared'],
+        'records.delete'    => ['Delete anything', 'Needed on top of the module\'s own permission'],
+        'bulksms.settings'  => ['Gateway keys', 'These send as the whole company'],
+        'livechat.view_all' => ['See every department', 'Not only the ones they answer for'],
+        'users.manage'      => ['Add and change people', 'Including what everybody else may do'],
+    ];
+
+    /**
+     * Every module, with the permissions inside it.
+     *
+     * Built from PERMISSIONS, so a permission cannot be added to the
+     * system and left off the screen that grants it.
+     *
+     * @return array<string, array{label:string, blurb:string,
+     *                             permissions:array<string, array{label:string, hint:string}>}>
+     */
+    public static function modules(): array
+    {
+        static $built = null;
+
+        if ($built !== null) {
+            return $built;
+        }
+
+        $groups = [];
+
+        foreach (array_keys(self::PERMISSIONS) as $permission) {
+            [$prefix, $action] = array_pad(explode('.', $permission, 2), 2, '');
+            $groups[$prefix][$permission] = self::describe($permission, $action);
+        }
+
+        // MODULES first and in its own order, then anything it does not
+        // name — so a forgotten prefix is visible rather than missing.
+        $out = [];
+
+        foreach (self::MODULES as $prefix => [$label, $blurb]) {
+            if (isset($groups[$prefix])) {
+                $out[$prefix] = ['label' => $label, 'blurb' => $blurb,
+                                 'permissions' => $groups[$prefix]];
+                unset($groups[$prefix]);
+            }
+        }
+
+        foreach ($groups as $prefix => $permissions) {
+            $out[$prefix] = ['label' => label_of($prefix), 'blurb' => '',
+                             'permissions' => $permissions];
+        }
+
+        return $built = $out;
+    }
+
+    /** @return array{label:string, hint:string} */
+    private static function describe(string $permission, string $action): array
+    {
+        if (isset(self::ACTION_OVERRIDES[$permission])) {
+            [$label, $hint] = self::ACTION_OVERRIDES[$permission];
+            return ['label' => $label, 'hint' => $hint];
+        }
+
+        if (isset(self::ACTION_WORDS[$action])) {
+            [$label, $hint] = self::ACTION_WORDS[$action];
+            return ['label' => $label, 'hint' => $hint];
+        }
+
+        return ['label' => label_of($action), 'hint' => ''];
+    }
+
+    /** Whether a string names a permission this system has. */
+    public static function isPermission(string $permission): bool
+    {
+        return isset(self::PERMISSIONS[$permission]);
+    }
+
+    /** @return string[] every permission the system defines */
+    public static function allPermissions(): array
+    {
+        return array_keys(self::PERMISSIONS);
+    }
+
+    /**
+     * What a set of roles allows, before anybody's exceptions.
+     *
+     * This is what the access screen starts from when somebody picks a
+     * role, and what an account falls back to when it has no exceptions
+     * of its own.
+     *
+     * @param string[] $roles
+     * @return string[]
+     */
+    public static function permissionsForRoles(array $roles): array
+    {
+        $out = [];
+
+        foreach (self::PERMISSIONS as $permission => $allowed) {
+            if (array_intersect($allowed, $roles) !== []) {
+                $out[] = $permission;
+            }
+        }
+
+        return $out;
+    }
+
 
     public static function attempt(string $email, string $password, string $ip): array
     {
@@ -722,19 +924,23 @@ class Auth
     }
 
     /**
-     * Drop the cached role set, so the next check re-reads the database.
-     * Call after changing someone's roles — otherwise an administrator who
-     * edits their own account carries the old permissions for the rest of
-     * the request, including the page that renders straight afterwards.
+     * Drop what is cached about somebody's access, so the next check
+     * re-reads the database. Roles and their own exceptions both, since
+     * either can change in the same save.
+     *
+     * Call after changing either — otherwise an administrator who edits
+     * their own account carries the old permissions for the rest of the
+     * request, including the page that renders straight afterwards.
      */
     public static function forgetRoles(?int $userId = null): void
     {
         if ($userId === null) {
-            self::$roleCache = [];
+            self::$roleCache     = [];
+            self::$overrideCache = [];
             return;
         }
 
-        unset(self::$roleCache[$userId]);
+        unset(self::$roleCache[$userId], self::$overrideCache[$userId]);
     }
 
     /** True when the user holds any of the named roles. */
@@ -743,10 +949,81 @@ class Auth
         return array_intersect($roles, self::roles()) !== [];
     }
 
+    /**
+     * The exceptions set for one person, permission => bool.
+     *
+     * Empty for almost everybody: a role decides what most people may
+     * do, and this holds only where somebody has overruled that for one
+     * account.
+     *
+     * A missing table is treated as "no exceptions" rather than as an
+     * error. That is the safe direction — an upgrade applied only half
+     * way leaves everyone on their role's access, which is what they
+     * had before this existed, instead of locking the office out.
+     *
+     * @return array<string, bool>
+     */
+    public static function overridesFor(?int $userId = null): array
+    {
+        $id = $userId ?? self::id();
+
+        if ($id === null) {
+            return [];
+        }
+
+        if (isset(self::$overrideCache[$id])) {
+            return self::$overrideCache[$id];
+        }
+
+        try {
+            $rows = Database::all(
+                'SELECT permission, allowed FROM user_permissions WHERE user_id = :id',
+                ['id' => $id]
+            );
+        } catch (\Throwable $e) {
+            Logger::warning('Could not read user_permissions, everyone is on their roles: ' . $e->getMessage());
+            $rows = [];
+        }
+
+        $out = [];
+
+        foreach ($rows as $row) {
+            // A row naming a permission the system no longer has is
+            // ignored: removing one from the map must not be able to
+            // grant something by accident.
+            if (isset(self::PERMISSIONS[$row['permission']])) {
+                $out[$row['permission']] = (int) $row['allowed'] === 1;
+            }
+        }
+
+        return self::$overrideCache[$id] = $out;
+    }
+
+    /**
+     * Whether this account has been tailored at all.
+     *
+     * Used to say "on the Sales defaults" rather than "3 exceptions" on
+     * a screen, which is a different question from what they may do.
+     */
+    public static function hasOverrides(int $userId): bool
+    {
+        return self::overridesFor($userId) !== [];
+    }
+
     public static function can(string $permission): bool
     {
+        $held = self::roles();
+
+        // An exception set for this person settles it, either way. Asked
+        // before the roles, because that is what an exception is for:
+        // this salesperson may also buy, that designer may not see costs.
+        $overrides = self::overridesFor();
+
+        if (array_key_exists($permission, $overrides)) {
+            return $overrides[$permission];
+        }
+
         $allowed = self::PERMISSIONS[$permission] ?? null;
-        $held    = self::roles();
 
         // Unknown permission: deny by default, but never lock out an admin.
         if ($allowed === null) {
@@ -758,6 +1035,29 @@ class Auth
     }
 
     /**
+     * Everything this person may do, roles and exceptions together.
+     *
+     * The single answer to "what does this account actually have", for
+     * the screen that sets it and for anybody reading it afterwards.
+     *
+     * @param string[] $roles
+     * @param array<string, bool> $overrides
+     * @return string[]
+     */
+    public static function effectivePermissions(array $roles, array $overrides = []): array
+    {
+        $out = [];
+
+        foreach (self::PERMISSIONS as $permission => $allowed) {
+            $out[$permission] = array_key_exists($permission, $overrides)
+                ? $overrides[$permission]
+                : array_intersect($allowed, $roles) !== [];
+        }
+
+        return array_keys(array_filter($out));
+    }
+
+    /**
      * Which roles hold a permission.
      *
      * Lets a query ask "who could own this?" without a second hand-written
@@ -765,12 +1065,65 @@ class Auth
      * roles that may act on leads, for instance, are exactly the roles that
      * should appear in the box that assigns one.
      *
+     * Roles only. Where the answer has to be people rather than roles,
+     * usersWith() is the one to call — it knows about exceptions, and
+     * this cannot.
+     *
      * @return string[]
      */
     public static function rolesWith(string $permission): array
     {
         return self::PERMISSIONS[$permission] ?? [];
     }
+
+    /**
+     * Everybody who may do this, exceptions included.
+     *
+     * The question every "who should this be assigned to?" box is really
+     * asking. A role list alone gets it wrong in both directions now:
+     * it would leave out the salesperson granted purchasing by hand, and
+     * offer the designer whose access to costs was taken away.
+     *
+     * Ordered by name, because these fill a picker.
+     *
+     * @return list<array{id:int, name:string, email:?string}>
+     */
+    public static function usersWith(string $permission): array
+    {
+        $roles = self::PERMISSIONS[$permission] ?? [];
+
+        // Somebody whose role allows it and who has not been excepted
+        // out of it, plus anybody excepted into it whatever their role.
+        // One query rather than two merged in PHP, so the ordering is
+        // the database's and not a second sort over the top.
+        //
+        // A permission no role holds leaves the role half as a literal
+        // false: everybody in the answer is then there by exception,
+        // which is correct and is not the same as everybody.
+        $byRole = '0';
+        $params = [$permission];
+
+        if ($roles !== []) {
+            $slots  = implode(',', array_fill(0, count($roles), '?'));
+            // u.role as well as user_roles: the primary role counts even
+            // where the join table has somehow missed it, which is the
+            // same fallback roles() makes.
+            $byRole = "(ur.role IN ({$slots}) OR u.role IN ({$slots}))";
+            $params = array_merge($params, $roles, $roles);
+        }
+
+        return Database::all(
+            "SELECT DISTINCT u.id, u.name, u.email
+               FROM users u
+          LEFT JOIN user_roles ur ON ur.user_id = u.id
+          LEFT JOIN user_permissions px ON px.user_id = u.id AND px.permission = ?
+              WHERE u.is_active = 1
+                AND (px.allowed = 1 OR (px.allowed IS NULL AND {$byRole}))
+           ORDER BY u.name",
+            $params
+        );
+    }
+
     /** Abort with 403 unless the current user holds the permission. */
     public static function authorize(string $permission): void
     {

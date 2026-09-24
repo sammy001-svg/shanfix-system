@@ -23,7 +23,7 @@ Database::connect(Config::get('db'));
 $result = \App\Services\LiveChat\Alerts::sweep();
 
 foreach ($result['notes'] as $note) {
-    echo $note, PHP_EOL;
+    echo $note, "\n";
 }
 
-echo 'checked ', $result['checked'], ', escalated ', $result['escalated'], PHP_EOL;
+echo 'checked ', $result['checked'], ', escalated ', $result['escalated'], "\n";

@@ -843,33 +843,33 @@ class LeadController extends Controller
     /**
      * Everyone who can be given a lead to work.
      *
-     * Derived from who holds leads.manage rather than a list of role names
-     * written out again here. That matters twice over: reception log and
-     * chase walk-ins, so they belong in the box; and a second hand-kept list
-     * is exactly the thing that quietly stops matching the permission table
-     * it is meant to mirror.
+     * Asked of who actually holds leads.manage rather than of a list of
+     * role names written out again here. That matters twice over:
+     * reception log and chase walk-ins, so they belong in the box; and a
+     * second hand-kept list is exactly the thing that quietly stops
+     * matching the permission table it is meant to mirror.
      *
-     * Matched against user_roles, not users.role. Someone may hold sales as
-     * a second role, and reading only the primary one would leave them out
-     * of a list they plainly belong in.
+     * usersWith() rather than rolesWith(), because access is no longer
+     * decided by role alone. Somebody granted leads.manage by hand
+     * belongs in this box, and somebody whose role allows it but who has
+     * had it taken away does not.
      */
     private function salesUsers(): array
     {
-        $roles = Auth::rolesWith('leads.manage');
+        $able = Auth::usersWith('leads.manage');
 
-        if ($roles === []) {
+        if ($able === []) {
             return [];
         }
 
-        $slots = implode(',', array_fill(0, count($roles), '?'));
+        // usersWith() answers with id, name and email; the avatar and the
+        // role badge are this screen's own business.
+        $slots = implode(',', array_fill(0, count($able), '?'));
 
         return Database::all(
-            "SELECT DISTINCT u.id, u.name, u.role, u.avatar_color
-               FROM users u
-               JOIN user_roles ur ON ur.user_id = u.id
-              WHERE u.is_active = 1 AND ur.role IN ({$slots})
-           ORDER BY u.name",
-            $roles
+            "SELECT id, name, role, avatar_color
+               FROM users WHERE id IN ({$slots}) ORDER BY name",
+            array_column($able, 'id')
         );
     }
 }
