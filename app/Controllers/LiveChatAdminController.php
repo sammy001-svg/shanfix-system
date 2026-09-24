@@ -9,6 +9,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
+use App\Services\LiveChat\Conversations;
 use App\Services\LiveChat\Departments;
 
 /**
@@ -163,6 +164,94 @@ class LiveChatAdminController extends Controller
         Response::to('/livechat/departments');
     }
 
+    // -----------------------------------------------------------------
+    // Saved replies
+    // -----------------------------------------------------------------
+
+    /**
+     * The replies the desk can drop into a conversation.
+     *
+     * These existed in the database from the day the chat was built and
+     * could be put there by nobody: the desk read them into a dropdown
+     * and there was no screen to write one. So the feature was off
+     * unless somebody opened MySQL, and the same six answers were typed
+     * out again every week — which is how replies get shorter and worse.
+     */
+    public function canned(Request $request): void
+    {
+        $this->view('livechat/canned', [
+            'title'       => 'Saved replies',
+            'replies'     => Database::all(
+                "SELECT k.*, d.name AS department,
+                        a.name AS author, e.name AS editor
+                   FROM live_canned k
+              LEFT JOIN live_departments d ON d.id = k.department_id
+              LEFT JOIN users a ON a.id = k.created_by
+              LEFT JOIN users e ON e.id = k.updated_by
+               ORDER BY d.position IS NULL DESC, d.position, d.name, k.uses DESC, k.title"
+            ),
+            'departments' => Departments::all(),
+        ]);
+    }
+
+    /** Write one, or change one. */
+    public function saveCanned(Request $request): void
+    {
+        $id    = $request->int('id');
+        $title = trim((string) $request->input('title', ''));
+        $body  = trim((string) $request->input('body', ''));
+
+        if ($title === '' || $body === '') {
+            Session::error('A saved reply needs a name and something to say.');
+            Response::to('/livechat/canned');
+        }
+
+        // Null means every department. Anything that is not a department
+        // we have becomes null rather than pointing at nothing — a reply
+        // belonging to a deleted queue would be invisible everywhere.
+        $departmentId = $request->int('department_id') ?: null;
+
+        if ($departmentId !== null && !Departments::find($departmentId)) {
+            $departmentId = null;
+        }
+
+        $data = [
+            'department_id' => $departmentId,
+            'title'         => mb_substr($title, 0, 80),
+            // Capped at what a chat message may be, because that is what
+            // this becomes the moment somebody picks it.
+            'body'          => mb_substr($body, 0, Conversations::MAX_BODY),
+        ];
+
+        if ($id > 0) {
+            $data['updated_by'] = Auth::id();
+            Database::update('live_canned', $data, ['id' => $id]);
+        } else {
+            $data['created_by'] = Auth::id();
+            $id = Database::insert('live_canned', $data);
+        }
+
+        ActivityLog::record('livechat_canned', 'live_canned', $id, 'Saved the reply "' . $title . '"');
+
+        Session::success('Saved.');
+        Response::to('/livechat/canned');
+    }
+
+    public function deleteCanned(Request $request): void
+    {
+        $id     = $request->paramInt('id');
+        $reply  = Database::first('SELECT * FROM live_canned WHERE id = :id', ['id' => $id]);
+
+        if ($reply) {
+            Database::delete('live_canned', ['id' => $id]);
+            ActivityLog::record('livechat_canned_delete', 'live_canned', $id,
+                'Removed the reply "' . $reply['title'] . '"');
+            Session::success('Removed.');
+        }
+
+        Response::to('/livechat/canned');
+    }
+
     /**
      * The hours, the greeting, and how loudly to be told.
      *
@@ -206,6 +295,7 @@ class LiveChatAdminController extends Controller
             'livechat_alert_email'     => $request->input('livechat_alert_email') ? '1' : '0',
             'livechat_alert_sms'       => $request->input('livechat_alert_sms') ? '1' : '0',
             'livechat_alert_sound'     => $request->input('livechat_alert_sound') ? '1' : '0',
+            'livechat_transcript_email' => $request->input('livechat_transcript_email') ? '1' : '0',
             'livechat_ask_department'  => $request->input('livechat_ask_department') ? '1' : '0',
             'livechat_enabled'         => $request->input('livechat_enabled') ? '1' : '0',
         ]);

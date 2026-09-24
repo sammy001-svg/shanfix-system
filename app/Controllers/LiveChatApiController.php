@@ -11,6 +11,7 @@ use App\Core\Settings;
 use App\Services\LiveChat\Alerts;
 use App\Services\LiveChat\Conversations;
 use App\Services\LiveChat\Departments;
+use App\Services\LiveChat\Transcripts;
 
 /**
  * The live chat endpoint the website widget talks to.
@@ -217,7 +218,12 @@ class LiveChatApiController extends Controller
 
         Conversations::close((int) $conversation['id'], null, 'Ended by the visitor');
 
-        Response::json(['ok' => true]);
+        // Somebody who gave us an address gets the thread posted to
+        // them. The widget says so, because a copy arriving unannounced
+        // reads like something went wrong.
+        $sent = Transcripts::send((int) $conversation['id']);
+
+        Response::json(['ok' => true, 'transcript' => $sent]);
     }
 
     /**

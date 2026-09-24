@@ -1213,6 +1213,9 @@ $r->group(['auth'], function ($r) {
         $r->post('/livechat/departments/{id}/staff',       [LiveChatAdminController::class, 'setStaff'], ['csrf']);
         $r->post('/livechat/departments/{id}/delete',      [LiveChatAdminController::class, 'delete'],   ['csrf']);
         $r->post('/livechat/settings',                     [LiveChatAdminController::class, 'saveSettings'], ['csrf']);
+        $r->get ('/livechat/canned',                       [LiveChatAdminController::class, 'canned']);
+        $r->post('/livechat/canned',                       [LiveChatAdminController::class, 'saveCanned'],   ['csrf']);
+        $r->post('/livechat/canned/{id}/delete',           [LiveChatAdminController::class, 'deleteCanned'], ['csrf']);
     });
 
     $r->group(['permission:livechat.use'], function ($r) {

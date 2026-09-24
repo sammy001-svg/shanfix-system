@@ -1680,6 +1680,10 @@
     const body  = $('#lcBody');
     const note  = form ? form.querySelector('[name=note]') : null;
     const btn   = form ? form.querySelector('button[type=submit], button:not([type])') : null;
+    // Which saved reply this was started from, if any. Declared up here
+    // rather than beside the dropdown, because send() has to see it and
+    // the dropdown is set up inside a block send() is not inside.
+    const usedId = form ? form.querySelector('input[name=canned_id]') : null;
     const convo = panel ? panel.dataset.conversation : null;
 
     let lastId = 0;
@@ -1740,6 +1744,7 @@
       data.set('_token', csrf());
       data.set('message', text);
       if (note && note.checked) data.set('note', '1');
+      if (usedId && usedId.value) data.set('canned_id', usedId.value);
 
       fetch(form.action, {
         method: 'POST',
@@ -1756,6 +1761,7 @@
           if (d && d.ok) {
             body.value = '';
             if (note) note.checked = false;   // a note is a one-off, never sticky
+            if (usedId) usedId.value = '';    // and so is the reply it came from
             poll();
           } else {
             alert((d && d.error) || 'That did not send. Please try again.');
@@ -1783,7 +1789,18 @@
       if (canned) {
         canned.addEventListener('change', () => {
           if (!canned.value) return;
-          body.value = body.value.trim() ? body.value.trimEnd() + '\n' + canned.value : canned.value;
+
+          const picked = canned.options[canned.selectedIndex];
+          const text   = picked.dataset.body || '';
+
+          body.value = body.value.trim() ? body.value.trimEnd() + '\n' + text : text;
+
+          // Which one was reached for, so the list can be ordered by
+          // what people actually use. Sent even when the wording is
+          // then edited: a reply somebody opened and rewrote still got
+          // them most of the way there.
+          if (usedId) usedId.value = canned.value;
+
           canned.value = '';
           body.focus();
           body.setSelectionRange(body.value.length, body.value.length);

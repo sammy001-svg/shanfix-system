@@ -2285,6 +2285,71 @@ fieldset:last-of-type { margin-bottom: 0; }
 .field-row--wrap { flex-wrap: wrap; gap: 8px 16px; }
 .field-row .input { width: auto; }
 
+
+/* ---------------------------------------------------------------------
+   Saved replies
+
+   Each one folds open to show what it actually says and the form that
+   changes it. A list of titles with an edit link somewhere else is why
+   nobody ever checks whether a saved reply still quotes this year's
+   price.
+   --------------------------------------------------------------------- */
+.canned {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 7px;
+  background: var(--surface);
+}
+
+.canned__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  border-radius: var(--r);
+}
+.canned__head::-webkit-details-marker { display: none; }
+.canned__head:hover { background: var(--surface-2); }
+.canned__head:focus-visible { outline: 2px solid var(--green-600); outline-offset: -2px; }
+
+.canned__title { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; }
+
+.canned__uses {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--slate-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.canned__caret {
+  width: 13px; height: 13px;
+  flex: 0 0 13px;
+  opacity: .45;
+  transform: rotate(-90deg);
+  transition: transform .16s var(--ease);
+}
+.canned[open] > .canned__head .canned__caret { transform: rotate(0deg); }
+
+.canned__body { padding: 2px 12px 12px; border-top: 1px solid var(--border); }
+
+/* What it says, shown as the visitor would read it. */
+.canned__text {
+  margin: 10px 0;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: var(--r);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
 .d-block { display: block; }
 
 /* ---------------------------------------------------------------------

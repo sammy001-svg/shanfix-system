@@ -69,6 +69,9 @@ $ago = static function (?string $when): string {
       <span data-chime-off><?= icon('bell') ?> Sound off</span>
     </button>
     <?php if ($canManage): ?>
+      <a class="btn btn--outline" href="<?= e(url('/livechat/canned')) ?>">
+        <?= icon('list') ?> Saved replies
+      </a>
       <a class="btn btn--outline" href="<?= e(url('/livechat/departments')) ?>">
         <?= icon('users') ?> Departments
       </a>
@@ -226,12 +229,19 @@ $ago = static function (?string $when): string {
           <?= csrf_field() ?>
 
           <?php if ($canned): ?>
+            <?php // The option carries the reply's id, with its words on a
+                  // data attribute. The id travels with the reply so the
+                  // count of how often each one is reached for is real —
+                  // the desk orders the list by it, and it had never once
+                  // been incremented. ?>
             <select class="input lc__canned" aria-label="Saved replies">
               <option value="">Saved replies…</option>
               <?php foreach ($canned as $k): ?>
-                <option value="<?= e($k['body']) ?>"><?= e($k['title']) ?></option>
+                <option value="<?= (int) $k['id'] ?>"
+                        data-body="<?= e($k['body']) ?>"><?= e($k['title']) ?></option>
               <?php endforeach; ?>
             </select>
+            <input type="hidden" name="canned_id" value="">
           <?php endif; ?>
 
           <textarea class="input" name="message" rows="2" id="lcBody"

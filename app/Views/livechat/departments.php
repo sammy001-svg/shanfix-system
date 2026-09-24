@@ -20,6 +20,7 @@ require_once APP_PATH . '/Views/partials/icons.php';
     </div>
   </div>
   <div class="page-head__actions">
+    <a class="btn btn--outline" href="<?= e(url('/livechat/canned')) ?>"><?= icon('list') ?> Saved replies</a>
     <a class="btn btn--outline" href="<?= e(url('/livechat')) ?>"><?= icon('message') ?> Back to the desk</a>
   </div>
 </div>
@@ -291,6 +292,15 @@ require_once APP_PATH . '/Views/partials/icons.php';
           <span class="check__text">
             <strong>The desk makes a sound when somebody joins the queue</strong>
             <span>A default only — each person can silence their own from the desk</span>
+          </span>
+        </label>
+
+        <label class="check mb-8">
+          <input type="checkbox" name="livechat_transcript_email" value="1"
+                 <?= setting('livechat_transcript_email', '1') ? 'checked' : '' ?>>
+          <span class="check__text">
+            <strong>Post them the conversation when it closes</strong>
+            <span>If they left an email. Private notes are never included</span>
           </span>
         </label>
 

@@ -11,6 +11,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Services\LiveChat\Conversations;
 use App\Services\LiveChat\Departments;
+use App\Services\LiveChat\Transcripts;
 
 /**
  * The desk: answering people who are on the website right now.
@@ -156,6 +157,22 @@ class LiveChatController extends Controller
             $isNote
         );
 
+        // Count the saved reply this was started from. The desk orders
+        // the list by it, so without this the ordering never changes and
+        // a reply nobody uses sits at the top for ever.
+        //
+        // Counted even if the agent rewrote it before sending: what the
+        // number answers is "which of these is worth keeping", and one
+        // that got somebody most of the way there is worth keeping.
+        $from = $request->int('canned_id');
+
+        if ($result['ok'] && $from > 0) {
+            Database::run(
+                'UPDATE live_canned SET uses = uses + 1 WHERE id = :id',
+                ['id' => $from]
+            );
+        }
+
         if ($request->wantsJson()) {
             Response::json($result);
         }
@@ -255,7 +272,14 @@ class LiveChatController extends Controller
             (string) $request->input('reason', '')
         );
 
-        Session::success('Closed.');
+        // Post them the conversation, if we know where to. A chat window
+        // closes and takes the price they were quoted with it; an email
+        // in their inbox is the only copy the customer ends up with.
+        $sent = Transcripts::send((int) $conversation['id']);
+
+        Session::success($sent
+            ? 'Closed. A copy has been sent to ' . $conversation['visitor_email'] . '.'
+            : 'Closed.');
         Response::to('/livechat');
     }
 
