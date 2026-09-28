@@ -275,14 +275,37 @@ try {
     // -----------------------------------------------------------------
     // 4. Work the queue
     // -----------------------------------------------------------------
-    if ($canLink && withinSendWindow()) {
-        $result = Notifier::processQueue(40);
+    // Not gated on $canLink, and that is the point of this block.
+    //
+    // A message already in the queue has its body already written. The
+    // links in it were built, or were not, when it was queued — which
+    // is where that guard belongs, and where it is. Refusing to post
+    // the envelope now does not change what is inside it, and an office
+    // with no app.url had every staff notification, every partner alert
+    // and every renewal reminder sit at 'queued' with attempts = 0 for
+    // ever, with nothing on any screen saying why.
+    //
+    // The window is a different question and is asked separately: it
+    // exists so a client is not texted at three in the morning, not to
+    // hold a colleague's e-mail until Monday.
+    $result = Notifier::processQueue(null, null, withinSendWindow());
 
-        if ($result['processed'] > 0) {
-            say("Queue: {$result['sent']} sent, {$result['failed']} failed of {$result['processed']}");
-        } else {
-            say('Queue empty');
-        }
+    if ($result['processed'] > 0) {
+        say("Queue: {$result['sent']} sent, {$result['failed']} failed of {$result['processed']}");
+    } else {
+        say('Queue empty');
+    }
+
+    if ($result['held'] > 0) {
+        say("Queue: {$result['held']} client message(s) held until the sending window");
+    }
+
+    // A transport that has refused five times in a row is down, not
+    // busy. Said out loud rather than buried, because the difference
+    // between "nothing to send" and "nothing can be sent" is the whole
+    // question somebody is asking when they come looking.
+    if ($result['stopped'] !== null) {
+        alert('Queue ' . $result['stopped']);
     }
 
     // -----------------------------------------------------------------
@@ -451,7 +474,17 @@ try {
         }
     }
 
+    // Say that this ran, and when.
+    //
+    // Nothing recorded it before, so "the queue is not moving" and
+    // "cron has not run since the hosting was migrated" looked
+    // identical from every screen in the system — and they are the two
+    // likeliest causes by a distance. One row, written last, so it only
+    // records runs that got all the way here.
+    Settings::set('cron_last_run', date('Y-m-d H:i:s'));
+
     $seconds = round(microtime(true) - $started, 2);
+    Settings::set('cron_last_seconds', (string) $seconds);
     say("Done in {$seconds}s");
 } catch (\Throwable $e) {
     Logger::error('Cron failed: ' . $e->getMessage(), [

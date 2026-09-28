@@ -236,9 +236,27 @@ class Notifier
      *
      * @return array{sent:int, failed:int, processed:int}
      */
-    public static function processQueue(int $limit = 25, ?int $onlyId = null): array
-    {
+    /**
+     * Send what is waiting.
+     *
+     * @param int|null $limit     how many to attempt; null takes the setting
+     * @param int|null $onlyId    one message, whatever its schedule
+     * @param bool     $clientToo whether client-facing messages may go now.
+     *                            False holds them for the sending window and
+     *                            sends everything internal — a colleague's
+     *                            e-mail at nine at night wakes nobody, and a
+     *                            client's text does.
+     *
+     * @return array{sent:int, failed:int, processed:int, held:int, stopped:?string}
+     */
+    public static function processQueue(
+        ?int $limit = null,
+        ?int $onlyId = null,
+        bool $clientToo = true
+    ): array {
         $maxAttempts = Settings::int('notify_max_attempts', 3);
+        $limit       = $limit ?? max(1, Settings::int('notify_batch_size', 60));
+        $giveUpAfter = max(1, Settings::int('notify_give_up_after', 5));
 
         $where  = "status = 'queued' AND attempts < :max";
         $params = ['max' => $maxAttempts];
@@ -248,6 +266,10 @@ class Notifier
             $params['id'] = $onlyId;
         } else {
             $where .= ' AND (scheduled_at IS NULL OR scheduled_at <= NOW())';
+
+            if (!$clientToo) {
+                $where .= " AND audience = 'internal'";
+            }
         }
 
         $rows = Database::all(
@@ -255,13 +277,29 @@ class Notifier
             $params
         );
 
-        $sent = 0;
-        $failed = 0;
+        $sent    = 0;
+        $failed  = 0;
+        $stopped = null;
+
+        // How many in a row have failed to leave the building. One bad
+        // address among good ones is nothing to do with the transport;
+        // five refusals in a row is the mail server being down, and the
+        // sixth attempt will fail exactly like the first — it will just
+        // take another two seconds to say so. Forty of those is most of
+        // the gap between cron runs, and it buries the log.
+        $inARow = 0;
 
         $mailer = new Mailer();
         $sms    = new Sms();
 
         foreach ($rows as $row) {
+            if ($inARow >= $giveUpAfter) {
+                $stopped = 'gave up after ' . $inARow . ' failures in a row — '
+                         . 'the mail or SMS server looks to be down. '
+                         . 'What is left stays queued for the next run.';
+                break;
+            }
+
             // Claim the row so two overlapping cron runs cannot double-send.
             $claimed = Database::run(
                 "UPDATE notifications SET status = 'sending', attempts = attempts + 1
@@ -292,6 +330,7 @@ class Notifier
                 ], ['id' => $row['id']]);
 
                 $sent++;
+                $inARow = 0;
             } else {
                 $attempts = (int) $row['attempts'] + 1;
                 $giveUp   = $attempts >= $maxAttempts;
@@ -302,6 +341,7 @@ class Notifier
                 ], ['id' => $row['id']]);
 
                 $failed++;
+                $inARow++;
 
                 Logger::warning('Notification send failed', [
                     'id'      => $row['id'],
@@ -311,7 +351,27 @@ class Notifier
             }
         }
 
-        return ['sent' => $sent, 'failed' => $failed, 'processed' => count($rows)];
+        return [
+            'sent'      => $sent,
+            'failed'    => $failed,
+            'processed' => $sent + $failed,
+            // What was left where it was because this is not its hour.
+            'held'      => $onlyId === null && !$clientToo ? self::heldForWindow() : 0,
+            'stopped'   => $stopped,
+        ];
+    }
+
+    /** Client messages waiting for the sending window to come round. */
+    public static function heldForWindow(): int
+    {
+        return (int) Database::scalar(
+            "SELECT COUNT(*) FROM notifications
+              WHERE status = 'queued' AND audience = 'client'
+                AND attempts < :max
+                AND (scheduled_at IS NULL OR scheduled_at <= NOW())",
+            ['max' => Settings::int('notify_max_attempts', 3)],
+            0
+        );
     }
 
     // -- Building context ----------------------------------------------

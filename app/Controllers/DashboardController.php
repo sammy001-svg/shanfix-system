@@ -180,6 +180,23 @@ class DashboardController extends Controller
             ];
         }
 
+        // Social media: a fast count of what needs attention this week,
+        // only fetched for people who can actually see the module.
+        $socialWidget = null;
+
+        if (Auth::can('social.view')) {
+            $socialWidget = Database::first(
+                "SELECT
+                    (SELECT COUNT(*) FROM social_posts
+                      WHERE status NOT IN ('published','cancelled')
+                        AND scheduled_at BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)) AS due_week,
+                    (SELECT COUNT(*) FROM social_posts
+                      WHERE status = 'pending') AS pending_approval,
+                    (SELECT COUNT(*) FROM social_posts
+                      WHERE status = 'published' AND metrics_at IS NULL) AS unrecorded"
+            );
+        }
+
         $this->view('dashboard/index', [
             'title'              => 'Dashboard',
             'money'              => $money,
@@ -194,7 +211,9 @@ class DashboardController extends Controller
             'urgentJobs'         => $urgentJobs,
             'trend'              => $trend,
             'dueReminders'       => $myReminders !== [],
+            'socialWidget'       => $socialWidget,
         ]);
+
     }
 
 

@@ -72,7 +72,158 @@ class NotificationController extends Controller
             'filters'       => compact('channel', 'status', 'search'),
             'emailOn'       => Settings::bool('smtp_enabled'),
             'smsOn'         => Settings::bool('sms_enabled'),
+            'health'        => $this->queueHealth(),
         ]);
+    }
+
+    /**
+     * Why the queue is or is not moving.
+     *
+     * The screen's most useful job. Before this, "the queue is not
+     * moving" and "cron has not run since the hosting was migrated"
+     * looked identical from every page in the system — and they are the
+     * two likeliest causes by a distance.
+     *
+     * @return array{ran:?string, stale:bool, waiting:int, oldest:?string,
+     *               held:int, stuck:bool, reasons:list<string>}
+     */
+    private function queueHealth(): array
+    {
+        $ran  = (string) Settings::get('cron_last_run', '');
+        $ago  = $ran !== '' ? (time() - strtotime($ran)) : null;
+
+        // Cron is documented as running every fifteen minutes. An hour
+        // without a run is not a blip.
+        $stale = $ran === '' || ($ago !== null && $ago > 3600);
+
+        $row = Database::first(
+            "SELECT COUNT(*) AS waiting, MIN(created_at) AS oldest
+               FROM notifications
+              WHERE status = 'queued' AND attempts < :max",
+            ['max' => Settings::int('notify_max_attempts', 3)]
+        );
+
+        $waiting = (int) ($row['waiting'] ?? 0);
+        $oldest  = $row['oldest'] ?? null;
+
+        $reasons = [];
+
+        if ($ran === '') {
+            $reasons[] = 'Cron has never run on this installation. Nothing '
+                       . 'will be sent on its own until it does — the line to '
+                       . 'add is in Settings, under Messaging.';
+        } elseif ($stale) {
+            $reasons[] = 'Cron last ran ' . time_ago($ran) . '. It should run '
+                       . 'every fifteen minutes; while it is not running, '
+                       . 'nothing goes out on its own.';
+        }
+
+        if (!Settings::bool('smtp_enabled')) {
+            $reasons[] = 'Email is switched off, so nothing on the email side '
+                       . 'can be sent.';
+        }
+
+        if (!Settings::bool('sms_enabled')) {
+            $reasons[] = 'SMS is switched off, so nothing on the SMS side can '
+                       . 'be sent.';
+        }
+
+        // Client messages waiting for the hours the office set.
+        $held   = 0;
+        $window = trim((string) Settings::get('notify_send_window', ''));
+
+        if ($window !== '') {
+            $held = Notifier::heldForWindow();
+
+            if ($held > 0 && !$this->withinWindow($window)) {
+                $reasons[] = $held . ' message' . ($held === 1 ? '' : 's')
+                           . ' to clients ' . ($held === 1 ? 'is' : 'are')
+                           . ' waiting for the sending window (' . e($window)
+                           . '). Messages to colleagues are not held by it.';
+            }
+        }
+
+        // Something queued for over an hour while cron is running fine is
+        // a transport problem rather than a timing one.
+        $stuck = $waiting > 0 && !$stale && $oldest !== null
+              && strtotime((string) $oldest) < strtotime('-1 hour');
+
+        if ($stuck && $reasons === []) {
+            $reasons[] = 'Messages have been waiting over an hour although cron '
+                       . 'is running. Open one and read the error on it — that '
+                       . 'is usually the mail or SMS server refusing the '
+                       . 'connection.';
+        }
+
+        return [
+            'ran'     => $ran !== '' ? $ran : null,
+            'stale'   => $stale,
+            'waiting' => $waiting,
+            'oldest'  => $oldest,
+            'held'    => $held,
+            'stuck'   => $stuck,
+            'reasons' => $reasons,
+        ];
+    }
+
+    /** Whether now is inside a "08:00-18:00" window. */
+    private function withinWindow(string $window): bool
+    {
+        if (!preg_match('/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/', $window, $m)) {
+            return true;
+        }
+
+        $now   = (int) date('H') * 60 + (int) date('i');
+        $start = (int) $m[1] * 60 + (int) $m[2];
+        $end   = (int) $m[3] * 60 + (int) $m[4];
+
+        return $start <= $end
+            ? ($now >= $start && $now <= $end)
+            : ($now >= $start || $now <= $end);
+    }
+
+    /**
+     * Put everything that failed back in the queue.
+     *
+     * After a mail server has been down for an afternoon there can be
+     * two hundred of these, and retrying them one at a time is not a
+     * thing anybody does — so they stay failed, and the client never
+     * gets their invoice.
+     */
+    public function retryFailed(Request $request): void
+    {
+        $this->authorize('settings.manage');
+
+        $count = (int) Database::scalar(
+            "SELECT COUNT(*) FROM notifications WHERE status = 'failed'", [], 0
+        );
+
+        if ($count === 0) {
+            Session::info('Nothing has failed.');
+            Response::back('/notifications');
+        }
+
+        Database::run(
+            "UPDATE notifications
+                SET status = 'queued', attempts = 0, last_error = NULL
+              WHERE status = 'failed'"
+        );
+
+        ActivityLog::record('notifications_retry_all', 'notification', null,
+            'Put ' . $count . ' failed message(s) back in the queue');
+
+        // Worked straight away rather than left for cron: somebody who
+        // presses this has just fixed the mail server and wants to know
+        // whether it took.
+        $result = Notifier::processQueue();
+
+        Session::success(
+            $count . ' message(s) requeued. '
+            . $result['sent'] . ' sent, ' . $result['failed'] . ' failed'
+            . ($result['stopped'] !== null ? ' — ' . $result['stopped'] : '.')
+        );
+
+        Response::back('/notifications');
     }
 
     public function show(Request $request): void

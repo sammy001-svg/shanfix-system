@@ -158,6 +158,11 @@ class StaffNotifier
             Database::insert('notifications', [
                 'channel'        => $channel,
                 'event'          => $notice['event'],
+                // A colleague, not a customer. The sending window holds
+                // client messages so nobody is texted at three in the
+                // morning; it has no business holding the bell e-mail
+                // that says a visitor is waiting on the website.
+                'audience'       => 'internal',
                 'recipient'      => $channel === 'email'
                     ? $user['email']
                     : (normalize_phone((string) $user['phone']) ?? ''),

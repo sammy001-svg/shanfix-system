@@ -1141,6 +1141,7 @@ $r->group(['auth'], function ($r) {
 
     $r->group(['permission:settings.manage', 'csrf'], function ($r) {
         $r->post('/notifications/run',           [NotificationController::class, 'runQueue']);
+        $r->post('/notifications/retry-failed',  [NotificationController::class, 'retryFailed']);
         $r->post('/notifications/{id}/retry',    [NotificationController::class, 'retry']);
         $r->post('/notifications/{id}/cancel',   [NotificationController::class, 'cancel']);
         $r->post('/settings/messaging',          [SettingsController::class, 'saveMessaging']);
@@ -1351,6 +1352,10 @@ $r->group(['auth'], function ($r) {
         $r->post('/settings/payments',           [SettingsController::class, 'savePayments']);
         $r->post('/settings/payments/test',      [SettingsController::class, 'testKopokopo']);
         $r->post('/settings/payments/webhook',   [SettingsController::class, 'subscribeWebhook']);
+        $r->post('/settings/messaging',          [SettingsController::class, 'saveMessaging']);
+        $r->post('/settings/meetings',           [SettingsController::class, 'saveMeetings']);
+        $r->post('/settings/email',              [SettingsController::class, 'saveMailServer']);
+        $r->post('/settings/social',             [SettingsController::class, 'saveSocial']);
         $r->post('/settings/categories',         [SettingsController::class, 'storeCategory']);
         $r->post('/settings/categories/{id}/delete', [SettingsController::class, 'destroyCategory'], ['permission:records.delete']);
     });

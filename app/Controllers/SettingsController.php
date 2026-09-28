@@ -19,7 +19,7 @@ class SettingsController extends Controller
     {
         $tab = (string) $request->query('tab', 'company');
 
-        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'email', 'meetings', 'categories'], true)) {
+        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'email', 'meetings', 'categories', 'social'], true)) {
             $tab = 'company';
         }
 
@@ -75,6 +75,13 @@ class SettingsController extends Controller
             'events'              => \App\Services\Notifier::EVENTS,
             'defaultCallback'     => rtrim((string) Config::get('app.url', ''), '/') . base_path() . '/webhooks/kopokopo',
             'appUrlSet'           => rtrim((string) Config::get('app.url', ''), '/') !== '',
+            'socialSettings'      => [
+                'approval_required' => Settings::get('social_approval_required', '1'),
+                'images_max'        => Settings::get('social_images_max', '10'),
+                'remind_hours'      => Settings::get('social_remind_hours', '24'),
+                'weekly_digest'     => Settings::get('social_weekly_digest', '1'),
+                'digest_day'        => Settings::get('social_digest_day', '1'),
+            ],
         ]);
 
         // Shown once. Leaving it would have the page still reporting a
@@ -641,6 +648,29 @@ class SettingsController extends Controller
 
         Session::success('Messaging settings saved. Send yourself a test to confirm they work.');
         Response::to('/settings?tab=messaging');
+    }
+
+    // -- Social media --------------------------------------------------
+
+    public function saveSocial(Request $request): void
+    {
+        $this->authorize('admin');
+
+        $remindHours = max(1, min(168, $request->int('social_remind_hours', 24)));
+        $imagesMax   = max(1, min(20,  $request->int('social_images_max',   10)));
+        $digestDay   = max(1, min(7,   $request->int('social_digest_day',    1)));
+
+        Settings::setMany([
+            'social_approval_required' => $request->bool('social_approval_required') ? '1' : '0',
+            'social_images_max'        => (string) $imagesMax,
+            'social_remind_hours'      => (string) $remindHours,
+            'social_weekly_digest'     => $request->bool('social_weekly_digest') ? '1' : '0',
+            'social_digest_day'        => (string) $digestDay,
+        ]);
+
+        ActivityLog::record('settings_updated', 'settings', null, 'Updated social media settings');
+        Session::success('Social media settings saved.');
+        Response::to('/settings?tab=social');
     }
 
     // -- Categories ----------------------------------------------------

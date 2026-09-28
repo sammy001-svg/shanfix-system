@@ -2350,6 +2350,33 @@ fieldset:last-of-type { margin-bottom: 0; }
   color: var(--ink);
 }
 
+
+/* A line saying whether the outbound queue is actually being worked.
+   Before it, "the queue is stuck" and "cron has not run since the
+   hosting was migrated" looked the same from every screen. */
+.queue-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 9px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  font-size: 13px;
+}
+.queue-state__dot {
+  width: 8px; height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--slate-400);
+}
+.queue-state__dot.is-good { background: var(--green-500); }
+.queue-state__dot.is-bad  { background: var(--amber-700); }
+
+.queue-why { margin: 6px 0 0; padding-left: 18px; }
+.queue-why li { margin-bottom: 3px; }
+
 .d-block { display: block; }
 
 /* ---------------------------------------------------------------------

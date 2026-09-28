@@ -10,10 +10,63 @@
       <?= csrf_field() ?>
       <button class="btn btn--outline" type="submit"><?= icon('refresh') ?> Run queue now</button>
     </form>
+    <?php if ((int) ($summary['failed'] ?? 0) > 0): ?>
+      <?php // After a mail server has been down for an afternoon there
+            // can be two hundred of these, and retrying them one at a
+            // time is not a thing anybody does — so they stay failed,
+            // and the client never gets their invoice. ?>
+      <form method="post" action="<?= url('/notifications/retry-failed') ?>" style="display:inline"
+            onsubmit="return confirm('Put all <?= (int) $summary['failed'] ?> failed messages back in the queue and try again now?')">
+        <?= csrf_field() ?>
+        <button class="btn btn--outline" type="submit">
+          <?= icon('repeat') ?> Try the <?= (int) $summary['failed'] ?> failed again
+        </button>
+      </form>
+    <?php endif; ?>
     <a class="btn btn--primary" href="<?= url('/settings?tab=messaging') ?>">
       <?= icon('settings') ?> Messaging settings
     </a>
   </div>
+</div>
+
+<?php // Why the queue is or is not moving. The most useful thing on
+      // the page: before this, "the queue is stuck" and "cron has not
+      // run since the hosting was migrated" looked identical from every
+      // screen, and they are the two likeliest causes by a distance. ?>
+<?php if ($health['reasons']): ?>
+  <div class="alert alert--warning mb-16">
+    <?= icon('alert-triangle') ?>
+    <div class="alert__body">
+      <strong>
+        <?= (int) $health['waiting'] ?>
+        <?= (int) $health['waiting'] === 1 ? 'message is' : 'messages are' ?> waiting.
+      </strong>
+      <ul class="queue-why">
+        <?php foreach ($health['reasons'] as $reason): ?>
+          <li><?= $reason ?></li>
+        <?php endforeach; ?>
+      </ul>
+    </div>
+  </div>
+<?php endif; ?>
+
+<div class="queue-state mb-16">
+  <span class="queue-state__dot<?= $health['stale'] ? ' is-bad' : ' is-good' ?>"></span>
+  <?php if ($health['ran'] === null): ?>
+    <strong>Cron has never run here.</strong>
+    Nothing is sent automatically until it does.
+  <?php else: ?>
+    <strong>Cron last ran <?= e(time_ago($health['ran'])) ?>.</strong>
+    <?php if (!$health['stale']): ?>
+      The queue is being worked.
+    <?php endif; ?>
+  <?php endif; ?>
+
+  <?php if ((int) $health['waiting'] > 0 && $health['oldest']): ?>
+    <span class="text-muted">
+      · oldest waiting since <?= e(fdatetime($health['oldest'])) ?>
+    </span>
+  <?php endif; ?>
 </div>
 
 <?php if (!$emailOn && !$smsOn): ?>

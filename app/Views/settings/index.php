@@ -86,6 +86,9 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     <a class="tab <?= $tab === 'categories' ? 'is-active' : '' ?>" href="<?= e($tabUrl('categories')) ?>">
       <?= icon('layers') ?> Categories
     </a>
+    <a class="tab <?= $tab === 'social'      ? 'is-active' : '' ?>" href="<?= e($tabUrl('social')) ?>">
+      <?= icon('share-2') ?> Social media
+    </a>
     <a class="tab" href="<?= url('/settings/backups') ?>">
       <?= icon('archive') ?> Backups
     </a>
@@ -1327,5 +1330,143 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
       </div>
     </aside>
   </div>
+
+<?php endif; ?>
+
+<?php if ($tab === 'social'): ?>
+
+  <form method="post" action="<?= url('/settings/social') ?>">
+    <?= csrf_field() ?>
+
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card__title">Approval &amp; content</div>
+          <div class="card__sub">What happens before a post goes out, and how much it can carry.</div>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="form-grid form-grid--2">
+
+          <div class="field field--full">
+            <label class="check">
+              <input type="checkbox" name="social_approval_required" value="1"
+                     <?= ($socialSettings['approval_required'] ?? '1') === '1' ? 'checked' : '' ?>>
+              <span class="check__text">
+                <strong>Require approval before publishing</strong>
+                <span>
+                  On: every post must be approved by someone with the <em>social.approve</em>
+                  permission before it can be marked as out. Turning it off lets the
+                  writer publish straight from an approved draft &mdash; useful when the
+                  team is one person.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label class="label" for="social_images_max">Images per post (max)</label>
+            <input class="input" type="number" min="1" max="20" id="social_images_max"
+                   name="social_images_max"
+                   value="<?= (int) ($socialSettings['images_max'] ?? 10) ?>">
+            <span class="field-hint">
+              Instagram carousels carry up to 10. Raising this beyond what any
+              network accepts just means extra pictures nobody sees.
+            </span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card__title">Reminders</div>
+          <div class="card__sub">When cron tells somebody a post is coming, and when it tells them one was missed.</div>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="form-grid form-grid--2">
+
+          <div class="field">
+            <label class="label" for="social_remind_hours">Remind the writer this many hours before</label>
+            <input class="input" type="number" min="1" max="168" id="social_remind_hours"
+                   name="social_remind_hours"
+                   value="<?= (int) ($socialSettings['remind_hours'] ?? 24) ?>">
+            <span class="field-hint">
+              24 means the nudge goes out the day before. 48 gives two days&rsquo;
+              notice. The notification fires once &mdash; rescheduling a post resets
+              it so the reminder goes out again.
+            </span>
+          </div>
+
+          <div class="field field--full" style="padding-top:12px">
+            <p class="text-sm text-muted mb-0">
+              A missed-post alert is sent to the writer (and any approver, if the
+              post is still waiting on approval) when the scheduled time passes
+              with nothing published. This always fires &mdash; there is no setting
+              to turn it off, because a post that should have gone out is a thing
+              somebody needs to know.
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card__title">Weekly digest</div>
+          <div class="card__sub">One message a week to everyone who works on social, so the calendar stays opened.</div>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="form-grid form-grid--2">
+
+          <div class="field field--full">
+            <label class="check">
+              <input type="checkbox" name="social_weekly_digest" value="1"
+                     <?= ($socialSettings['weekly_digest'] ?? '1') === '1' ? 'checked' : '' ?>>
+              <span class="check__text">
+                <strong>Send a weekly digest</strong>
+                <span>
+                  On the chosen day, sends one note saying how many posts are
+                  coming this week, how many are waiting for approval, and how
+                  many are published without any numbers written down yet.
+                  Skipped silently if there is nothing to say.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label class="label" for="social_digest_day">Send it on</label>
+            <select class="select" id="social_digest_day" name="social_digest_day">
+              <?php
+                $days = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
+                         4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday', 7 => 'Sunday'];
+                $cur  = (int) ($socialSettings['digest_day'] ?? 1);
+                foreach ($days as $n => $name): ?>
+                <option value="<?= $n ?>" <?= $n === $cur ? 'selected' : '' ?>>
+                  <?= e($name) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <span class="field-hint">
+              Monday works well &mdash; it is when somebody plans the week they
+              are about to have rather than the one they had.
+            </span>
+          </div>
+
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn--primary" type="submit"><?= icon('save') ?> Save social media settings</button>
+        </div>
+      </div>
+    </div>
+  </form>
 
 <?php endif; ?>

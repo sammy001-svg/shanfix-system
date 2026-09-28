@@ -395,6 +395,56 @@ $greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good
       </div>
     <?php endif; ?>
 
+    <?php if (can('social.view') && $socialWidget): ?>
+      <?php
+        $hasSocialAlert = (int) $socialWidget['pending_approval'] > 0
+                        || (int) $socialWidget['due_week'] > 0;
+      ?>
+      <div class="card">
+        <div class="card__head">
+          <?= icon('share-2') ?>
+          <div>
+            <div class="card__title">Social media</div>
+            <div class="card__sub">What needs attention</div>
+          </div>
+          <div class="card__actions">
+            <a class="btn btn--ghost btn--sm" href="<?= url('/social') ?>">Calendar</a>
+          </div>
+        </div>
+        <div class="card__body">
+          <div class="flex gap-8" style="flex-direction:column">
+
+            <a href="<?= url('/social/list?status=pending') ?>"
+               style="display:flex;align-items:center;justify-content:space-between;text-decoration:none;padding:6px 0;border-bottom:1px solid var(--border)">
+              <span class="text-sm">Pending approval</span>
+              <span class="badge <?= (int) $socialWidget['pending_approval'] > 0 ? 'badge--amber' : 'badge--grey' ?>">
+                <?= (int) $socialWidget['pending_approval'] ?>
+              </span>
+            </a>
+
+            <a href="<?= url('/social') ?>"
+               style="display:flex;align-items:center;justify-content:space-between;text-decoration:none;padding:6px 0;border-bottom:1px solid var(--border)">
+              <span class="text-sm">Due this week</span>
+              <span class="badge <?= (int) $socialWidget['due_week'] > 0 ? 'badge--navy' : 'badge--grey' ?>">
+                <?= (int) $socialWidget['due_week'] ?>
+              </span>
+            </a>
+
+            <a href="<?= url('/social/catch-up') ?>"
+               style="display:flex;align-items:center;justify-content:space-between;text-decoration:none;padding:6px 0">
+              <span class="text-sm">Published, no numbers yet</span>
+              <span class="badge <?= (int) $socialWidget['unrecorded'] > 0 ? 'badge--red' : 'badge--grey' ?>">
+                <?= (int) $socialWidget['unrecorded'] ?>
+              </span>
+            </a>
+
+          </div>
+        </div>
+      </div>
+    <?php endif; ?>
+
+
+
     <div class="card">
       <div class="card__head"><div class="card__title">Quick actions</div></div>
       <div class="card__body">
