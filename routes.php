@@ -1278,8 +1278,10 @@ $r->group(['auth'], function ($r) {
         $r->get ('/social/reports',              [SocialController::class, 'reports']);
         $r->get ('/social/new',                  [SocialController::class, 'create']);
         $r->get ('/social/accounts',             [SocialController::class, 'accountsPage']);
+        $r->get ('/social/catch-up',             [SocialController::class, 'catchUp']);
 
         $r->post('/social',                      [SocialController::class, 'store'],         ['csrf']);
+        $r->post('/social/catch-up',             [SocialController::class, 'catchUpSave'], ['csrf']);
         $r->post('/social/accounts',             [SocialController::class, 'saveAccount'],   ['csrf']);
         $r->post('/social/accounts/{id}/delete', [SocialController::class, 'deleteAccount'], ['csrf']);
         $r->post('/social/campaigns',            [SocialController::class, 'saveCampaign'],  ['csrf']);

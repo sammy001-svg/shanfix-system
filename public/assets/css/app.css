@@ -2450,6 +2450,14 @@ fieldset:last-of-type { margin-bottom: 0; }
   text-align: center;
 }
 
+/* One post's numbers on the catch-up page: several of these stacked,
+   filled in off a phone, saved once. */
+.catch { padding: 10px 0; }
+.catch + .catch { border-top: 1px dashed var(--border); }
+.catch__who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+
+.catch__save { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
 /* Ideas with no date, beside the calendar rather than in it. */
 .idea {
   display: block;

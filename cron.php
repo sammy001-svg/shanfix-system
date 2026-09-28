@@ -137,6 +137,29 @@ try {
     }
 
     // -----------------------------------------------------------------
+    // 0c. Social media that is due, and social media that was missed
+    // -----------------------------------------------------------------
+    // Near the front with the other two because this is also about
+    // somebody waiting: a post scheduled for nine this morning that is
+    // still sitting unapproved at ten is a thing the office would want
+    // to hear about now rather than in tonight's run.
+    //
+    // Migration 053 seeded social_remind_hours and nothing read it, so
+    // until this existed a calendar full of dates reminded nobody of
+    // anything — which is how a calendar stops being opened.
+    try {
+        $social = \App\Services\Social\Reminders::sweep();
+
+        foreach ($social['notes'] as $note) {
+            say('Social: ' . $note);
+        }
+    } catch (\Throwable $e) {
+        // Before migration 053 there is nothing to sweep. Nothing else
+        // in the run depends on this.
+        alert('Social media sweep failed: ' . $e->getMessage());
+    }
+
+    // -----------------------------------------------------------------
     // 1. Invoice status maintenance
     // -----------------------------------------------------------------
     $overdue = Database::run(

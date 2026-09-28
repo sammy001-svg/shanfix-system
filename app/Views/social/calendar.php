@@ -44,6 +44,11 @@ $tone = static fn(string $status): string => match ($status) {
     <a class="btn btn--outline" href="<?= e(url('/social/list')) ?>"><?= icon('list') ?> All posts</a>
     <a class="btn btn--outline" href="<?= e(url('/social/reports')) ?>"><?= icon('bar-chart') ?> Report</a>
     <?php if ($canManage): ?>
+      <a class="btn btn--outline" href="<?= e(url('/social/catch-up')) ?>">
+        <?= icon('check-circle') ?> Numbers
+      </a>
+    <?php endif; ?>
+    <?php if ($canManage): ?>
       <a class="btn btn--primary" href="<?= e(url('/social/new')) ?>"><?= icon('plus') ?> New post</a>
     <?php endif; ?>
   </div>

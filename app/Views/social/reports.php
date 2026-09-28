@@ -72,7 +72,9 @@ $days = ['1' => 'Sunday', '2' => 'Monday', '3' => 'Tuesday', '4' => 'Wednesday',
       <strong><?= (int) $summary['unchecked'] ?></strong>
       <?= $summary['unchecked'] === 1 ? 'post has' : 'posts have' ?>
       no numbers written down yet, so everything below is what has been
-      checked and not what went out. Open a post and record what the app says.
+      checked and not what went out.
+      <a href="<?= e(url('/social/catch-up')) ?>">Fill them in</a> — they are
+      all on one page.
     </div>
   </div>
 <?php endif; ?>

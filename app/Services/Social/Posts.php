@@ -100,6 +100,16 @@ final class Posts
     /** Change one. Never its status — that is move(). */
     public static function update(int $postId, array $in): void
     {
+        // A post moved to another day is one nobody has been reminded
+        // about yet, so the stamps come off with the date. Without
+        // this, rescheduling means the reminder never fires again —
+        // and the post that was moved is exactly the one most likely
+        // to be forgotten.
+        $was  = Database::scalar(
+            'SELECT scheduled_for FROM social_posts WHERE id = :id', ['id' => $postId]
+        );
+        $now  = self::when($in['scheduled_for'] ?? null);
+
         $data = [
             'title'         => mb_substr(trim($in['title']), 0, 140),
             'caption'       => self::clean($in['caption'] ?? ''),
@@ -112,6 +122,11 @@ final class Posts
             'owner_id'      => $in['owner_id'] ?? null,
             'notes'         => mb_substr(trim((string) ($in['notes'] ?? '')), 0, 1000) ?: null,
         ];
+
+        if ($was !== $now) {
+            $data['reminded_at'] = null;
+            $data['missed_at']   = null;
+        }
 
         Database::update('social_posts', $data, ['id' => $postId]);
     }

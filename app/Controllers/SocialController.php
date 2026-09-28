@@ -362,6 +362,116 @@ class SocialController extends Controller
         Response::to('/social/' . $post['id']);
     }
 
+    /**
+     * Every published post that still owes numbers, on one page.
+     *
+     * The weak point of the whole module. Recording a month one post at
+     * a time is a dozen page loads, and whether the reports ever have
+     * anything in them turns on this being quick — a report nobody
+     * feeds is a report nobody trusts, and then nobody opens.
+     *
+     * Oldest first, because those are the ones about to be forgotten.
+     */
+    public function catchUp(Request $request): void
+    {
+        $this->authorize('social.manage');
+
+        $all = $request->query('all') === '1';
+
+        $rows = Database::all(
+            "SELECT t.*, a.network, a.name AS account,
+                    p.id AS post_id, p.ref, p.title, p.post_type, p.published_at
+               FROM social_post_targets t
+               JOIN social_posts p    ON p.id = t.post_id
+               JOIN social_accounts a ON a.id = t.account_id
+              WHERE p.status = 'published' "
+            . ($all ? '' : 'AND t.metrics_at IS NULL ') .
+            "  AND p.published_at > DATE_SUB(NOW(), INTERVAL 120 DAY)
+           ORDER BY p.published_at ASC, a.position, a.name
+              LIMIT 200"
+        );
+
+        // Grouped by post, because that is how somebody works through
+        // them: open the app, find the post, read off three numbers.
+        $byPost = [];
+
+        foreach ($rows as $row) {
+            $byPost[(int) $row['post_id']]['post'] ??= [
+                'id'           => (int) $row['post_id'],
+                'ref'          => $row['ref'],
+                'title'        => $row['title'],
+                'post_type'    => $row['post_type'],
+                'published_at' => $row['published_at'],
+            ];
+            $byPost[(int) $row['post_id']]['targets'][] = $row;
+        }
+
+        $this->view('social/catchup', [
+            'title'  => 'Record the numbers',
+            'byPost' => $byPost,
+            'all'    => $all,
+            'owed'   => (int) Database::scalar(
+                "SELECT COUNT(*) FROM social_post_targets t
+                   JOIN social_posts p ON p.id = t.post_id
+                  WHERE p.status = 'published' AND t.metrics_at IS NULL
+                    AND p.published_at > DATE_SUB(NOW(), INTERVAL 120 DAY)",
+                [],
+                0
+            ),
+        ]);
+    }
+
+    /** Save whatever was filled in across however many posts. */
+    public function catchUpSave(Request $request): void
+    {
+        $this->authorize('social.manage');
+
+        $figures = (array) $request->input('t', []);
+        $saved   = 0;
+
+        foreach ($figures as $targetId => $in) {
+            if (!is_array($in)) {
+                continue;
+            }
+
+            // Every row on this page belongs to a published post, but
+            // the ids come off a form — so each one is checked against
+            // that same condition rather than trusted.
+            $ok = Database::scalar(
+                "SELECT 1 FROM social_post_targets t
+                   JOIN social_posts p ON p.id = t.post_id
+                  WHERE t.id = :id AND p.status = 'published'",
+                ['id' => (int) $targetId]
+            );
+
+            if (!$ok) {
+                continue;
+            }
+
+            $before = Database::scalar(
+                'SELECT metrics_at FROM social_post_targets WHERE id = :id',
+                ['id' => (int) $targetId]
+            );
+
+            Posts::record((int) $targetId, $in);
+
+            $after = Database::scalar(
+                'SELECT metrics_at FROM social_post_targets WHERE id = :id',
+                ['id' => (int) $targetId]
+            );
+
+            if ($before !== $after) {
+                $saved++;
+            }
+        }
+
+        Session::success($saved === 0
+            ? 'Nothing was filled in, so nothing was saved.'
+            : $saved . ' ' . ($saved === 1 ? 'entry' : 'entries') . ' written down.');
+
+        Response::to('/social/catch-up');
+    }
+
     // -----------------------------------------------------------------
     // Reporting
     // -----------------------------------------------------------------
