@@ -27,6 +27,7 @@ class Numbering
         'partner'       => 'partner_prefix',
         'employee'      => 'employee_prefix',
         'equipment'     => 'equipment_prefix',
+        'social_post'   => 'social_post_prefix',
     ];
 
     private const DEFAULTS = [
@@ -47,6 +48,7 @@ class Numbering
         'partner'       => 'PTR',
         'employee'      => 'EMP',
         'equipment'     => 'EQP',
+        'social_post'   => 'SP',
     ];
 
     /**

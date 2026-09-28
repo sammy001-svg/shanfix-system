@@ -55,7 +55,11 @@ id_for() {
 build_pages() {
   php -r '
     $src = file_get_contents(getenv("SHANFIX_ROOT") . "/routes.php");
-    preg_match_all("/\\\$r->get\(\s*[\x27\"]([^\x27\"]+)[\x27\"]/", $src, $m);
+    # \s* before the bracket as well as after it. routes.php lines up
+    # its paths in columns, so a good many are written "$r->get (" —
+    # twenty-five of them, including the whole live chat and social
+    # sections, and none had ever been crawled.
+    preg_match_all("/\\\$r->get\s*\(\s*[\x27\"]([^\x27\"]+)[\x27\"]/", $src, $m);
     $out = [];
     foreach (array_unique($m[1]) as $p) {
         if (str_contains($p, "{\$path}")) {

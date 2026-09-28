@@ -69,6 +69,7 @@ use App\Controllers\SubscriptionController;
 use App\Controllers\SettingsController;
 use App\Controllers\SupplierController;
 use App\Controllers\SmsCampaignController;
+use App\Controllers\SocialController;
 use App\Controllers\ThreadController;
 use App\Controllers\UserController;
 use App\Controllers\WhatsAppController;
@@ -1257,6 +1258,42 @@ $r->group(['auth'], function ($r) {
         $r->post('/testimonials',             [TestimonialController::class, 'save'],   ['csrf']);
         $r->post('/testimonials/{id}/toggle', [TestimonialController::class, 'toggle'], ['csrf']);
         $r->post('/testimonials/{id}/delete', [TestimonialController::class, 'delete'], ['csrf']);
+    });
+
+    // -- The company's own social media
+    //
+    // Reading is one permission and writing another, because most of
+    // the team has reason to look at what is going out this week and
+    // very few have reason to change it. Approving is a third, and
+    // narrower still: what goes out under the company's name is worth
+    // a second pair of eyes, and one you can give yourself is not.
+    $r->group(['permission:social.view'], function ($r) {
+        // Every fixed path first. The router takes the first pattern
+        // that matches, so "/social/accounts" posted after
+        // "/social/{id}" is read as a post whose id is the word
+        // "accounts" — which turns into a 404 on a page that plainly
+        // exists, and takes a while to see.
+        $r->get ('/social',                      [SocialController::class, 'calendar']);
+        $r->get ('/social/list',                 [SocialController::class, 'index']);
+        $r->get ('/social/reports',              [SocialController::class, 'reports']);
+        $r->get ('/social/new',                  [SocialController::class, 'create']);
+        $r->get ('/social/accounts',             [SocialController::class, 'accountsPage']);
+
+        $r->post('/social',                      [SocialController::class, 'store'],         ['csrf']);
+        $r->post('/social/accounts',             [SocialController::class, 'saveAccount'],   ['csrf']);
+        $r->post('/social/accounts/{id}/delete', [SocialController::class, 'deleteAccount'], ['csrf']);
+        $r->post('/social/campaigns',            [SocialController::class, 'saveCampaign'],  ['csrf']);
+
+        // Then anything with an id in it.
+        $r->get ('/social/{id}',                 [SocialController::class, 'show']);
+        $r->get ('/social/{id}/edit',            [SocialController::class, 'edit']);
+
+        $r->post('/social/{id}',                 [SocialController::class, 'update'],  ['csrf']);
+        $r->post('/social/{id}/move',            [SocialController::class, 'move'],    ['csrf']);
+        $r->post('/social/{id}/record',          [SocialController::class, 'record'],  ['csrf']);
+        $r->post('/social/{id}/delete',          [SocialController::class, 'destroy'], ['csrf']);
+        $r->post('/social/{id}/images/{image}/delete',
+                 [SocialController::class, 'deleteImage'], ['csrf']);
     });
 
     // -- Newsletter subscribers from the website footer

@@ -189,6 +189,27 @@ class Auth
         // greeting and office hours the public sees.
         'livechat.manage'   => ['admin', 'manager'],
 
+        // The company's own social media: what is going out this week,
+        // what went out last month and how it did.
+        //
+        // Designers are in deliberately. Nearly every post is a picture
+        // somebody in the studio made, and the person who made it is
+        // the one who knows which version is the right one — leaving
+        // them out means the caption and the artwork are put together
+        // by somebody who has not seen the artwork.
+        'social.view'       => ['admin', 'manager', 'sales', 'designer'],
+        'social.manage'     => ['admin', 'manager', 'sales', 'designer'],
+
+        // Saying yes to what goes out under the company's name. Not the
+        // same authority as writing it, and deliberately not held by
+        // everybody who can write: an approval you can give yourself is
+        // not an approval.
+        'social.approve'    => ['admin', 'manager'],
+
+        // The profiles themselves, and what a campaign cost. Adding a
+        // page is a decision about where the company speaks from.
+        'social.accounts'   => ['admin', 'manager'],
+
         // The newsletter list from the website footer. Whoever does the
         // marketing needs it; the export holds only people who asked.
         'newsletter.view'   => ['admin', 'manager', 'sales'],
@@ -300,6 +321,7 @@ class Auth
         'meetings'      => ['Meetings',         'Video calls and their minutes'],
 
         'sms'           => ['Text our clients', 'Sending a text to every client at once'],
+        'social'        => ['Social media',     'What we post, when it goes out and how it did'],
         'newsletter'    => ['Newsletter',       'The mailing list from the website'],
         'testimonials'  => ['Testimonials',     'What the website says our clients said'],
         'bulksms'       => ['SMS platform',     'The product customers and partners send through'],

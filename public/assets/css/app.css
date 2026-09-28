@@ -2353,6 +2353,209 @@ fieldset:last-of-type { margin-bottom: 0; }
 .d-block { display: block; }
 
 /* ---------------------------------------------------------------------
+   Social media
+
+   The calendar is the point of the module: the question it answers at a
+   glance is "is next week empty", which a list sorted by date answers
+   badly.
+   --------------------------------------------------------------------- */
+.cal__nav { display: flex; gap: 4px; margin-left: auto; }
+
+.cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--border);
+}
+
+.cal__dow {
+  padding: 7px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--slate-500);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.cal__day {
+  min-height: 112px;
+  padding: 5px 6px 7px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.cal__day:nth-child(7n + 7) { border-right: 0; }
+.cal__day--empty { background: var(--surface-2); }
+.cal__day.is-today { background: rgba(26, 160, 92, .07); }
+.cal__day.is-today .cal__date { color: var(--on-green); font-weight: 700; }
+
+.cal__date {
+  display: flex;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--slate-500);
+  margin-bottom: 4px;
+}
+
+/* Straight into a new post already dated. The gap between noticing an
+   empty Thursday and filling it should be one click. */
+.cal__add {
+  margin-left: auto;
+  width: 17px; height: 17px;
+  line-height: 15px;
+  text-align: center;
+  border-radius: 5px;
+  font-size: 14px;
+  color: var(--slate-500);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity .12s, background .12s;
+}
+.cal__day:hover .cal__add { opacity: 1; }
+.cal__add:hover { background: var(--green-600); color: #fff; text-decoration: none; }
+.cal__add:focus-visible { opacity: 1; outline: 2px solid var(--green-500); }
+
+.cal__post {
+  display: block;
+  padding: 4px 6px;
+  margin-bottom: 3px;
+  border-radius: 5px;
+  border-left: 3px solid var(--slate-400);
+  background: var(--surface-2);
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ink);
+  text-decoration: none;
+}
+.cal__post:hover { background: var(--border); text-decoration: none; }
+.cal__post--green { border-left-color: var(--green-600); }
+.cal__post--navy  { border-left-color: var(--navy-700); }
+.cal__post--amber { border-left-color: var(--amber-700); }
+.cal__post--grey  { border-left-color: var(--slate-400); }
+
+.cal__time { font-weight: 700; margin-right: 3px; color: var(--slate-500); }
+.cal__what { }
+
+.cal__nets { display: flex; gap: 2px; margin-top: 3px; }
+.cal__net {
+  width: 14px; height: 14px;
+  border-radius: 3px;
+  background: var(--navy-700);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+
+/* Ideas with no date, beside the calendar rather than in it. */
+.idea {
+  display: block;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 6px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.idea:hover { border-color: var(--green-600); background: var(--surface-2); text-decoration: none; }
+.idea__title { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.idea__meta { display: flex; align-items: center; gap: 6px; }
+
+/* ── One post ───────────────────────────────────────────────────────── */
+.social__caption {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+.social__tags { margin-top: 10px; font-size: 13px; color: var(--on-green); }
+
+.social__shots { display: flex; flex-wrap: wrap; gap: 10px; }
+.social__shot { position: relative; margin: 0; }
+.social__shot img {
+  width: 150px; height: 150px;
+  object-fit: cover;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  display: block;
+}
+.social__shot-x {
+  position: absolute;
+  top: 5px; right: 5px;
+  width: 22px; height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .62);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.social__shot-x:hover { background: var(--red-600); }
+
+/* ── Where it went, and how it did ──────────────────────────────────── */
+.target {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 7px;
+  background: var(--surface);
+}
+
+.target__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  border-radius: var(--r);
+}
+.target__head::-webkit-details-marker { display: none; }
+.target__head:hover { background: var(--surface-2); }
+.target__head:focus-visible { outline: 2px solid var(--green-600); outline-offset: -2px; }
+
+.target__who { flex: 1; min-width: 0; font-size: 13.5px; }
+
+.target__caret {
+  width: 13px; height: 13px;
+  flex: 0 0 13px;
+  opacity: .45;
+  transform: rotate(-90deg);
+  transition: transform .16s var(--ease);
+}
+.target[open] > .target__head .target__caret { transform: rotate(0deg); }
+
+.target__body { padding: 4px 12px 12px; border-top: 1px solid var(--border); }
+
+/* Eight figures typed off a phone screen. Small boxes in a row, because
+   the alternative is eight full-width fields and a lot of scrolling. */
+.numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.numbers__one .label { font-size: 11px; margin-bottom: 2px; }
+.numbers__one .input { padding: 6px 8px; font-size: 13px; }
+
+@media (max-width: 900px) {
+  /* A seven-column grid on a phone is seven unreadable columns. The
+     month becomes a list of the days that have anything on them. */
+  .cal { display: block; border-top: 0; }
+  .cal__dow { display: none; }
+  .cal__day { min-height: 0; border-right: 0; }
+  .cal__day--empty { display: none; }
+  .cal__day:not(:has(.cal__post)) { display: none; }
+  .cal__date { font-weight: 700; color: var(--ink); }
+  .cal__add { opacity: 1; }
+}
+
+
+/* ---------------------------------------------------------------------
    HR overview
 
    The page was written against a handful of classes and variables this

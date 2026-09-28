@@ -36,6 +36,15 @@ class ImageLibrary
             'folder' => 'services',
             'max'    => 'service_images_max',
         ],
+        // The picture that goes out with a social post. Same shape as
+        // the other two, so the resizing, the thumbnails and the cap
+        // are the ones already in use rather than a second set.
+        'social' => [
+            'table'  => 'social_post_images',
+            'fk'     => 'post_id',
+            'folder' => 'social',
+            'max'    => 'social_images_max',
+        ],
     ];
 
     public static function isKind(string $kind): bool

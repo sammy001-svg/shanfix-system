@@ -473,12 +473,12 @@ if ($me && can('jobs.view')) {
       <?php
         // ── Marketing ──────────────────────────────────────────────────────
         // Us reaching out, rather than someone reaching us.
-        $showMarketing = can('sms.campaign') || can('newsletter.view')
-                      || can('testimonials.manage');
+        $showMarketing = can('social.view') || can('sms.campaign')
+                      || can('newsletter.view') || can('testimonials.manage');
       ?>
       <?php if ($showMarketing): ?>
         <details class="nav-group" data-nav-group="marketing"
-                 <?= $navOpen('/sms-campaigns', '/newsletter', '/testimonials') ? 'open' : '' ?>>
+                 <?= $navOpen('/social', '/sms-campaigns', '/newsletter', '/testimonials') ? 'open' : '' ?>>
           <summary class="nav-group__label">
             <?= icon('send', 'nav-group__icon') ?>
             <span class="nav-group__text">Marketing</span>
@@ -486,6 +486,22 @@ if ($me && can('jobs.view')) {
             <?= icon('chevron-down', 'nav-group__caret') ?>
           </summary>
           <div class="nav-group__items">
+
+            <?php // What the company posts on its own pages: the calendar,
+                  // the approval and the record of how each one did. The
+                  // badge counts posts waiting on somebody's yes, which
+                  // is the only state where the work has stopped. ?>
+            <?php if (can('social.view')): ?>
+              <?php $socialWaiting = (int) \App\Core\Database::scalar(
+                  "SELECT COUNT(*) FROM social_posts WHERE status = 'awaiting'", [], 0
+              ); ?>
+              <a class="nav-link <?= is_active_nav('/social') ? 'is-active' : '' ?>" href="<?= url('/social') ?>">
+                <?= icon('calendar', 'nav-link__icon') ?> Social media
+                <?php if ($socialWaiting > 0): ?>
+                  <span class="nav-link__badge"><?= $socialWaiting ?></span>
+                <?php endif; ?>
+              </a>
+            <?php endif; ?>
 
             <?php // Two different things that both involve texting. This one is
                   // us messaging our own clients; the SMS platform further down
