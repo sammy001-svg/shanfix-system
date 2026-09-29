@@ -189,11 +189,11 @@ class DashboardController extends Controller
                 "SELECT
                     (SELECT COUNT(*) FROM social_posts
                       WHERE status NOT IN ('published','cancelled')
-                        AND scheduled_at BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)) AS due_week,
+                        AND scheduled_for BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)) AS due_week,
                     (SELECT COUNT(*) FROM social_posts
-                      WHERE status = 'pending') AS pending_approval,
-                    (SELECT COUNT(*) FROM social_posts
-                      WHERE status = 'published' AND metrics_at IS NULL) AS unrecorded"
+                      WHERE status = 'awaiting') AS pending_approval,
+                    (SELECT COUNT(*) FROM social_post_targets
+                      WHERE published_at IS NOT NULL AND metrics_at IS NULL) AS unrecorded"
             );
         }
 
