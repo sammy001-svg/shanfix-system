@@ -43,7 +43,17 @@ BEFORE=$(q "SELECT GROUP_CONCAT(CONCAT(setting_key,'=',setting_value) SEPARATOR 
 
 KEPT="$D/queue_notifications.sql"
 
+NEEDS_CONFIG_RESTORE=0
+
 restore() {
+  # This suite blanks app.url on disk for one test. If it died in
+  # between, the config is broken for everything that runs next.
+  if [ "$NEEDS_CONFIG_RESTORE" = "1" ] && [ -f "$D/config.before-queue-test" ]; then
+    cp "$D/config.before-queue-test" "$ROOT/config/config.php"
+  fi
+
+  rm -f "$D/config.before-queue-test"
+
   local pair key val
   while IFS= read -r pair; do
     [ -n "$pair" ] || continue
@@ -75,13 +85,24 @@ echo "=== 1. A message in the queue is attempted, app.url or no app.url ==="
 STAFF=$(queue email internal social_awaiting 'colleague@queue.test')
 eq "it starts untouched" "$(attempts "$STAFF")" "0"
 
-work --no-app-url >/dev/null
-ne "with no app.url it is still attempted" "$(attempts "$STAFF")" "0"
+# Reproduced the way it happened: a real cron run against a config with
+# no app.url. Blanked on disk because Config is deliberately immutable,
+# and put back immediately — and again from the trap, in case this dies
+# in between.
+CONF="$ROOT/config/config.php"
+cp "$CONF" "$D/config.before-queue-test"
+NEEDS_CONFIG_RESTORE=1
+$PHP -r '$f=$argv[1]; $s=file_get_contents($f);
+         file_put_contents($f, preg_replace("/('url'\s*=>\s*)'[^']*'/", "$1''", $s, 1));' "$CONF"
 
-# And the guard that does belong on app.url is still doing its job:
-# queueing a client document needs a real link.
-OUT=$($PHP "$ROOT/tests/helpers/work_queue.php" --queue-with-no-url 2>&1)
-has "queueing a client document without app.url still refuses" "$OUT" "app.url"
+eq "with app.url blank, cron still refuses to queue a client document"    "$(work --can-build-links | grep -c 'app.url is not set')" "1"
+
+$PHP "$ROOT/cron.php" >/dev/null 2>&1
+
+cp "$D/config.before-queue-test" "$CONF"
+NEEDS_CONFIG_RESTORE=0
+
+ne "but it did attempt the message already in the queue" "$(attempts "$STAFF")" "0"
 
 echo ""
 echo "=== 2. The window holds a client's text, not a colleague's email ==="

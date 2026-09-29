@@ -6,11 +6,10 @@
  *   php tests/helpers/work_queue.php --outside-window as if the sending
  *                                                    window excluded now
  *   php tests/helpers/work_queue.php --one <id>      just that one
- *   php tests/helpers/work_queue.php --no-app-url    with app.url unset
+ *   php tests/helpers/work_queue.php --can-build-links
+ *                                                    what cron asks before it
+ *                                                    queues a client document
  *   php tests/helpers/work_queue.php --renewals      queue renewal reminders
- *   php tests/helpers/work_queue.php --queue-with-no-url
- *                                                    what cron would say when
- *                                                    it cannot build a link
  *
  * cron.php does a great deal besides this, and a suite that wanted to
  * check one send would otherwise run backups and invoicing to get there.
@@ -26,17 +25,13 @@ use App\Services\Notifier;
 
 Config::load(CONFIG_PATH . '/config.php');
 
-// The reported fault: with no app.url, cron worked none of the queue.
-// Unsetting it here is what makes that testable without editing the
-// config file on disk.
-if (in_array('--no-app-url', $argv, true)) {
-    Config::set('app.url', '');
-}
-
 Database::connect(Config::get('db'));
 
-if (in_array('--queue-with-no-url', $argv, true)) {
-    Config::set('app.url', '');
+// What cron asks before queueing a client document, reported on
+// whatever the config file currently says. Config is deliberately
+// immutable, so the one test that needs app.url blank blanks it on
+// disk and puts it back, rather than this pretending.
+if (in_array('--can-build-links', $argv, true)) {
     unset($_SERVER['HTTP_HOST']);
 
     echo Notifier::canBuildLinks()
