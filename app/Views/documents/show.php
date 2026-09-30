@@ -478,14 +478,51 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
           <?php endif; ?>
           <dt>VAT</dt>
           <dd>
-            <?= $doc['vat_mode'] === 'exempt'
-                ? 'Exempt'
-                : e(qty($doc['vat_rate'])) . '% ' . e($doc['vat_mode']) ?>
+            <?php // "16% exclusive" is only true of a document whose
+                  // lines are all standard rated. On a mixed one it is a
+                  // statement about tax that is not what was charged. ?>
+            <?php if ($doc['vat_mode'] === 'exempt'): ?>
+              Exempt
+            <?php elseif (\App\Services\Etims\TaxSummary::isMixed($items)): ?>
+              Mixed &middot; <?= e($doc['vat_mode']) ?>
+              <span class="d-block text-xs text-muted">
+                <?php $names = [];
+                      foreach (\App\Services\Etims\TaxSummary::bands($items, $doc) as $band) {
+                          $names[] = $band['class'] . ' ' . mb_strtolower($band['name']);
+                      } ?>
+                <?= e(implode(', ', $names)) ?>
+              </span>
+            <?php else: ?>
+              <?= e(qty($doc['vat_rate'])) ?>% <?= e($doc['vat_mode']) ?>
+            <?php endif; ?>
           </dd>
           <dt>Created by</dt><dd><?= e($doc['created_by_name'] ?: 'System') ?></dd>
           <dt>Created</dt><dd><?= e(fdatetime($doc['created_at'])) ?></dd>
           <?php if ($doc['sent_at']): ?>
             <dt>Sent</dt><dd><?= e(fdatetime($doc['sent_at'])) ?></dd>
+          <?php endif; ?>
+
+          <?php // Shown only where it means something: a tax document, on
+                // a system that has been set up to file them. Elsewhere a
+                // row reading "not sent" would be answering a question
+                // nobody in this office is asking. ?>
+          <?php if (in_array($doc['doc_type'], ['invoice', 'receipt'], true)
+                    && \App\Services\Etims\Setup::isConfigured()): ?>
+            <dt>KRA</dt>
+            <dd>
+              <?php $state = $doc['etims_status'] ?? 'not_sent'; ?>
+              <span class="badge <?= $state === 'sent' ? 'badge--green'
+                                     : ($state === 'failed' ? 'badge--red' : 'badge--grey') ?>">
+                <?= e(label_of($state)) ?>
+              </span>
+              <?php if ($state === 'sent' && !empty($doc['etims_invoice_no'])): ?>
+                <span class="d-block text-xs text-muted">
+                  <code><?= e($doc['etims_invoice_no']) ?></code>
+                </span>
+              <?php elseif ($state === 'failed' && !empty($doc['etims_last_error'])): ?>
+                <span class="d-block text-xs text-muted"><?= e($doc['etims_last_error']) ?></span>
+              <?php endif; ?>
+            </dd>
           <?php endif; ?>
         </dl>
       </div>

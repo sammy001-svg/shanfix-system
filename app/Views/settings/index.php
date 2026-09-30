@@ -86,6 +86,9 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     <a class="tab <?= $tab === 'categories' ? 'is-active' : '' ?>" href="<?= e($tabUrl('categories')) ?>">
       <?= icon('layers') ?> Categories
     </a>
+    <a class="tab <?= $tab === 'etims'       ? 'is-active' : '' ?>" href="<?= e($tabUrl('etims')) ?>">
+      <?= icon('shield') ?> eTIMS
+    </a>
     <a class="tab <?= $tab === 'social'      ? 'is-active' : '' ?>" href="<?= e($tabUrl('social')) ?>">
       <?= icon('share-2') ?> Social media
     </a>
@@ -1269,83 +1272,213 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     </div>
   </form>
 
-<?php else: ?>
+<?php elseif ($tab === 'etims'): ?>
 
-  <div class="grid-sidebar">
-    <div>
-      <?php foreach ([
-          'inventory' => ['Inventory categories', 'Group your stock items'],
-          'service'   => ['Service categories', 'Group the services you offer'],
-          'expense'   => ['Expense categories', 'Drive your expense reporting'],
-      ] as $type => [$heading, $sub]): ?>
-        <div class="card">
-          <div class="card__head">
-            <div>
-              <div class="card__title"><?= e($heading) ?></div>
-              <div class="card__sub"><?= e($sub) ?></div>
-            </div>
-          </div>
+  <?php
+    // Written out in full: `use` is a compile-time construct and cannot
+    // live inside a conditional, and every tab in this file is one.
+    $missing = \App\Services\Etims\Setup::missing();
+    $waiting = \App\Services\Etims\Transmission::waitingCount();
+    $stuck   = \App\Services\Etims\Transmission::stuck(8);
+  ?>
 
-          <?php $list = $categories[$type] ?? []; ?>
-          <?php if (!$list): ?>
-            <div class="card__body"><p class="text-sm text-muted mb-0">No categories yet.</p></div>
-          <?php else: ?>
-            <div class="table-wrap">
-              <table class="table table--compact">
-                <thead><tr><th>Name</th><th class="num">In use by</th><th class="actions"></th></tr></thead>
-                <tbody>
-                  <?php foreach ($list as $c):
-                      $used = (int) $c['item_count'] + (int) $c['service_count'] + (int) $c['expense_count'];
-                  ?>
-                    <tr>
-                      <td class="table__primary"><?= e($c['name']) ?></td>
-                      <td class="num text-muted"><?= $used ?> record(s)</td>
-                      <td class="actions">
-                        <form method="post" action="<?= url('/settings/categories/' . $c['id'] . '/delete') ?>"
-                              data-confirm="Delete &quot;<?= e($c['name']) ?>&quot;?<?= $used ? ' ' . $used . ' record(s) will become uncategorised.' : '' ?>">
-                          <?= csrf_field() ?>
-                          <button class="btn btn--danger-soft btn--sm" type="submit" aria-label="Delete this category"><?= icon('trash') ?></button>
-                        </form>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          <?php endif; ?>
-        </div>
-      <?php endforeach; ?>
+  <div class="card">
+    <div class="card__head">
+      <?= icon('shield') ?>
+      <div>
+        <div class="card__title">Where this stands</div>
+        <div class="card__sub"><?= e(\App\Services\Etims\Setup::describe()) ?></div>
+      </div>
     </div>
+    <div class="card__body">
 
-    <aside>
-      <div class="card">
-        <div class="card__head"><div class="card__title">Add a category</div></div>
-        <div class="card__body">
-          <form method="post" action="<?= url('/settings/categories') ?>">
-            <?= csrf_field() ?>
-            <div class="field mb-12">
-              <label class="label" for="cat_type">Type</label>
-              <select class="select" id="cat_type" name="type" required>
-                <option value="inventory">Inventory</option>
-                <option value="service">Service</option>
-                <option value="expense">Expense</option>
-              </select>
-            </div>
-            <div class="field mb-16">
-              <label class="label" for="cat_name">Name</label>
-              <input class="input" id="cat_name" name="name" required maxlength="120"
-                     placeholder="e.g. Vehicle Branding">
-            </div>
-            <button class="btn btn--primary btn--block" type="submit"><?= icon('plus') ?> Add category</button>
-          </form>
+      <?php if (!\App\Services\Etims\Oscu::isImplemented()): ?>
+        <?php // Said plainly on the screen rather than discovered when an
+              // invoice fails to go. Everything around the connection is
+              // finished; the connection itself needs KRA's paperwork. ?>
+        <div class="alert alert--warning mb-16"><div class="alert__body">
+          <strong>The connection to KRA is not finished.</strong>
+          <p class="mb-0">
+            Invoices already carry a tax class and a KRA item code on every line,
+            they queue, they retry, and every attempt is kept. What is still needed
+            is KRA's own OSCU documentation for this company —
+            the sale payload, how the device signs in, and what a rejection looks
+            like — together with the sandbox credentials. Until that is in,
+            nothing is sent under this PIN, which is deliberate: an invoice KRA
+            rejects is a filing the business has not made.
+          </p>
+        </div></div>
+      <?php endif; ?>
+
+      <?php if ($missing): ?>
+        <div class="alert alert--info mb-16"><div class="alert__body">
+          <strong>Still to fill in</strong>
+          <ul class="mb-0">
+            <?php foreach ($missing as $one): ?>
+              <li><?= e(ucfirst($one)) ?></li>
+            <?php endforeach; ?>
+          </ul>
+        </div></div>
+      <?php endif; ?>
+
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat__label">Waiting to go</div>
+          <div class="stat__value"><?= (int) $waiting ?></div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Given up on</div>
+          <div class="stat__value"><?= count($stuck) ?></div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Environment</div>
+          <div class="stat__value"><?= e(ucfirst(\App\Services\Etims\Setup::environment())) ?></div>
         </div>
       </div>
-    </aside>
+
+      <?php if ($stuck): ?>
+        <div class="table-wrap mt-16">
+          <table class="table">
+            <thead>
+              <tr><th>Invoice</th><th>Client</th><th class="num">Total</th><th>Why not</th></tr>
+            </thead>
+            <tbody>
+              <?php foreach ($stuck as $one): ?>
+                <tr>
+                  <td><a href="<?= url('/invoices/' . $one['id']) ?>"><?= e($one['doc_number']) ?></a></td>
+                  <td><?= e($one['client_name'] ?: '—') ?></td>
+                  <td class="num"><?= e(money($one['total'], false)) ?></td>
+                  <td class="text-sm text-muted"><?= e($one['etims_last_error'] ?: 'No reason recorded.') ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
+    </div>
   </div>
 
-<?php endif; ?>
+  <form method="post" action="<?= url('/settings/etims') ?>">
+    <?= csrf_field() ?>
 
-<?php if ($tab === 'social'): ?>
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card__title">This business, as KRA holds it</div>
+          <div class="card__sub">
+            These come off the eTIMS registration. They are not guessable and a
+            wrong one is rejected rather than corrected.
+          </div>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="form-grid form-grid--2">
+          <?php // Shown, not asked for. The PIN is the company's own and
+                // lives on the Company tab, where it is also the one
+                // printed on every invoice. Asking for it again here
+                // would let the paper and the declaration disagree. ?>
+          <div class="field">
+            <label class="label">KRA PIN</label>
+            <?php $companyPin = (string) setting('company_kra_pin', ''); ?>
+            <p class="mb-4">
+              <?php if ($companyPin !== ''): ?>
+                <strong><code><?= e($companyPin) ?></code></strong>
+              <?php else: ?>
+                <span class="text-muted">Not set</span>
+              <?php endif; ?>
+            </p>
+            <span class="field-hint">
+              The company's own PIN, from
+              <a href="<?= e($tabUrl('company')) ?>">Company</a>. It is the same
+              one printed on your invoices.
+            </span>
+          </div>
+
+          <div class="field">
+            <label class="label" for="etims_branch_id">Branch</label>
+            <input class="input" id="etims_branch_id" name="etims_branch_id" maxlength="10"
+                   value="<?= e(setting('etims_branch_id', '00')) ?>">
+            <span class="field-hint">00 is head office, which is the answer for a single location.</span>
+          </div>
+
+          <div class="field">
+            <label class="label" for="etims_device_serial">Device serial</label>
+            <input class="input" id="etims_device_serial" name="etims_device_serial" maxlength="60"
+                   value="<?= e(setting('etims_device_serial', '')) ?>">
+            <span class="field-hint">Issued by KRA for this installation.</span>
+          </div>
+
+          <div class="field">
+            <label class="label" for="etims_device_key">Device credential</label>
+            <input class="input" type="password" id="etims_device_key" name="etims_device_key"
+                   autocomplete="new-password"
+                   placeholder="<?= setting('etims_device_key', '') !== '' ? 'Saved — leave blank to keep it' : '' ?>">
+            <span class="field-hint">
+              Stored encrypted. Anybody holding this can file under the company's PIN,
+              so it is never shown again once saved.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head">
+        <div>
+          <div class="card__title">How it connects</div>
+          <div class="card__sub">Sandbox first. Production sends real declarations.</div>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="form-grid form-grid--2">
+          <div class="field">
+            <label class="label" for="etims_environment">Environment</label>
+            <select class="select" id="etims_environment" name="etims_environment">
+              <?php $env = setting('etims_environment', 'sandbox'); ?>
+              <option value="sandbox"    <?= $env === 'sandbox'    ? 'selected' : '' ?>>Sandbox — nothing is real</option>
+              <option value="production" <?= $env === 'production' ? 'selected' : '' ?>>Production — declarations count</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="label" for="etims_base_url">eTIMS address</label>
+            <input class="input" id="etims_base_url" name="etims_base_url" maxlength="255"
+                   value="<?= e(setting('etims_base_url', '')) ?>"
+                   placeholder="https://…">
+            <span class="field-hint">From KRA's documentation for the environment above.</span>
+            <?= error_for($errors ?? [], 'etims_base_url') ?>
+          </div>
+        </div>
+
+        <label class="check mt-8">
+          <input type="checkbox" name="etims_enabled" value="1"
+                 <?= setting('etims_enabled', '0') === '1' ? 'checked' : '' ?>>
+          <span class="check__text">
+            <strong>Send invoices to KRA</strong>
+            <span>Off until the details above are complete. Nothing is sent while this is off.</span>
+          </span>
+        </label>
+
+        <label class="check mt-8">
+          <input type="checkbox" name="etims_auto_send" value="1"
+                 <?= setting('etims_auto_send', '0') === '1' ? 'checked' : '' ?>>
+          <span class="check__text">
+            <strong>Send automatically when an invoice is raised</strong>
+            <span>
+              Leave this off to begin with. The first weeks are spent finding out
+              what KRA rejects, and finding that out one invoice at a time is
+              kinder than finding it out across a day's billing.
+            </span>
+          </span>
+        </label>
+      </div>
+      <div class="card__foot">
+        <button class="btn btn--primary" type="submit"><?= icon('save') ?> Save eTIMS settings</button>
+      </div>
+    </div>
+  </form>
+
+<?php elseif ($tab === 'social'): ?>
 
   <form method="post" action="<?= url('/settings/social') ?>">
     <?= csrf_field() ?>
@@ -1481,4 +1614,85 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
     </div>
   </form>
 
+<?php else: ?>
+
+  <?php // Categories. Named by elimination rather than by an explicit
+        // test, which is safe only because the controller clamps the tab
+        // to a list it knows. It used to be reached by every tab that
+        // chain did not name, which is how the social settings have been
+        // sitting on top of the category lists. ?>
+  <div class="grid-sidebar">
+    <div>
+      <?php foreach ([
+          'inventory' => ['Inventory categories', 'Group your stock items'],
+          'service'   => ['Service categories', 'Group the services you offer'],
+          'expense'   => ['Expense categories', 'Drive your expense reporting'],
+      ] as $type => [$heading, $sub]): ?>
+        <div class="card">
+          <div class="card__head">
+            <div>
+              <div class="card__title"><?= e($heading) ?></div>
+              <div class="card__sub"><?= e($sub) ?></div>
+            </div>
+          </div>
+
+          <?php $list = $categories[$type] ?? []; ?>
+          <?php if (!$list): ?>
+            <div class="card__body"><p class="text-sm text-muted mb-0">No categories yet.</p></div>
+          <?php else: ?>
+            <div class="table-wrap">
+              <table class="table table--compact">
+                <thead><tr><th>Name</th><th class="num">In use by</th><th class="actions"></th></tr></thead>
+                <tbody>
+                  <?php foreach ($list as $c):
+                      $used = (int) $c['item_count'] + (int) $c['service_count'] + (int) $c['expense_count'];
+                  ?>
+                    <tr>
+                      <td class="table__primary"><?= e($c['name']) ?></td>
+                      <td class="num text-muted"><?= $used ?> record(s)</td>
+                      <td class="actions">
+                        <form method="post" action="<?= url('/settings/categories/' . $c['id'] . '/delete') ?>"
+                              data-confirm="Delete &quot;<?= e($c['name']) ?>&quot;?<?= $used ? ' ' . $used . ' record(s) will become uncategorised.' : '' ?>">
+                          <?= csrf_field() ?>
+                          <button class="btn btn--danger-soft btn--sm" type="submit" aria-label="Delete this category"><?= icon('trash') ?></button>
+                        </form>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+
+    <aside>
+      <div class="card">
+        <div class="card__head"><div class="card__title">Add a category</div></div>
+        <div class="card__body">
+          <form method="post" action="<?= url('/settings/categories') ?>">
+            <?= csrf_field() ?>
+            <div class="field mb-12">
+              <label class="label" for="cat_type">Type</label>
+              <select class="select" id="cat_type" name="type" required>
+                <option value="inventory">Inventory</option>
+                <option value="service">Service</option>
+                <option value="expense">Expense</option>
+              </select>
+            </div>
+            <div class="field mb-16">
+              <label class="label" for="cat_name">Name</label>
+              <input class="input" id="cat_name" name="name" required maxlength="120"
+                     placeholder="e.g. Vehicle Branding">
+            </div>
+            <button class="btn btn--primary btn--block" type="submit"><?= icon('plus') ?> Add category</button>
+          </form>
+        </div>
+      </div>
+    </aside>
+  </div>
+
 <?php endif; ?>
+
+

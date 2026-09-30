@@ -30,6 +30,7 @@ use App\Core\Settings;
 use App\Services\Backup;
 use App\Services\Notifier;
 use App\Services\StaffNotifier;
+use App\Services\Etims\Transmission as Etims;
 use App\Services\Renewals;
 
 $verbose = in_array('--verbose', $argv, true) || in_array('-v', $argv, true);
@@ -306,6 +307,37 @@ try {
     // question somebody is asking when they come looking.
     if ($result['stopped'] !== null) {
         alert('Queue ' . $result['stopped']);
+    }
+
+    // -----------------------------------------------------------------
+    // 4b. What KRA is still owed
+    // -----------------------------------------------------------------
+    // Separate from the message queue above because it fails
+    // differently. A text that does not go is a text that does not go;
+    // an invoice that does not reach KRA is a declaration the business
+    // has not made, and the business goes on not knowing unless
+    // somebody is told.
+    $etims = Etims::sweep();
+
+    if ($etims['sent'] > 0 || $etims['failed'] > 0) {
+        say("eTIMS: {$etims['sent']} sent, {$etims['failed']} refused");
+    }
+
+    // Held is not an error: the operator has not finished setting it up
+    // or has switched it off, and both are decisions. It is said once
+    // rather than every run, and only while something is actually
+    // waiting — an empty queue on an unconfigured system is not news.
+    if (($etims['held'] ?? 0) > 0) {
+        say("eTIMS: {$etims['held']} invoice(s) waiting — " . ($etims['reason'] ?? ''));
+    }
+
+    // Given up on. This is the one worth waking somebody for: the
+    // invoice stands, the client has it, and the declaration has not
+    // been made.
+    $stuck = count(Etims::stuck(50));
+
+    if ($stuck > 0) {
+        alert("eTIMS: {$stuck} invoice(s) KRA has refused and that nobody has dealt with");
     }
 
     // -----------------------------------------------------------------

@@ -415,6 +415,146 @@ $MYSQL -e "UPDATE settings SET setting_value='16' WHERE setting_key='vat_rate';"
 eq "the rate is back for the next suite" "$(setting_of vat_rate)" "16"
 
 echo ""
+echo "=== 9c. Sending to KRA ==="
+
+# The wire to KRA is not written — it needs KRA's own documentation and
+# guessing it produces invoices they reject. Everything around it is,
+# and that is what this section is about: an invoice that should not be
+# sent is not sent, and an invoice that cannot be sent says why.
+etims() { $PHP "$ROOT/tests/helpers/etims_queue.php" "$@"; }
+
+ETIMS_WAS=$(q "SELECT setting_value FROM settings WHERE setting_key='etims_enabled';")
+SERIAL_WAS=$(q "SELECT setting_value FROM settings WHERE setting_key='etims_device_serial';")
+URL_WAS=$(q "SELECT setting_value FROM settings WHERE setting_key='etims_base_url';")
+
+# Nothing goes while the details are incomplete. Refusing to send is
+# always safe; sending something malformed under the company's PIN is
+# not, because a rejected invoice is a filing that was not made.
+$MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key='etims_enabled';
+           UPDATE settings SET setting_value='' WHERE setting_key='etims_device_serial';"
+
+has "an unconfigured system will not send" "$(etims state)" "can send: no"
+has "and says what is missing"             "$(etims state)" "device serial"
+has "the sweep holds rather than fails"    "$(etims sweep)" "sent 0, failed 0"
+
+# Switched off is a decision, not a fault.
+$MYSQL -e "UPDATE settings SET setting_value='TEST-DEVICE-001' WHERE setting_key='etims_device_serial';
+           UPDATE settings SET setting_value='https://etims.example.invalid' WHERE setting_key='etims_base_url';
+           UPDATE settings SET setting_value='0' WHERE setting_key='etims_enabled';"
+$PHP -r 'require getenv("SHANFIX_ROOT")."/app/bootstrap.php";
+         App\Core\Config::load(CONFIG_PATH."/config.php");
+         App\Core\Database::connect(App\Core\Config::get("db"));
+         App\Core\Settings::set("etims_device_key", "test-credential");' 2>/dev/null
+
+has "a complete but switched-off setup says so" "$(etims state)" "switched off"
+has "and still will not send"                   "$(etims state)" "can send: no"
+
+# The credential is encrypted at rest. Anybody holding it can file
+# declarations under this company's PIN.
+RAW=$(q "SELECT setting_value FROM settings WHERE setting_key='etims_device_key';")
+case "$RAW" in
+  *test-credential*) bad "the device credential is encrypted at rest" "plaintext" "ciphertext" ;;
+  "")                bad "the device credential is encrypted at rest" "empty" "ciphertext" ;;
+  *)                 ok  "the device credential is encrypted at rest" "not plaintext" ;;
+esac
+
+# Switched on and complete: it would send, and refuses for the one
+# honest reason.
+$MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key='etims_enabled';"
+has "a complete setup is ready"  "$(etims state)" "can send: yes"
+has "but the wire is not written" "$(etims state)" "implemented: no"
+
+# What may be queued, and what may not.
+raise "eTIMS suite to send" exclusive none 0 "Pull-up banner" 10000 B
+DS=$(docid "eTIMS suite to send")
+
+# A draft is not a tax document. Sending one declares income from a sale
+# nobody has agreed to, and the correction is a credit note.
+$MYSQL -e "UPDATE documents SET status='draft' WHERE id=$DS;"
+has "a draft is not sent"     "$(etims queue $DS)" "still a draft"
+eq  "and is not queued"       "$(q "SELECT etims_status FROM documents WHERE id=$DS;")" "not_sent"
+
+$MYSQL -e "UPDATE documents SET status='unpaid' WHERE id=$DS;"
+has "an issued invoice queues"  "$(etims queue $DS)" "ok"
+eq  "and is waiting"            "$(q "SELECT etims_status FROM documents WHERE id=$DS;")" "queued"
+eq  "and the queue counts it"   "$(q "SELECT COUNT(*) FROM etims_log WHERE document_id=$DS AND action='queue';")" "1"
+
+# A quotation is not a tax document either.
+post /quotations \
+  --data-urlencode "_token=$(tok /quotations/create)" \
+  --data-urlencode "client_id=$CID" --data-urlencode "title=eTIMS suite not a tax doc" \
+  --data-urlencode "issue_date=2026-09-30" --data-urlencode "status=sent" \
+  --data-urlencode "vat_mode=exclusive" \
+  --data-urlencode "items[0][item_type]=custom" --data-urlencode "items[0][description]=Banner" \
+  --data-urlencode "items[0][quantity]=1" --data-urlencode "items[0][unit_price]=1000" > /dev/null
+QQ=$(docid "eTIMS suite not a tax doc")
+has "a quotation is not sent to KRA" "$(etims queue $QQ)" "not a tax document"
+
+# The invoice's own problems are found here rather than discovered as a
+# rejection, because a rejection does not say which line of which
+# invoice was at fault.
+has "a line with no KRA code is caught" "$(etims check $DS)" "no KRA item code"
+
+$MYSQL -e "UPDATE document_items SET etims_code='5059790800' WHERE document_id=$DS;"
+has "and passes once it has one"        "$(etims check $DS)" "nothing"
+
+# A line whose tax does not match the invoice would mean the declaration
+# and the document the client holds are two different things.
+$MYSQL -e "UPDATE document_items SET tax_amount=99.00 WHERE document_id=$DS;"
+has "tax that does not add up is caught" "$(etims check $DS)" "but the invoice says"
+$MYSQL -e "UPDATE document_items SET tax_amount=1600.00 WHERE document_id=$DS;"
+
+# And an attempt that cannot succeed records why, rather than leaving
+# the invoice looking sent.
+etims send $DS > /dev/null
+eq  "a refused send is recorded as failed" "$(q "SELECT etims_status FROM documents WHERE id=$DS;")" "failed"
+ne  "with a reason on it"                  "$(q "SELECT etims_last_error FROM documents WHERE id=$DS;")" ""
+eq  "and the attempt counted"              "$(q "SELECT etims_attempts FROM documents WHERE id=$DS;")" "1"
+eq  "and kept in the log"                  "$(q "SELECT COUNT(*) FROM etims_log WHERE document_id=$DS AND action='send';")" "1"
+
+# It gives up rather than knocking for ever, and tells somebody when it
+# does — an invoice the business has not declared is a compliance
+# problem, not a row to retry quietly.
+$MYSQL -e "DELETE FROM staff_notifications WHERE event='etims_failed';
+           UPDATE documents SET etims_attempts=3, etims_status='queued' WHERE id=$DS;"
+etims send $DS > /dev/null
+eq "somebody is told when it gives up" \
+   "$(q "SELECT COUNT(*) > 0 FROM staff_notifications WHERE event='etims_failed' AND entity_id=$DS;")" "1"
+
+$MYSQL -e "UPDATE documents SET etims_attempts=9 WHERE id=$DS;"
+has "and the sweep leaves it alone" "$(etims sweep)" "sent 0, failed 0"
+
+# Queueing it again does not forgive the attempts already made. It used
+# to: the count was read from a column the query did not select, so it
+# came back as nothing and was written as zero, and an invoice somebody
+# kept pressing Send on would knock at KRA for ever.
+etims queue $DS > /dev/null
+eq "queueing again keeps the attempts"    "$(q "SELECT etims_attempts FROM documents WHERE id=$DS;")" "9"
+
+# The settings screen says all of this out loud rather than leaving it
+# to be discovered when an invoice does not go.
+TAB=$(page "/settings?tab=etims")
+has "the tab says the wire is unfinished" "$TAB" "not finished"
+has "and what it needs"                   "$TAB" "OSCU"
+has "the PIN comes from the company"      "$TAB" "from"
+has "and is not asked for twice"          "$TAB" "P051234567X"
+eq  "there is no second PIN setting" \
+    "$(q "SELECT COUNT(*) FROM settings WHERE setting_key='etims_pin';")" "0"
+
+# The tab used to render the category lists underneath itself, because
+# the chain of tabs ended in a bare else.
+eq "and it does not show somebody else's tab" \
+   "$(page "/settings?tab=etims" | grep -c 'Inventory categories')" "0"
+eq "nor does social" \
+   "$(page "/settings?tab=social" | grep -c 'Inventory categories')" "0"
+
+$MYSQL -e "UPDATE settings SET setting_value='$ETIMS_WAS' WHERE setting_key='etims_enabled';
+           UPDATE settings SET setting_value='$SERIAL_WAS' WHERE setting_key='etims_device_serial';
+           UPDATE settings SET setting_value='$URL_WAS' WHERE setting_key='etims_base_url';
+           DELETE FROM settings WHERE setting_key='etims_device_key';
+           DELETE FROM staff_notifications WHERE event='etims_failed';"
+
+echo ""
 echo "=== 10. Tidy up ==="
 
 $MYSQL -e "DELETE FROM documents WHERE title LIKE 'eTIMS suite%';

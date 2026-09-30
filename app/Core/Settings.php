@@ -28,6 +28,10 @@ class Settings
         // billed to our gateway account.
         'onfon_api_key',
         'onfon_access_key',
+        // The eTIMS device credential files tax declarations under this
+        // company's PIN. Anybody holding it can declare income the
+        // business did not earn, or fail to declare income it did.
+        'etims_device_key',
     ];
 
     private static function load(): array

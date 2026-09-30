@@ -103,6 +103,11 @@ CREATE TABLE IF NOT EXISTS etims_log (
 -- rejects, and a rejected invoice is a compliance problem rather than
 -- an error message.
 --
+-- The KRA PIN is not here either. The business already has one, on
+-- the company settings, and it is the one printed on every invoice.
+-- Two settings for one PIN means the paper and the declaration can
+-- disagree about who filed.
+--
 -- The device credentials are not listed here. Settings::SECRETS
 -- encrypts them at rest, and a row inserted with an empty value would
 -- be an empty encrypted value — they are written the first time
@@ -111,7 +116,6 @@ CREATE TABLE IF NOT EXISTS etims_log (
 INSERT INTO settings (setting_key, setting_value) VALUES
   ('etims_enabled',      '0'),
   ('etims_environment',  'sandbox'),
-  ('etims_pin',          ''),
   ('etims_branch_id',    '00'),
   ('etims_device_serial',''),
   ('etims_base_url',     ''),

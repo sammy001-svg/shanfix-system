@@ -42,10 +42,18 @@ final class Setup
         return self::environment() === 'production';
     }
 
-    /** The taxpayer's PIN, as KRA holds it. */
+    /**
+     * The taxpayer's PIN, as KRA holds it.
+     *
+     * The company's own PIN, from the Company tab — the one already
+     * printed on every invoice. Not a second setting of its own: two
+     * settings for one fact means the PIN on the paper and the PIN on
+     * the declaration can differ, and the one that is wrong is whichever
+     * the person was not looking at.
+     */
     public static function pin(): string
     {
-        return strtoupper(trim((string) Settings::get('etims_pin', '')));
+        return strtoupper(trim((string) Settings::get('company_kra_pin', '')));
     }
 
     /**
@@ -101,7 +109,7 @@ final class Setup
         $missing = [];
 
         if (self::pin() === '') {
-            $missing[] = 'the KRA PIN this business is registered under';
+            $missing[] = 'the company KRA PIN, on the Company tab';
         }
 
         if (self::deviceSerial() === '') {

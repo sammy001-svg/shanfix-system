@@ -19,7 +19,7 @@ class SettingsController extends Controller
     {
         $tab = (string) $request->query('tab', 'company');
 
-        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'email', 'meetings', 'categories', 'social'], true)) {
+        if (!in_array($tab, ['company', 'documents', 'payments', 'messaging', 'email', 'meetings', 'categories', 'etims', 'social'], true)) {
             $tab = 'company';
         }
 
@@ -100,6 +100,22 @@ class SettingsController extends Controller
           ->maxLen('company_kra_pin', 30, 'KRA PIN')
           ->maxLen('currency', 5, 'Currency');
 
+        // A Kenyan PIN is a letter, nine digits and a letter. It was only
+        // ever length-checked, which was survivable while it was just
+        // something printed on an invoice. It is now the PIN every
+        // declaration to KRA is filed under, and a typo in it is not
+        // found until an invoice is refused — or, worse, until it is
+        // accepted against somebody else's number.
+        //
+        // Spaces are taken out rather than refused. People write it with
+        // them and it is the same PIN.
+        $pin = strtoupper(preg_replace('/\\s+/', '', (string) $request->input('company_kra_pin', '')));
+
+        if ($pin !== '' && !preg_match('/^[A-Z]\\d{9}[A-Z]$/', $pin)) {
+            $v->custom('company_kra_pin', false,
+                'That does not look like a KRA PIN. They are a letter, nine digits and a letter — P051234567X.');
+        }
+
         if ($v->fails()) {
             $v->redirectBack('/settings');
         }
@@ -112,7 +128,7 @@ class SettingsController extends Controller
             'company_phone'   => $request->input('company_phone'),
             'company_address' => $request->input('company_address'),
             'company_website' => $request->input('company_website'),
-            'company_kra_pin' => strtoupper((string) $request->input('company_kra_pin')),
+            'company_kra_pin' => $pin,
             'currency'        => strtoupper((string) $request->input('currency', 'KES')),
         ]);
 
@@ -674,6 +690,64 @@ class SettingsController extends Controller
         ActivityLog::record('settings_updated', 'settings', null, 'Updated social media settings');
         Session::success('Social media settings saved.');
         Response::to('/settings?tab=social');
+    }
+
+    /**
+     * The company's own KRA details.
+     *
+     * Nothing here is guessable and a wrong value is rejected by KRA
+     * rather than corrected, so what validation there is checks shape
+     * rather than meaning — a PIN that is not a PIN, an address that is
+     * not https. Whether KRA agrees is between KRA and the first
+     * invoice.
+     */
+    public function saveEtims(Request $request): void
+    {
+        $this->authorize('admin');
+
+        $url = trim((string) $request->input('etims_base_url', ''));
+
+        $v = new Validator($request->all());
+
+        // Declarations do not travel over plain http, whatever a
+        // sandbox happens to accept.
+        if ($url !== '' && !str_starts_with($url, 'https://')) {
+            $v->custom('etims_base_url', false, 'The eTIMS address has to be https.');
+        }
+
+        if ($v->fails()) {
+            $v->redirectBack('/settings?tab=etims');
+        }
+
+        $settings = [
+            'etims_branch_id'     => trim((string) $request->input('etims_branch_id', '00')) ?: '00',
+            'etims_device_serial' => trim((string) $request->input('etims_device_serial', '')),
+            'etims_base_url'      => rtrim($url, '/'),
+            'etims_environment'   => $request->input('etims_environment') === 'production'
+                                     ? 'production' : 'sandbox',
+            'etims_enabled'       => $request->bool('etims_enabled') ? '1' : '0',
+            'etims_auto_send'     => $request->bool('etims_auto_send') ? '1' : '0',
+        ];
+
+        // Blank means "leave it alone", not "clear it". The field is
+        // never filled in on the way out, so a save of any other
+        // setting on this page would otherwise wipe the credential.
+        $key = trim((string) $request->input('etims_device_key', ''));
+
+        if ($key !== '') {
+            $settings['etims_device_key'] = $key;
+        }
+
+        Settings::setMany($settings);
+
+        // The credential is not in the log line, and neither is anything
+        // that would narrow it down.
+        ActivityLog::record('settings_updated', 'settings', null,
+            'Updated eTIMS settings (' . $settings['etims_environment'] . ', '
+            . ($settings['etims_enabled'] === '1' ? 'sending' : 'not sending') . ')');
+
+        Session::success('eTIMS settings saved.');
+        Response::to('/settings?tab=etims');
     }
 
     // -- Categories ----------------------------------------------------

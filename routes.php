@@ -1355,6 +1355,7 @@ $r->group(['auth'], function ($r) {
         $r->post('/settings/messaging',          [SettingsController::class, 'saveMessaging']);
         $r->post('/settings/meetings',           [SettingsController::class, 'saveMeetings']);
         $r->post('/settings/email',              [SettingsController::class, 'saveMailServer']);
+        $r->post('/settings/etims',              [SettingsController::class, 'saveEtims']);
         $r->post('/settings/social',             [SettingsController::class, 'saveSocial']);
         $r->post('/settings/categories',         [SettingsController::class, 'storeCategory']);
         $r->post('/settings/categories/{id}/delete', [SettingsController::class, 'destroyCategory'], ['permission:records.delete']);
