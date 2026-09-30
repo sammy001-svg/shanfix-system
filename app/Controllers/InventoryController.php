@@ -12,6 +12,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\Settings;
 use App\Core\Validator;
+use App\Services\Etims\TaxTypes;
 use App\Services\ImageLibrary;
 
 class InventoryController extends Controller
@@ -511,6 +512,8 @@ class InventoryController extends Controller
 
         return [
             'sku'           => strtoupper((string) $request->input('sku')),
+            'tax_type'      => TaxTypes::clean($request->input('tax_type')),
+            'etims_code'    => trim((string) $request->input('etims_code')) ?: null,
             'name'          => (string) $request->input('name'),
             'category_id'   => $request->int('category_id') ?: null,
             'description'   => $request->input('description') ?: null,

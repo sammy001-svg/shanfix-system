@@ -310,10 +310,21 @@ $paidPct = $total > 0 ? min(100, ($paid / $total) * 100) : 0;
             </div>
           <?php endif; ?>
 
-          <?php if ($doc['vat_mode'] !== 'exempt'): ?>
+          <?php if ($doc['vat_mode'] !== 'exempt' && \App\Services\Etims\TaxSummary::isMixed($items)): ?>
+            <?php foreach (\App\Services\Etims\TaxSummary::bands($items, $doc) as $band): ?>
+              <div class="totals__row">
+                <span class="totals__label">
+                  <?= e($band['class']) ?> &middot; <?= e($band['name']) ?><?php if ($band['rate'] > 0): ?>
+                    (<?= e(qty($band['rate'])) ?>%)<?php endif; ?>
+                  <span class="text-muted">on <?= e(money($band['net'])) ?></span>
+                </span>
+                <span class="totals__value"><?= e(money($band['tax'])) ?></span>
+              </div>
+            <?php endforeach; ?>
+          <?php elseif ($doc['vat_mode'] !== 'exempt'): ?>
             <div class="totals__row">
               <span class="totals__label">
-                VAT (<?= e(qty($doc['vat_rate'])) ?>%)<?= $doc['vat_mode'] === 'inclusive' ? ' — included' : '' ?>
+                <?= e(\App\Services\Etims\TaxSummary::label($items, $doc)) ?>
               </span>
               <span class="totals__value"><?= e(money($doc['vat_amount'])) ?></span>
             </div>

@@ -76,6 +76,10 @@ SET @col := (SELECT COUNT(*) FROM information_schema.columns
               WHERE table_schema = DATABASE()
                 AND table_name = 'document_items' AND column_name = 'tax_type');
 
+-- Whether the column is new, remembered before we add it, because the
+-- backfill below must only ever run the once.
+SET @fresh := (@col = 0);
+
 SET @sql := IF(@col = 0,
   'ALTER TABLE document_items
      ADD COLUMN tax_type CHAR(1) NOT NULL DEFAULT ''B'' AFTER line_total,
@@ -91,11 +95,18 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 -- so nothing recomputes to a different total than the one the client
 -- was sent. An exempt document becomes A; everything else B, which is
 -- what the single-rate arithmetic was already doing to it.
+--
+-- Once only. A zero-rated line has no tax on it quite legitimately, so
+-- "no tax yet" stops being a way to spot an un-backfilled row the
+-- moment the first such line is written. Run this a second time and it
+-- would quietly re-stamp every one of them as standard rated.
 -- ---------------------------------------------------------------------
-UPDATE document_items i
-  JOIN documents d ON d.id = i.document_id
-   SET i.tax_type = IF(d.vat_mode = 'exempt', 'A', 'B')
- WHERE i.tax_amount = 0.00;
+SET @sql := IF(@fresh,
+  'UPDATE document_items i
+     JOIN documents d ON d.id = i.document_id
+      SET i.tax_type = IF(d.vat_mode = ''exempt'', ''A'', ''B'')',
+  'DO 0');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- ---------------------------------------------------------------------
 -- Settings

@@ -233,8 +233,19 @@ $tone = static fn(string $s): string => match ($s) {
         <?php endif; ?>
 
         <?php if ($doc['vat_mode'] !== 'exempt' && (float) $doc['vat_amount'] > 0): ?>
-          <dt>VAT (<?= e(rtrim(rtrim(number_format((float) $doc['vat_rate'], 2), '0'), '.')) ?>%)</dt>
-          <dd><?= e(money($doc['vat_amount'], false)) ?></dd>
+          <?php // Band by band where the document is mixed, because the
+                // client is entitled to see which part of what they are
+                // paying carried VAT and at what rate. ?>
+          <?php if (\App\Services\Etims\TaxSummary::isMixed($items)): ?>
+            <?php foreach (\App\Services\Etims\TaxSummary::bands($items, $doc) as $band): ?>
+              <?php if ($band['tax'] <= 0) { continue; } ?>
+              <dt><?= e($band['name']) ?> VAT (<?= e(\App\Services\Etims\TaxSummary::percent($band['rate'])) ?>%)</dt>
+              <dd><?= e(money($band['tax'], false)) ?></dd>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <dt>VAT (<?= e(rtrim(rtrim(number_format((float) $doc['vat_rate'], 2), '0'), '.')) ?>%)</dt>
+            <dd><?= e(money($doc['vat_amount'], false)) ?></dd>
+          <?php endif; ?>
         <?php endif; ?>
 
         <dt class="portal-totals__grand">Total</dt>

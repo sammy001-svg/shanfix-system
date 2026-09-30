@@ -26,6 +26,7 @@ $catalog = [
         'price'       => (float) $i['selling_price'],
         'unit'        => $i['unit'],
         'description' => $i['description'] ?: $i['name'],
+        'tax_type'    => \App\Services\Etims\TaxTypes::clean($i['tax_type'] ?? null),
     ], $inventory),
     'service' => array_map(static fn($s) => [
         'id'          => (int) $s['id'],
@@ -33,7 +34,15 @@ $catalog = [
         'price'       => (float) $s['price'],
         'unit'        => $s['unit_label'] ?? '',
         'description' => $s['description'] ?: $s['name'],
+        'tax_type'    => \App\Services\Etims\TaxTypes::clean($s['tax_type'] ?? null),
     ], $services),
+
+    // What each class costs, so the running total in the browser is
+    // worked out with the same rates the server will use on save.
+    'rates' => array_map(
+        static fn($one) => $one['rate'],
+        \App\Services\Etims\TaxTypes::all()
+    ),
 ];
 
 $rows = $existingItems ?: [];
@@ -196,6 +205,7 @@ $rows = $existingItems ?: [];
                 <th>Item / description</th>
                 <th class="col-w-qty num">Qty</th>
                 <th class="col-w-price num">Unit price</th>
+                <th class="col-w-vat">VAT</th>
                 <th class="col-w-total num">Line total</th>
                 <th style="width:38px"></th>
               </tr>
@@ -228,6 +238,17 @@ $rows = $existingItems ?: [];
                            data-f="unit_price" aria-label="Unit price" name="items[<?= $i ?>][unit_price]"
                            value="<?= e(number_format((float) $item['unit_price'], 2, '.', '')) ?>" required>
                   </td>
+                  <td>
+                    <select class="select select--sm" data-f="tax_type" aria-label="VAT class"
+                            name="items[<?= $i ?>][tax_type]">
+                      <?php foreach (\App\Services\Etims\TaxTypes::all() as $letter => $one): ?>
+                        <option value="<?= e($letter) ?>" title="<?= e($one['hint']) ?>"
+                          <?= \App\Services\Etims\TaxTypes::clean($item['tax_type'] ?? null) === $letter ? 'selected' : '' ?>>
+                          <?= e(\App\Services\Etims\TaxTypes::chip($letter)) ?>
+                        </option>
+                      <?php endforeach; ?>
+                    </select>
+                  </td>
                   <td class="num fw-600 nums" data-f="line_total">0.00</td>
                   <td>
                     <button class="items-table__del" type="button" aria-label="Remove line"><?= icon('trash') ?></button>
@@ -248,10 +269,14 @@ $rows = $existingItems ?: [];
               <span class="totals__label">Discount</span>
               <span class="totals__value">− <?= e(setting('currency', 'KES')) ?> <span id="sum-discount">0.00</span></span>
             </div>
+            <?php // One row where the whole document is in one tax class,
+                  // and a row per class where it is not. Filled by app.js
+                  // as the lines are typed. ?>
             <div class="totals__row" id="row-vat">
               <span class="totals__label">VAT</span>
               <span class="totals__value"><?= e(setting('currency', 'KES')) ?> <span id="sum-vat">0.00</span></span>
             </div>
+            <div id="vat-bands" class="hidden" data-currency="<?= e(setting('currency', 'KES')) ?>"></div>
             <div class="totals__row totals__row--grand">
               <span class="totals__label">Total</span>
               <span class="totals__value"><?= e(setting('currency', 'KES')) ?> <span id="sum-total">0.00</span></span>
@@ -313,11 +338,20 @@ $rows = $existingItems ?: [];
             </select>
           </div>
 
-          <div class="field">
-            <label class="label" for="vat_rate">VAT rate (%)</label>
-            <input class="input" type="number" step="0.001" min="0" id="vat_rate" name="vat_rate"
-                   value="<?= e($val('vat_rate', $vatRate)) ?>">
-          </div>
+          <?php // The rate is no longer typed here. Each line carries its
+                // own tax class and is charged at that class's rate, so a
+                // single figure for the whole document would either be
+                // ignored or be wrong. The standard rate is a setting and
+                // travels with the document as a record of the day.
+                $standard = \App\Services\Etims\TaxTypes::rate('B'); ?>
+          <input type="hidden" id="vat_rate" name="vat_rate" value="<?= e($standard) ?>">
+
+          <p class="field-hint mb-0">
+            Standard rate is <strong><?= e(rtrim(rtrim(number_format($standard, 2, '.', ''), '0'), '.')) ?>%</strong>,
+            set in <a href="<?= url('/settings') ?>">settings</a>. Each line has its own
+            VAT class in the table above — use that for anything zero-rated or exempt.
+            Choosing “No VAT” here overrides every line.
+          </p>
         </div>
       </div>
 
@@ -431,6 +465,15 @@ $rows = $existingItems ?: [];
     <td class="num">
       <input class="input num" type="number" step="0.01" min="0"
              data-f="unit_price" aria-label="Unit price" name="items[][unit_price]" value="0.00" required>
+    </td>
+    <td>
+      <select class="select select--sm" data-f="tax_type" aria-label="VAT class" name="items[][tax_type]">
+        <?php foreach (\App\Services\Etims\TaxTypes::all() as $letter => $one): ?>
+          <option value="<?= e($letter) ?>" title="<?= e($one['hint']) ?>" <?= $letter === 'B' ? 'selected' : '' ?>>
+            <?= e(\App\Services\Etims\TaxTypes::chip($letter)) ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
     </td>
     <td class="num fw-600 nums" data-f="line_total">0.00</td>
     <td>

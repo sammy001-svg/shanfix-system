@@ -4,6 +4,7 @@ namespace App\Services;
 use App\Core\Database;
 use App\Core\Numbering;
 use App\Core\Settings;
+use App\Services\Etims\TaxTypes;
 
 /**
  * The recurring side of the business: what renews, when, and the invoice
@@ -149,11 +150,29 @@ class Renewals
         $vatMode = (string) Settings::get('vat_default_mode', 'exclusive');
         $vatRate = (float) Settings::get('vat_rate', 16);
 
+        // The tax class of the service being renewed. A renewal of a
+        // zero-rated service is zero-rated, and nobody is at the screen
+        // to notice if it goes out at sixteen per cent instead.
+        $taxClass = 'B';
+
+        if ($sub['service_id']) {
+            $service = Database::first(
+                'SELECT tax_type, etims_code FROM services WHERE id = :id',
+                ['id' => $sub['service_id']]
+            );
+
+            $taxClass = TaxTypes::clean($service['tax_type'] ?? null);
+            $taxCode  = $service['etims_code'] ?? null;
+        }
+
+        $taxCode ??= null;
+
         $line = [[
             'item_type'   => 'service',
             'description' => self::lineDescription($sub, $period),
             'quantity'    => 1,
             'unit_price'  => $amount,
+            'tax_type'    => $taxClass,
         ]];
 
         $totals = DocumentCalculator::compute($line, 'none', 0.0, $vatMode, $vatRate);
@@ -201,6 +220,9 @@ class Renewals
             'unit'        => 'each',
             'unit_price'  => $amount,
             'line_total'  => $totals['lines'][0] ?? $amount,
+            'tax_type'    => $taxClass,
+            'tax_amount'  => $totals['line_tax'][0] ?? 0,
+            'etims_code'  => $taxCode,
             'sort_order'  => 0,
         ]);
 

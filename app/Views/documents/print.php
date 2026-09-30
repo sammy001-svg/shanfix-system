@@ -97,11 +97,20 @@ $logoPath = $company['logo'] ? url('files/' . $company['logo']) : null;
     </section>
   <?php endforeach; ?>
 
+  <?php // Where the lines are in more than one tax class, each line says
+        // which. A client reading a tax invoice is entitled to see which
+        // part of what they are paying carried VAT, and KRA expects a
+        // class against every item. On an ordinary invoice the column
+        // would say "B" three times and is left off. ?>
+  <?php $showClass = $doc['vat_mode'] !== 'exempt'
+                     && \App\Services\Etims\TaxSummary::isMixed($items); ?>
+
   <table class="doc-table">
     <thead>
       <tr>
         <th class="doc-table__idx">#</th>
         <th>Description</th>
+        <?php if ($showClass): ?><th style="width:52px">VAT</th><?php endif; ?>
         <th class="num" style="width:82px">Qty</th>
         <th class="num" style="width:105px">Unit price</th>
         <th class="num" style="width:115px">Amount</th>
@@ -114,6 +123,10 @@ $logoPath = $company['logo'] ? url('files/' . $company['logo']) : null;
           <td>
             <div class="doc-table__desc"><?= nl2br(e($item['description'])) ?></div>
           </td>
+          <?php if ($showClass): ?>
+            <?php $cls = \App\Services\Etims\TaxTypes::clean($item['tax_type'] ?? null); ?>
+            <td title="<?= e(\App\Services\Etims\TaxTypes::name($cls)) ?>"><?= e($cls) ?></td>
+          <?php endif; ?>
           <td class="num">
             <?= e(qty($item['quantity'])) ?>
             <?php if ($item['unit']): ?>
@@ -143,9 +156,24 @@ $logoPath = $company['logo'] ? url('files/' . $company['logo']) : null;
 
       <?php if ($doc['vat_mode'] === 'exempt'): ?>
         <div class="doc-totals__row"><span>VAT</span><span>Exempt / zero-rated</span></div>
+      <?php elseif (\App\Services\Etims\TaxSummary::isMixed($items)): ?>
+        <?php // Lines in more than one tax class, so the VAT is shown band
+              // by band. "VAT @ 16%" over an invoice where only part of it
+              // is standard rated is a false statement on a tax document,
+              // and it is the shape KRA wants totals in anyway. ?>
+        <?php foreach (\App\Services\Etims\TaxSummary::bands($items, $doc) as $band): ?>
+          <div class="doc-totals__row doc-totals__row--band">
+            <span>
+              <?= e($band['class']) ?> &middot; <?= e($band['name']) ?><?php
+                if ($band['rate'] > 0): ?> @ <?= e(qty($band['rate'])) ?>%<?php endif; ?>
+              <span class="doc-totals__note">on <?= e(money($band['net'], false)) ?></span>
+            </span>
+            <span><?= e(money($band['tax'])) ?></span>
+          </div>
+        <?php endforeach; ?>
       <?php else: ?>
         <div class="doc-totals__row">
-          <span>VAT @ <?= e(qty($doc['vat_rate'])) ?>%<?= $doc['vat_mode'] === 'inclusive' ? ' (incl.)' : '' ?></span>
+          <span><?= e(\App\Services\Etims\TaxSummary::label($items, $doc)) ?></span>
           <span><?= e(money($doc['vat_amount'])) ?></span>
         </div>
       <?php endif; ?>

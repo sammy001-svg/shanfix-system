@@ -353,7 +353,10 @@
 
     const tbody    = $('tbody', table);
     const catalog  = window.SHANFIX_CATALOG || { inventory: [], service: [] };
+    const rates    = window.SHANFIX_TAX_RATES || {};
     const template = $('#item-row-template');
+
+    const round = (n) => Math.round(n * 100) / 100;
 
     function rowTotal(tr) {
       const q = parseFloat(($('[data-f=quantity]', tr) || {}).value) || 0;
@@ -365,46 +368,81 @@
       return n.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    /* This mirrors DocumentCalculator::compute() in PHP. The two have to
+       agree to the cent, so they are written in the same order with the
+       same rounding: tax per line at that line's own class rate, and the
+       discount shared across the lines in proportion so that it does not
+       move tax from one class to another. */
     function recalc() {
+      const rows  = $$('tr', tbody);
+      const lines = [];
       let subtotal = 0;
 
-      $$('tr', tbody).forEach((tr) => {
+      rows.forEach((tr) => {
         const total = rowTotal(tr);
+        lines.push(total);
         subtotal += total;
         const cell = $('[data-f=line_total]', tr);
         if (cell) cell.textContent = fmt(total);
       });
+
+      subtotal = round(subtotal);
 
       // Discount
       const discType  = ($('#discount_type') || {}).value || 'none';
       const discValue = parseFloat(($('#discount_value') || {}).value) || 0;
 
       let discount = 0;
-      if (discType === 'percent') discount = subtotal * (discValue / 100);
-      else if (discType === 'amount') discount = discValue;
-      discount = Math.min(Math.round(discount * 100) / 100, subtotal);
+      if (discType === 'percent') discount = round(subtotal * (discValue / 100));
+      else if (discType === 'amount') discount = round(discValue);
+      discount = Math.max(0, Math.min(discount, subtotal));
 
-      const net     = subtotal - discount;
+      const net     = round(subtotal - discount);
       const vatMode = ($('#vat_mode') || {}).value || 'exclusive';
-      const vatRate = parseFloat(($('#vat_rate') || {}).value) || 0;
+
+      // A document marked exempt is exempt whatever its lines claim.
+      const exempt = vatMode === 'exempt';
 
       let vat = 0;
-      let total = net;
+      const ratesUsed = [];
+      const bands = {};
 
-      if (vatMode === 'exclusive') {
-        vat = net * (vatRate / 100);
-        total = net + vat;
-      } else if (vatMode === 'inclusive') {
-        // Net already contains VAT; back it out for display.
-        vat = net - (net / (1 + vatRate / 100));
-        total = net;
-      }
+      rows.forEach((tr, i) => {
+        const share = subtotal > 0 ? round(lines[i] - (discount * (lines[i] / subtotal))) : 0;
+        const sel   = $('[data-f=tax_type]', tr);
+        const cls   = exempt ? 'A' : ((sel && sel.value) || 'B');
+        const rate  = exempt ? 0 : (parseFloat(rates[cls]) || 0);
 
-      vat   = Math.round(vat * 100) / 100;
-      total = Math.round(total * 100) / 100;
+        let tax = 0;
+        if (rate > 0) {
+          if (vatMode === 'inclusive') {
+            // The price typed already contains the tax.
+            tax = round(share - round(share / (1 + rate / 100)));
+          } else {
+            tax = round(share * (rate / 100));
+          }
+          if (ratesUsed.indexOf(rate) === -1) ratesUsed.push(rate);
+        }
+
+        vat += tax;
+
+        // What each class was charged on, for the breakdown. An inclusive
+        // price contains its tax, so the taxable amount is the share less
+        // what is inside it.
+        const label = sel && sel.selectedOptions[0]
+          ? sel.selectedOptions[0].textContent.trim() : cls;
+
+        bands[cls] = bands[cls] || { label: label, rate: rate, net: 0, tax: 0 };
+        bands[cls].net = round(bands[cls].net + (vatMode === 'inclusive' ? share - tax : share));
+        bands[cls].tax = round(bands[cls].tax + tax);
+      });
+
+      vat = round(vat);
+
+      const total = vatMode === 'inclusive' ? net : round(net + vat);
 
       const set = (sel, val) => { const el = $(sel); if (el) el.textContent = fmt(val); };
-      set('#sum-subtotal', Math.round(subtotal * 100) / 100);
+      set('#sum-subtotal', subtotal);
       set('#sum-discount', discount);
       set('#sum-vat', vat);
       set('#sum-total', total);
@@ -412,12 +450,51 @@
       const discRow = $('#row-discount');
       if (discRow) discRow.classList.toggle('hidden', discount <= 0);
 
+      // More than one class on the document means the VAT is shown band
+      // by band, the way the printed invoice shows it. "VAT (16%)" over
+      // a document only part of which is standard rated is the sentence
+      // this whole arrangement exists to stop the system saying.
+      const classes = Object.keys(bands);
+      const split   = !exempt && classes.length > 1;
+
       const vatRow = $('#row-vat');
       if (vatRow) {
-        vatRow.classList.toggle('hidden', vatMode === 'exempt');
+        vatRow.classList.toggle('hidden', exempt || split);
         const lbl = $('.totals__label', vatRow);
         if (lbl) {
-          lbl.textContent = 'VAT (' + vatRate + '%)' + (vatMode === 'inclusive' ? ' — included' : '');
+          let name = 'VAT';
+          if (ratesUsed.length === 1) name = 'VAT (' + ratesUsed[0] + '%)';
+
+          lbl.textContent = name + (vatMode === 'inclusive' ? ' — included' : '');
+        }
+      }
+
+      const bandWrap = $('#vat-bands');
+      if (bandWrap) {
+        bandWrap.classList.toggle('hidden', !split);
+        bandWrap.textContent = '';
+
+        if (split) {
+          classes.sort().forEach((cls) => {
+            const band = bands[cls];
+
+            const row = document.createElement('div');
+            row.className = 'totals__row';
+
+            const label = document.createElement('span');
+            label.className = 'totals__label';
+            label.textContent = band.label
+              + (band.rate > 0 ? ' ' + band.rate + '%' : '')
+              + ' on ' + fmt(band.net);
+
+            const value = document.createElement('span');
+            value.className = 'totals__value';
+            value.textContent = (bandWrap.dataset.currency || '') + ' ' + fmt(band.tax);
+
+            row.appendChild(label);
+            row.appendChild(value);
+            bandWrap.appendChild(row);
+          });
         }
       }
     }
@@ -445,6 +522,7 @@
         set('unit_price', preset.unit_price);
         set('quantity', preset.quantity || 1);
         set('unit', preset.unit || '');
+        set('tax_type', preset.tax_type || 'B');
         populateCatalog(tr);
         const sel = $('[data-f=ref_id]', tr);
         if (sel) sel.value = preset.ref_id;
@@ -485,6 +563,7 @@
         opt.dataset.price = entry.price;
         opt.dataset.unit  = entry.unit || '';
         opt.dataset.desc  = entry.description || entry.label;
+        opt.dataset.tax   = entry.tax_type || 'B';
         refSel.appendChild(opt);
       });
     }
@@ -501,15 +580,24 @@
         recalc();
       }
 
+      if (e.target.matches('[data-f=tax_type]')) {
+        recalc();
+      }
+
       if (e.target.matches('[data-f=ref_id]')) {
         const opt = e.target.selectedOptions[0];
         if (opt && opt.value) {
           const desc  = $('[data-f=description]', tr);
           const price = $('[data-f=unit_price]', tr);
           const unit  = $('[data-f=unit]', tr);
+          const tax   = $('[data-f=tax_type]', tr);
           if (desc && !desc.value.trim()) desc.value = opt.dataset.desc || opt.textContent;
           if (price) price.value = opt.dataset.price || 0;
           if (unit) unit.value = opt.dataset.unit || '';
+          // The class follows the item picked: changing the item changes
+          // what is being sold, so the class chosen for the last one no
+          // longer applies.
+          if (tax) tax.value = opt.dataset.tax || 'B';
         }
         recalc();
       }

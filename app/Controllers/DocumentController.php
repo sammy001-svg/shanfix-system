@@ -14,6 +14,7 @@ use App\Core\Settings;
 use App\Core\Validator;
 use App\Core\Logger;
 use App\Services\DocumentCalculator;
+use App\Services\Etims\TaxTypes;
 use App\Services\Notifier;
 use App\Services\DocumentApproval;
 use App\Services\StockLedger;
@@ -628,6 +629,9 @@ class DocumentController extends Controller
                     'unit'        => $item['unit'],
                     'unit_price'  => $item['unit_price'],
                     'line_total'  => $item['line_total'],
+                    'tax_type'    => $item['tax_type'] ?? 'B',
+                    'tax_amount'  => $item['tax_amount'] ?? 0,
+                    'etims_code'  => $item['etims_code'] ?? null,
                     'sort_order'  => $i,
                 ]);
             }
@@ -719,6 +723,9 @@ class DocumentController extends Controller
                     'unit'        => $item['unit'],
                     'unit_price'  => $item['unit_price'],
                     'line_total'  => $item['line_total'],
+                    'tax_type'    => $item['tax_type'] ?? 'B',
+                    'tax_amount'  => $item['tax_amount'] ?? 0,
+                    'etims_code'  => $item['etims_code'] ?? null,
                     'sort_order'  => $i,
                 ]);
             }
@@ -814,6 +821,9 @@ class DocumentController extends Controller
                     'unit'        => $item['unit'],
                     'unit_price'  => $item['unit_price'],
                     'line_total'  => $item['line_total'],
+                    'tax_type'    => $item['tax_type'] ?? 'B',
+                    'tax_amount'  => $item['tax_amount'] ?? 0,
+                    'etims_code'  => $item['etims_code'] ?? null,
                     'sort_order'  => $i,
                 ]);
             }
@@ -898,6 +908,9 @@ class DocumentController extends Controller
                     'unit'        => $item['unit'],
                     'unit_price'  => $item['unit_price'],
                     'line_total'  => $item['line_total'],
+                    'tax_type'    => $item['tax_type'] ?? 'B',
+                    'tax_amount'  => $item['tax_amount'] ?? 0,
+                    'etims_code'  => $item['etims_code'] ?? null,
                     'sort_order'  => $i,
                 ]);
             }
@@ -986,6 +999,9 @@ class DocumentController extends Controller
                     'unit'        => $item['unit'],
                     'unit_price'  => $item['unit_price'],
                     'line_total'  => $item['line_total'],
+                    'tax_type'    => $item['tax_type'] ?? 'B',
+                    'tax_amount'  => $item['tax_amount'] ?? 0,
+                    'etims_code'  => $item['etims_code'] ?? null,
                     'sort_order'  => $i,
                 ]);
             }
@@ -1084,13 +1100,15 @@ class DocumentController extends Controller
         $inventory = Database::all(
             // Main photo comes along so the picker can show what the item is.
             'SELECT i.id, i.sku, i.name, i.unit, i.selling_price, i.quantity, i.description,
+                    i.tax_type, i.etims_code,
                     (SELECT COALESCE(thumb_path, file_path) FROM inventory_images
                       WHERE item_id = i.id ORDER BY is_primary DESC, sort_order, id LIMIT 1) AS thumb
                FROM inventory_items i WHERE i.is_active = 1 ORDER BY i.name'
         );
 
         $services = Database::all(
-            'SELECT id, code, name, unit_label, price, pricing_type, description
+            'SELECT id, code, name, unit_label, price, pricing_type, description,
+                    tax_type, etims_code
                FROM services WHERE is_active = 1 ORDER BY name'
         );
 
@@ -1191,13 +1209,29 @@ class DocumentController extends Controller
             $itemType = in_array($row['item_type'] ?? '', ['inventory', 'service', 'custom'], true)
                 ? $row['item_type'] : 'custom';
 
+            $refId = $itemType === 'custom' ? null : ((int) ($row['ref_id'] ?? 0) ?: null);
+
             $items[] = [
                 'item_type'   => $itemType,
-                'ref_id'      => $itemType === 'custom' ? null : ((int) ($row['ref_id'] ?? 0) ?: null),
+                'ref_id'      => $refId,
                 'description' => mb_substr($description, 0, 500),
                 'quantity'    => $quantity,
                 'unit'        => mb_substr(trim((string) ($row['unit'] ?? '')), 0, 30) ?: null,
                 'unit_price'  => $unitPrice,
+
+                // What this line is, for tax. The picker fills it from the
+                // catalogue but the user may change it — a single export
+                // sale of an ordinarily standard-rated item is zero-rated,
+                // and that is a decision about the sale, not the item.
+                'tax_type'    => TaxTypes::clean(
+                    $row['tax_type'] ?? $this->catalogueTax($itemType, $refId)
+                ),
+
+                // The KRA classification code is read from the catalogue,
+                // never from the form. It is a fact about the thing sold,
+                // it has to match what was registered with KRA, and a
+                // hidden field is not somewhere to keep it.
+                'etims_code'  => $this->catalogueCode($itemType, $refId),
             ];
         }
 
@@ -1219,6 +1253,7 @@ class DocumentController extends Controller
 
         foreach ($items as $i => &$item) {
             $item['line_total'] = $totals['lines'][$i];
+            $item['tax_amount'] = $totals['line_tax'][$i] ?? 0.0;
             $item['sort_order'] = $i;
         }
         unset($item);
@@ -1332,6 +1367,46 @@ class DocumentController extends Controller
 
         return $out;
     }
+    /**
+     * The tax class the catalogue holds for a thing, used when the form
+     * did not say. Custom lines have nothing to look up and fall to the
+     * standard rate, which is what a custom line has always been.
+     */
+    private function catalogueTax(string $itemType, ?int $refId): ?string
+    {
+        return $this->catalogueField($itemType, $refId, 'tax_type');
+    }
+
+    private function catalogueCode(string $itemType, ?int $refId): ?string
+    {
+        $code = $this->catalogueField($itemType, $refId, 'etims_code');
+
+        return $code !== null && $code !== '' ? $code : null;
+    }
+
+    private function catalogueField(string $itemType, ?int $refId, string $field): ?string
+    {
+        // The column name goes into the query as text, so it is named
+        // here rather than trusted from a caller.
+        if ($refId === null || !in_array($field, ['tax_type', 'etims_code'], true)) {
+            return null;
+        }
+
+        $table = match ($itemType) {
+            'inventory' => 'inventory_items',
+            'service'   => 'services',
+            default     => null,
+        };
+
+        if ($table === null) {
+            return null;
+        }
+
+        $row = Database::first("SELECT {$field} FROM {$table} WHERE id = :id", ['id' => $refId]);
+
+        return $row[$field] ?? null;
+    }
+
     private function saveItems(int $documentId, array $items): void
     {
         foreach ($items as $item) {
@@ -1344,6 +1419,9 @@ class DocumentController extends Controller
                 'unit'        => $item['unit'],
                 'unit_price'  => $item['unit_price'],
                 'line_total'  => $item['line_total'],
+                'tax_type'    => $item['tax_type'] ?? 'B',
+                'tax_amount'  => $item['tax_amount'] ?? 0,
+                'etims_code'  => $item['etims_code'] ?? null,
                 'sort_order'  => $item['sort_order'],
             ]);
         }

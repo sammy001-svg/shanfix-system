@@ -6,8 +6,14 @@
   if (!el) return;
 
   try {
-    window.SHANFIX_CATALOG = JSON.parse(el.textContent);
+    var data = JSON.parse(el.textContent);
+    window.SHANFIX_CATALOG = data;
+    /* What each KRA tax class costs. Sent from PHP rather than written
+       here, because the rates are settings and the Finance Act moves
+       them. */
+    window.SHANFIX_TAX_RATES = data.rates || {};
   } catch (e) {
     window.SHANFIX_CATALOG = { inventory: [], service: [] };
+    window.SHANFIX_TAX_RATES = {};
   }
 })();

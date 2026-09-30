@@ -89,6 +89,38 @@ final class TaxTypes
         return self::all()[strtoupper($letter)]['name'] ?? $letter;
     }
 
+    /**
+     * The name cut down to fit a table cell: "B · Standard 16%".
+     *
+     * A column narrow enough for an invoice line cannot hold "Standard
+     * rated", and a column showing only the letter asks the person
+     * raising the invoice to have learnt the KRA classes. Neither is
+     * acceptable on the screen where the tax is actually decided.
+     */
+    public static function short(string $letter): string
+    {
+        return match (strtoupper($letter)) {
+            'A'     => 'Exempt',
+            'B'     => 'Standard',
+            'C'     => 'Zero',
+            'D'     => 'Non-VAT',
+            'E'     => 'Reduced',
+            default => strtoupper($letter),
+        };
+    }
+
+    /**
+     * "B · Standard", for a picker on an invoice line.
+     *
+     * Without the rate: it does not fit a column narrow enough to sit
+     * between the price and the line total, and the rate is stated
+     * beside the total and again in the sidebar.
+     */
+    public static function chip(string $letter): string
+    {
+        return strtoupper($letter) . ' · ' . self::short($letter);
+    }
+
     /** "B — Standard rated (16%)", for a dropdown. */
     public static function label(string $letter): string
     {

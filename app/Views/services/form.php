@@ -61,6 +61,35 @@ $val = static function (string $key, $fallback = '') use ($service) {
               </select>
             </div>
 
+            <?php // What this is, for tax. It travels onto every invoice
+                  // line the item is put on, and eTIMS will not take a
+                  // line without it. Standard rated unless somebody says
+                  // otherwise, because nearly everything is. ?>
+            <div class="field">
+              <label class="label" for="tax_type">VAT treatment</label>
+              <select class="select" id="tax_type" name="tax_type">
+                <?php foreach (\App\Services\Etims\TaxTypes::all() as $letter => $one): ?>
+                  <option value="<?= e($letter) ?>"
+                    <?= \App\Services\Etims\TaxTypes::clean($val('tax_type', 'B')) === $letter ? 'selected' : '' ?>>
+                    <?= e(\App\Services\Etims\TaxTypes::label($letter)) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+              <span class="field-hint">
+                Carried onto every invoice line this appears on.
+              </span>
+            </div>
+
+            <div class="field">
+              <label class="label" for="etims_code">KRA item code</label>
+              <input class="input" id="etims_code" name="etims_code"
+                     value="<?= e($val('etims_code')) ?>" maxlength="20"
+                     placeholder="from KRA's classification list">
+              <span class="field-hint">
+                Only needed once you are sending invoices to eTIMS.
+              </span>
+            </div>
+
             <div class="field">
               <label class="label" for="lead_time">Typical turnaround</label>
               <input class="input" id="lead_time" name="lead_time" value="<?= e($val('lead_time')) ?>"
