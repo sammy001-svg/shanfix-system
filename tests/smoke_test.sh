@@ -199,6 +199,78 @@ post "/logout" "_token=$TOKEN" "POST /logout"
 check "/dashboard" 302 "GET /dashboard after logout -> redirect"
 
 echo ""
+echo "=== The welcome screen ==="
+
+# An animated panel in front of the sign-in form, on all four doors.
+# Almost everything asserted here is about it getting out of the way
+# again: a sign-in page that an animation can leave shut is an office
+# that cannot start work.
+for door in /login /portal/login /partners/login /signin; do
+  BODY=$(curl -s "$BASE$door")
+  has "the welcome screen is on $door" "$BODY" 'class="intro"'
+done
+
+BODY=$(curl -s "$BASE/login")
+
+has "it names the company"  "$BODY" 'data-name="Shanfix Technology"'
+has "and says what we do"   "$BODY" "Printing, Branding"
+
+# Hidden from assistive technology: it is decoration, and the panel
+# underneath says both of those things again in readable markup.
+has "a screen reader walks past it" "$BODY" 'class="intro" id="intro" aria-hidden="true"'
+
+# There is always a way out, from the first frame.
+has "there is a skip button" "$BODY" 'id="introSkip"'
+
+# With no JavaScript nothing would ever un-hide the form, so the page
+# carries its own undo for that case.
+has "it undoes itself without JavaScript" "$BODY" "<noscript>"
+has "by showing the form"                 "$BODY" "login-stage { opacity: 1 !important"
+has "and hiding the panel"                "$BODY" ".intro { display: none !important"
+
+# Somebody being told something is not made to wait for an animation
+# before they can read it.
+T=$(token "/login")
+REFUSED=$(curl -s -b "$JAR" -c "$JAR" -X POST "$BASE/login" \
+  --data-urlencode "_token=$T" \
+  --data-urlencode "email=nobody@shanfix.co.ke" \
+  --data-urlencode "password=wrong-on-purpose" -L)
+
+case "$REFUSED" in
+  *'class="intro"'*) bad "a refused password is not held behind it" "played" "skipped" ;;
+  *)                 ok  "a refused password is not held behind it" "skipped" ;;
+esac
+
+# And the form underneath is never hidden on a page where the panel is
+# not there to un-hide it.
+case "$REFUSED" in
+  *"has-intro"*) bad "and the form is not left hidden" "has-intro" "no has-intro" ;;
+  *)             ok  "and the form is not left hidden" "visible" ;;
+esac
+
+# The animation is the one from the Mascardi system, so the pieces that
+# make it what it is are named rather than left to drift.
+CSS=$(cat "$ROOT/public/assets/css/app.css")
+has "letters rise out of a blur"  "$CSS" "@keyframes introLetter"
+has "the rule draws itself"       "$CSS" ".intro.is-open .intro__rule"
+has "the tagline tracking closes" "$CSS" ".intro.is-open .intro__tagline"
+has "a light crosses the name"    "$CSS" "is-glint"
+
+# Words are kept whole. A flat row of letters broke this company's name
+# as "Shanfix Techno / logy" when it ran out of screen.
+has "words wrap as words" "$CSS" ".intro__word"
+
+# The letter rules reach the letters, not the word wrapper — which is a
+# span too, and sat invisible waiting for a class it never gets.
+has "and the wrapper is not treated as a letter" "$CSS" ".intro__word > span {"
+
+# Somebody who has asked their machine to stop moving things gets the
+# same screen without the movement.
+has "it respects reduced motion" "$CSS" "prefers-reduced-motion"
+
+signin_admin
+
+echo ""
 echo "=== The connectivity probe ==="
 # The browser asks this before claiming there is no internet. It used to
 # trust navigator.onLine, which on Windows is routinely stuck reporting

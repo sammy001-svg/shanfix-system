@@ -61,6 +61,27 @@ if ($uploaded !== '' && is_file(STORAGE_PATH . '/' . $uploaded)) {
 // this is one image on one page, and it is the whole look of the screen.
 $bg = inline_image($bgFile, 1_200_000) ?? $bg;
 
+// ── The welcome intro ───────────────────────────────────────────────
+//
+// Plays on a fresh arrival at any of the four doors, every time, and is
+// skipped when the page is carrying something the person needs to read.
+// Somebody whose password was refused, or who has just been signed out
+// by a timeout, is being told something — holding that behind four
+// seconds of animation is making them wait to find out what went wrong.
+//
+// A POST is never a fresh arrival: it is the form coming back, and the
+// form coming back means it did not work.
+$showIntro = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
+             && empty($errors)
+             && empty($flashes);
+
+// What it says. The company name is spelled out letter by letter, so it
+// wants to be a name and not a sentence; the tagline carries the rest.
+$introName    = $brand['name'];
+$introTagline = $brand['tagline'] !== ''
+    ? $brand['tagline']
+    : 'Welcome to ' . $brand['name'];
+
 $logoFile = $brand['logo'] !== '' && is_file(STORAGE_PATH . '/' . $brand['logo'])
     ? STORAGE_PATH . '/' . $brand['logo']
     : null;
@@ -97,13 +118,46 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
 <?= css_tag() ?>
 <link rel="icon" href="<?= asset('img/favicon.svg') ?>" type="image/svg+xml">
 <meta name="theme-color" content="#0C2B4A">
+<?php // If the intro is going to run, the form underneath starts hidden
+      // so it does not show through. Which means: with no JavaScript,
+      // nothing would ever un-hide it. This undoes the whole arrangement
+      // for a browser that cannot run the animation — a sign-in page is
+      // not somewhere to find out that a script did not load. ?>
+<?php if ($showIntro): ?>
+  <noscript><style>
+    .intro { display: none !important; }
+    body.has-intro .login-stage { opacity: 1 !important; }
+  </style></noscript>
+<?php endif; ?>
 </head>
-<body class="auth-body">
+<body class="auth-body <?= $showIntro ? 'has-intro' : '' ?>">
+
+<?php if ($showIntro): ?>
+  <?php // Hidden from assistive technology entirely. A screen reader
+        // announces the page, and the page is the sign-in form; an
+        // animation of the company name is decoration it should walk
+        // straight past. The name and tagline are both said again in
+        // the panel below. ?>
+  <div class="intro" id="intro" aria-hidden="true">
+    <div class="intro__field"></div>
+
+    <h1 class="intro__name" id="introName" data-name="<?= e($introName) ?>"></h1>
+    <div class="intro__rule"></div>
+    <p class="intro__tagline"><?= e($introTagline) ?></p>
+  </div>
+
+  <?php // Outside the overlay and not hidden, because this one is for
+        // using rather than for looking at. ?>
+  <button type="button" class="intro__skip" id="introSkip">
+    Skip <?= icon('chevron-right') ?>
+  </button>
+<?php endif; ?>
 
 <?php // Keyboard users should not have to tab through a decorative
       // photograph and a brand panel to reach the form. ?>
 <a class="skip-link" href="#main">Skip to the form</a>
 
+<div class="login-stage" id="loginStage">
 <div class="auth">
 
   <?php // ── The photograph, and what we say over it ───────────────────
@@ -226,7 +280,123 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
     </div>
   </main>
 </div>
+</div><?php // .login-stage ?>
 
 <?= js_tag() ?>
+
+<?php if ($showIntro): ?>
+<?php // The sequence, matching the one on the Mascardi system: letters
+      // rise out of a blur one after another, the rule draws itself
+      // while the tagline settles, a light glints across the name, then
+      // it hands over to the form.
+      //
+      // Inline because it runs once on one page and needs the overlay
+      // to already be in the document; it carries the CSP nonce like
+      // every other inline script here. ?>
+<script nonce="<?= e(csp_nonce()) ?>">
+(function () {
+  'use strict';
+
+  var intro = document.getElementById('intro');
+  var nameEl = document.getElementById('introName');
+  var stage = document.getElementById('loginStage');
+  var skip  = document.getElementById('introSkip');
+
+  if (!intro || !nameEl || !stage) { return; }
+
+  var reduced = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var done = false;
+
+  // Build the name one letter at a time, grouped by word. The grouping
+  // is what stops a two-word name breaking through the middle of a
+  // word when it is too wide for the screen.
+  var letters = [];
+
+  (nameEl.getAttribute('data-name') || '').split(/\s+/).forEach(function (word) {
+    if (!word) { return; }
+
+    var wrap = document.createElement('span');
+    wrap.className = 'intro__word';
+
+    word.split('').forEach(function (ch) {
+      var span = document.createElement('span');
+      span.textContent = ch;
+      wrap.appendChild(span);
+      letters.push(span);
+    });
+
+    nameEl.appendChild(wrap);
+  });
+
+  function reveal() {
+    if (done) { return; }
+    done = true;
+
+    intro.classList.add('is-done');
+    stage.classList.add('show');
+
+    if (skip) { skip.style.display = 'none'; }
+
+    // Put the cursor where the person was going anyway.
+    setTimeout(function () {
+      var first = stage.querySelector('input:not([type=hidden])');
+      if (first) { try { first.focus(); } catch (e) {} }
+    }, 500);
+
+    // Out of the way once it has finished fading, so it can never
+    // swallow a click.
+    setTimeout(function () { intro.style.display = 'none'; }, 1100);
+  }
+
+  // Every way out of it. Somebody who has seen this before should not
+  // have to hunt for the button.
+  if (skip) {
+    skip.addEventListener('click', function (e) { e.stopPropagation(); reveal(); });
+  }
+  intro.addEventListener('click', reveal);
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { reveal(); }
+  });
+
+  // However badly the rest of this goes, the form appears. A sign-in
+  // page held shut by a timer that did not fire is an office that
+  // cannot work.
+  setTimeout(reveal, 9000);
+
+  if (reduced) {
+    letters.forEach(function (span) { span.classList.add('is-in'); });
+    intro.classList.add('is-open');
+    setTimeout(reveal, 1400);
+    return;
+  }
+
+  // 1. The letters rise and unblur, one after another.
+  var step = 95;
+  letters.forEach(function (span, i) {
+    setTimeout(function () { span.classList.add('is-in'); }, 250 + i * step);
+  });
+
+  var settled = 250 + letters.length * step + 900;
+
+  // 2. The rule draws itself and the tagline settles in.
+  setTimeout(function () { intro.classList.add('is-open'); }, settled - 350);
+
+  // 3. A light crosses the name.
+  setTimeout(function () {
+    letters.forEach(function (span, i) {
+      setTimeout(function () {
+        span.classList.add('is-glint');
+        setTimeout(function () { span.classList.remove('is-glint'); }, 340);
+      }, i * 55);
+    });
+  }, settled + 250);
+
+  // 4. Hold, then hand over.
+  setTimeout(reveal, settled + 2500);
+}());
+</script>
+<?php endif; ?>
 </body>
 </html>

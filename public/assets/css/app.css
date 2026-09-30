@@ -1592,6 +1592,172 @@ fieldset:last-of-type { margin-bottom: 0; }
   .auth__stageInner { background: var(--navy-900); border-color: rgba(255,255,255,.4); }
 }
 
+/* ═══════════════════ WELCOME INTRO ═══════════════════
+   The animated screen before the sign-in form, built to match the one on
+   the Mascardi system: the company name rises letter by letter out of a
+   blur, a hairline underline draws itself, the tagline settles in as its
+   tracking closes up, a light glints across the wordmark, and the whole
+   panel fades away to hand over to the form.
+
+   Two things are different. It is navy and green rather than black and
+   white, because that is this company. And the login form underneath is
+   only hidden once JavaScript has said it is going to run the animation
+   — a sign-in page that a script error can leave blank is a page that
+   locks the office out of its own system. See the <noscript> block and
+   the fallback timer in layouts/auth.php.
+
+   The overlay is fixed and covers everything, so it needs no cooperation
+   from the page beneath it.
+
+   One exception to the rule stated at the top of this section. The
+   sign-in page has no gradients and still does not: everything below
+   this block is flat. The intro has three — a pool of light in the
+   middle, the hairline grid, and the rule that draws itself — because
+   they are what the effect is. A flat panel with a flat line on it is a
+   different screen, not the same screen done properly. Nothing here
+   touches the form. */
+
+.login-stage { opacity: 1; }
+
+body.has-intro .login-stage {
+  opacity: 0;
+  transition: opacity .9s ease;
+}
+body.has-intro .login-stage.show { opacity: 1; }
+
+.intro {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 30px; padding: 24px; overflow: hidden;
+  background: var(--navy-900);
+  transition: opacity 1s ease, visibility 1s;
+}
+.intro.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+
+/* A faint pool of light in the middle and a hairline grid that fades out
+   at the edges, so the ground reads as a room rather than as a flat
+   colour. Both are masked to nothing before they reach the sides. */
+.intro__field {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(720px 440px at 50% 42%, rgba(255,255,255,.055), transparent 70%);
+}
+.intro__field::after {
+  content: ''; position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.024) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.024) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 35%, transparent 82%);
+          mask-image: radial-gradient(circle at 50% 45%, #000 35%, transparent 82%);
+}
+
+/* The name. Each letter is its own span so they can arrive one after
+   another, and each word is its own row so that a name too long for the
+   screen breaks between its words rather than through the middle of one.
+   Sized for two words: this company is not called one. */
+.intro__name {
+  position: relative; z-index: 2; margin: 0 auto;
+  font-family: var(--font);
+  font-weight: 800;
+  font-size: clamp(24px, 5.2vw, 58px);
+  letter-spacing: .22em;
+  line-height: 1.12;
+  display: flex; flex-wrap: wrap;
+  justify-content: center; align-items: baseline;
+  gap: 0 .5em;
+  width: 100%; max-width: 94vw;
+  text-align: center;
+  color: #fff;
+}
+.intro__word {
+  display: inline-flex;
+  text-indent: .22em;          /* balances the tracking on the last letter */
+}
+/* Scoped to the letters inside a word rather than to every span beneath
+   the name: the word wrapper is a span too, and while these rules
+   reached it the whole word sat invisible, waiting for a class that only
+   ever goes on its letters. */
+.intro__word > span {
+  display: inline-block; opacity: 0;
+  transform: translateY(26px);
+  filter: blur(12px);
+  text-shadow: 0 0 34px rgba(255,255,255,.18);
+  will-change: transform, opacity, filter;
+}
+.intro__word > span.is-in { animation: introLetter 1.15s cubic-bezier(.16,.68,.24,1) forwards; }
+
+@keyframes introLetter {
+  0%   { opacity: 0; transform: translateY(26px); filter: blur(12px); }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+/* The light that sweeps across once the name has settled. */
+.intro__word > span.is-glint {
+  text-shadow: 0 0 42px rgba(26,160,92,.85), 0 0 14px rgba(255,255,255,.65);
+  transition: text-shadow .3s ease;
+}
+
+/* Drawn rather than faded: it grows out from the middle. Green, because
+   on a navy ground it is the one place a company colour can sit without
+   competing with the name. */
+.intro__rule {
+  position: relative; z-index: 2;
+  height: 1px; width: 0; margin-top: -2px;
+  background: linear-gradient(90deg, transparent, var(--green-500), transparent);
+  transition: width 1.3s cubic-bezier(.16,.7,.2,1) .15s;
+}
+.intro.is-open .intro__rule { width: min(520px, 78vw); }
+
+/* Fades up while its tracking closes, which reads as the words settling
+   into place rather than simply appearing. */
+.intro__tagline {
+  position: relative; z-index: 2; min-height: 1.6em;
+  font-family: var(--font); font-weight: 500;
+  font-size: clamp(10.5px, 1.9vw, 14px);
+  letter-spacing: .42em;
+  text-transform: uppercase; text-align: center;
+  color: rgba(255,255,255,.62);
+  padding: 0 12px;
+  opacity: 0; transform: translateY(14px);
+  transition: opacity 1.2s ease .25s, transform 1.2s ease .25s, letter-spacing 1.6s ease .25s;
+}
+.intro.is-open .intro__tagline { opacity: 1; transform: none; letter-spacing: .24em; }
+
+/* Always there, from the first frame. Somebody who has seen this a
+   hundred times must be able to get past it without waiting. */
+.intro__skip {
+  position: fixed; top: 22px; right: 24px; z-index: 10000;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: rgba(255,255,255,.55);
+  background: none; border: 1px solid rgba(255,255,255,.22);
+  border-radius: var(--r-sm); padding: 9px 18px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  transition: color .25s ease, border-color .25s ease;
+}
+.intro__skip:hover,
+.intro__skip:focus-visible { color: #fff; border-color: rgba(255,255,255,.6); }
+.intro__skip svg { width: 12px; height: 12px; }
+
+/* Somebody who has asked their machine to stop moving things has asked
+   for a reason — vertigo, or a migraine. They get the same screen,
+   assembled rather than performed, and a shorter wait. */
+@media (prefers-reduced-motion: reduce) {
+  .intro__word > span,
+  .intro__word > span.is-in { animation: none; opacity: 1; transform: none; filter: none; }
+  .intro__word > span.is-glint { text-shadow: 0 0 34px rgba(255,255,255,.18); }
+  .intro__rule { transition: width .3s ease; }
+  .intro__tagline { transition: opacity .3s ease; }
+  .intro, body.has-intro .login-stage { transition: opacity .3s ease; }
+}
+
+@media (max-width: 560px) {
+  .intro { gap: 22px; }
+  .intro__skip { top: 16px; right: 16px; padding: 8px 14px; }
+}
+
 /* ---------------------------------------------------------------------
    Chat
    --------------------------------------------------------------------- */
