@@ -47,19 +47,21 @@ SET @sql := IF(@col = 0,
   'DO 0');
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
--- Everything already in the queue was queued before this column
--- existed. The ones that went through StaffNotifier are recognisable by
--- their event names, and calling those 'client' would keep them held
--- outside office hours for no reason.
-UPDATE notifications
-   SET audience = 'internal'
- WHERE audience = 'client'
-   AND (event LIKE 'social\_%'
-     OR event LIKE 'livechat\_%'
-     OR event LIKE 'chat\_%'
-     OR event LIKE 'partner\_%'
-     OR event LIKE 'bulk\_%'
-     OR event IN ('backup_stale', 'payout_due', 'equipment_due'));
+-- Nothing already in the queue is backfilled, on purpose.
+--
+-- The obvious thing is to guess from the event name, and the first
+-- draft of this did: anything starting partner_ or bulk_ or livechat_
+-- was called internal. That is wrong in both directions, for exactly
+-- the reason given above. 'partner_applied' tells our own staff that
+-- somebody has applied; 'partner_paid' tells the partner we have paid
+-- them. 'livechat_waiting' is the bell on a colleague's screen;
+-- 'livechat_transcript' is the conversation going to the visitor who
+-- asked for it. Same prefix, opposite audiences.
+--
+-- So every row already queued stays 'client', which is the careful
+-- direction: at worst a colleague's message waits for the sending
+-- window once, and only where a window is configured at all. Anything
+-- queued from here is marked by whatever queued it, which knows.
 
 -- The queue is asked for what is waiting, oldest first. Without this it
 -- is a scan of every message ever sent, every fifteen minutes.

@@ -22,9 +22,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 # A message in the queue, as any of the three things that queue one.
 queue() {
   local channel="$1" audience="$2" event="$3" recipient="$4"
+  # Both statements in one call. q() starts a fresh mysql each time, and
+  # LAST_INSERT_ID() on a new connection is nought — which handed every
+  # later assertion an empty id and made the whole suite look broken.
   q "INSERT INTO notifications (channel,event,audience,recipient,recipient_name,subject,body,status)
-     VALUES ('$channel','$event','$audience','$recipient','Someone','A subject','<p>body</p>','queued');"
-  q "SELECT LAST_INSERT_ID();"
+     VALUES ('$channel','$event','$audience','$recipient','Someone','A subject','<p>body</p>','queued');
+     SELECT LAST_INSERT_ID();"
 }
 
 state()    { q "SELECT status   FROM notifications WHERE id=$1;"; }
@@ -64,10 +67,26 @@ $(printf '%s' "$BEFORE" | tr ';' '\n')
 EOF
 
   q "DELETE FROM notifications WHERE subject='A subject' OR recipient LIKE '%@queue.test';"
+
+  # Whatever else was waiting when this started, put back.
+  if [ -s "$D/queue_parked" ]; then
+    q "UPDATE notifications SET status='queued'
+        WHERE id IN ($(tr '\n' ',' < "$D/queue_parked" | sed 's/,$//'));"
+  fi
+
+  rm -f "$D/queue_parked"
 }
 trap restore EXIT
 
 q "DELETE FROM notifications WHERE subject='A subject' OR recipient LIKE '%@queue.test';"
+
+# Everything else waiting is parked for the duration, and put back on the
+# way out. The queue is worked oldest first, so a backlog another suite
+# left behind is what gets attempted — and the give-up test below would
+# be measuring those rather than its own twelve.
+q "SELECT id FROM notifications WHERE status='queued';" > "$D/queue_parked"
+q "UPDATE notifications SET status='cancelled' WHERE status='queued';"
+
 q "UPDATE settings SET setting_value='' WHERE setting_key='notify_send_window';"
 q "UPDATE settings SET setting_value='3' WHERE setting_key='notify_max_attempts';"
 q "UPDATE settings SET setting_value='60' WHERE setting_key='notify_batch_size';"
@@ -220,12 +239,15 @@ echo "=== 7. What queues a message says who it is for ==="
 # The distinction the window rests on, taken from the row rather than
 # guessed from the event name — which is a list that drifts.
 eq "staff notifications mark themselves internal" \
-   "$(grep -c \"'audience'       => 'internal'\" "$ROOT/app/Services/StaffNotifier.php")" "1"
+   "$(grep -c "=> 'internal'" "$ROOT/app/Services/StaffNotifier.php")" "1"
 
-eq "and a client document is a client's by default" \
-   "$(q "SELECT COLUMN_DEFAULT FROM information_schema.columns
-          WHERE table_schema=DATABASE() AND table_name='notifications'
-            AND column_name='audience';")" "client"
+# Asked by inserting one rather than by reading COLUMN_DEFAULT, which
+# MariaDB hands back with its quotes still on.
+q "INSERT INTO notifications (channel,event,recipient,subject,body,status)
+   VALUES ('email','probe','default@queue.test','A subject','<p>x</p>','queued');"
+eq "and anything queued without saying is treated as a client's" \
+   "$(q "SELECT audience FROM notifications WHERE recipient='default@queue.test';")" "client"
+q "DELETE FROM notifications WHERE recipient='default@queue.test';"
 
 echo ""
 echo "=== 8. Renewal reminders do reach the queue ==="
