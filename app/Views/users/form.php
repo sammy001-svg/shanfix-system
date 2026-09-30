@@ -282,7 +282,7 @@ $primary   = $val('role', 'staff');
                        <?= $isHeld || $primary === $key ? 'checked' : '' ?>
                        <?= $isHeld ? 'data-held="1"' : '' ?>>
                 <span>
-                  <strong><?= e(label_of($key)) ?></strong>
+                  <strong><?= e($roleName ?: label_of($key)) ?></strong>
                   <span class="text-xs text-muted d-block"><?= e(trim($detail)) ?></span>
                 </span>
               </label>

@@ -33,7 +33,8 @@ class Auth
         'sales'      => 'Sales — leads, clients, quotations and invoices',
         'production' => 'Production — job cards, artwork, printing and delivery notes',
         'designer'   => 'Designer — artwork requests, proofs and client approvals',
-        'social'     => 'Social media — the calendar, what goes out and how it did',
+        'social'     => 'Social media — planning posts, writing them and recording how they did',
+        'social_manager' => 'Social media manager — everything the social media role does, plus approving what goes out and owning the profiles',
         'reception'  => 'Reception — front desk: walk-in clients and enquiries, quotations, taking payment, job status',
         'staff'      => 'Staff — read-only across modules, plus team chat',
     ];
@@ -50,7 +51,7 @@ class Auth
      * anyone's account.
      */
     private const PERMISSIONS = [
-        'dashboard.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'hr', 'social'],
+        'dashboard.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'hr', 'social', 'social_manager'],
 
         'inventory.view'    => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'inventory.manage'  => ['admin', 'manager', 'production'],
@@ -58,7 +59,7 @@ class Auth
         'services.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer'],
         'services.manage'   => ['admin', 'manager'],
 
-        'clients.view'      => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'social'],
+        'clients.view'      => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'social', 'social_manager'],
         'clients.manage'    => ['admin', 'manager', 'sales', 'reception'],
         'clients.delete'    => ['admin'],
 
@@ -158,12 +159,12 @@ class Auth
         // The machines. Nearly everyone needs to look one up — whether the
         // laminator is out of action decides what can be promised today —
         // but changing the register is for the people answerable for it.
-        'equipment.view'    => ['admin', 'manager', 'finance', 'production', 'designer', 'sales', 'reception', 'staff', 'hr', 'social'],
+        'equipment.view'    => ['admin', 'manager', 'finance', 'production', 'designer', 'sales', 'reception', 'staff', 'hr', 'social', 'social_manager'],
         'equipment.manage'  => ['admin', 'manager', 'production'],
 
         'reports.view'      => ['admin', 'manager', 'finance'],
 
-        'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'hr', 'social'],
+        'chat.use'          => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'hr', 'social', 'social_manager'],
 
         // Who may put people into a channel or take them out. The
         // channel's own creator can do it too — see ChatController —
@@ -180,7 +181,7 @@ class Auth
         // Designers, production and general staff are left out: a
         // stranger asking about prices should reach somebody who can
         // answer about prices.
-        'livechat.use'      => ['admin', 'manager', 'finance', 'sales', 'reception', 'social'],
+        'livechat.use'      => ['admin', 'manager', 'finance', 'sales', 'reception', 'social', 'social_manager'],
 
         // Seeing every department regardless of membership, for whoever
         // is watching the queue as a whole rather than working it.
@@ -198,31 +199,40 @@ class Auth
         // the one who knows which version is the right one — leaving
         // them out means the caption and the artwork are put together
         // by somebody who has not seen the artwork.
-        'social.view'       => ['admin', 'manager', 'sales', 'designer', 'social'],
-        'social.manage'     => ['admin', 'manager', 'sales', 'designer', 'social'],
+        'social.view'       => ['admin', 'manager', 'sales', 'designer', 'social', 'social_manager'],
+        'social.manage'     => ['admin', 'manager', 'sales', 'designer', 'social', 'social_manager'],
 
         // Saying yes to what goes out under the company's name. Not the
         // same authority as writing it, and deliberately not held by
         // everybody who can write: an approval you can give yourself is
         // not an approval.
-        'social.approve'    => ['admin', 'manager', 'social'],
+        //
+        // This is the whole reason there are two social roles rather than
+        // one. A team of officers who can all approve each other's work
+        // is a team where the first two people to agree can put anything
+        // on the company's page. Somebody owns that, and it is the
+        // manager.
+        'social.approve'    => ['admin', 'manager', 'social_manager'],
 
         // The profiles themselves, and what a campaign cost. Adding a
-        // page is a decision about where the company speaks from.
-        'social.accounts'   => ['admin', 'manager', 'social'],
+        // page is a decision about where the company speaks from, and
+        // the access tokens behind it reach every follower the company
+        // has — that is the manager's to hold, not everyone's who
+        // writes a caption.
+        'social.accounts'   => ['admin', 'manager', 'social_manager'],
 
         // The newsletter list from the website footer. Whoever does the
         // marketing needs it; the export holds only people who asked.
-        'newsletter.view'   => ['admin', 'manager', 'sales', 'social'],
+        'newsletter.view'   => ['admin', 'manager', 'sales', 'social', 'social_manager'],
 
         // What the website says our clients said. Publishing words under a
         // client's name is marketing's job, so the same people as the
         // newsletter.
-        'testimonials.manage' => ['admin', 'manager', 'sales', 'social'],
+        'testimonials.manage' => ['admin', 'manager', 'sales', 'social', 'social_manager'],
 
         // Everybody's own email. Every role, because everybody has a
         // mailbox; what each person can open is only ever their own.
-        'mail.use'          => ['admin', 'manager', 'finance', 'hr', 'sales', 'production', 'designer', 'reception', 'staff', 'social'],
+        'mail.use'          => ['admin', 'manager', 'finance', 'hr', 'sales', 'production', 'designer', 'reception', 'staff', 'social', 'social_manager'],
 
         // The company WhatsApp is one number answered by many people.
         // Everyone client-facing can read and reply; production and general
@@ -233,8 +243,8 @@ class Auth
         // Meetings are a workplace tool, like the chat: anyone on the team
         // can call one and take minutes in it. Only management can delete
         // a meeting, because its minutes are a record of what was agreed.
-        'meetings.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'social'],
-        'meetings.manage'   => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'social'],
+        'meetings.view'     => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'social', 'social_manager'],
+        'meetings.manage'   => ['admin', 'manager', 'finance', 'sales', 'production', 'reception', 'staff', 'designer', 'social', 'social_manager'],
         'meetings.delete'   => ['admin', 'manager'],
 
         // Buying binds the company to a supplier and changes what stock is
@@ -261,7 +271,7 @@ class Auth
 
         // Artwork. A designer works their own queue and sends proofs to a
         // client; allocating the work is for whoever runs the studio.
-        'artwork.view'      => ['admin', 'manager', 'designer', 'sales', 'production', 'reception', 'social'],
+        'artwork.view'      => ['admin', 'manager', 'designer', 'sales', 'production', 'reception', 'social', 'social_manager'],
         'artwork.manage'    => ['admin', 'manager', 'designer', 'sales', 'reception'],
         'artwork.assign'    => ['admin', 'manager'],
         'artwork.design'    => ['admin', 'manager', 'designer'],

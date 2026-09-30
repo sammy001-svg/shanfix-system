@@ -22,7 +22,7 @@
       <?php foreach ($roles as $key => $description):
           [$roleName, $detail] = array_pad(explode('—', $description, 2), 2, '');
       ?>
-        <dt><span class="badge badge--navy"><?= e(label_of($key)) ?></span></dt>
+        <dt><span class="badge badge--navy"><?= e($roleName ?: label_of($key)) ?></span></dt>
         <dd class="text-sm text-muted"><?= e(trim($detail)) ?></dd>
       <?php endforeach; ?>
     </dl>

@@ -188,6 +188,8 @@ class SettingsController extends Controller
         $v = new Validator($request->all());
         $v->numeric('vat_rate', 'VAT rate')
           ->min('vat_rate', 0, 'VAT rate')
+          ->numeric('tax_rate_e', 'Reduced VAT rate')
+          ->min('tax_rate_e', 0, 'Reduced VAT rate')
           ->in('vat_default_mode', ['exclusive', 'inclusive', 'exempt'], 'Default VAT treatment')
           ->numeric('quotation_validity_days', 'Quotation validity')
           ->min('quotation_validity_days', 1, 'Quotation validity')
@@ -208,6 +210,7 @@ class SettingsController extends Controller
 
         Settings::setMany([
             'vat_rate'                => $request->decimal('vat_rate', 16),
+            'tax_rate_e'              => $request->decimal('tax_rate_e', 8),
             'vat_default_mode'        => $request->input('vat_default_mode'),
             'quotation_validity_days' => $request->int('quotation_validity_days', 30),
             'invoice_due_days'        => $request->int('invoice_due_days', 14),

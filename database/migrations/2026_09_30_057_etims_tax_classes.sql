@@ -113,8 +113,13 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 --
 -- The rates live here because the Finance Act moves them. B and E are
 -- the only classes with a rate; A, C and D are nought by definition.
+--
+-- Only the reduced rate is added. The standard rate is vat_rate, which
+-- has held it since the beginning and which the settings page edits;
+-- this file used to add a tax_rate_b beside it, and migration 059
+-- removes that again. A rate held in two settings goes stale in one of
+-- them, and the stale one is whichever the administrator was not shown.
 -- ---------------------------------------------------------------------
 INSERT INTO settings (setting_key, setting_value) VALUES
-  ('tax_rate_b', '16'),
   ('tax_rate_e', '8')
 ON DUPLICATE KEY UPDATE setting_value = settings.setting_value;

@@ -74,11 +74,19 @@ final class TaxTypes
         return self::isValid($letter) ? $letter : 'B';
     }
 
-    /** What this class costs, as a percentage. */
+    /**
+     * What this class costs, as a percentage.
+     *
+     * The standard rate is vat_rate, the setting that has always held
+     * it and that the settings page edits. It is not copied into a
+     * second setting of its own: a rate held in two places is a rate
+     * that goes stale in one of them, and the stale one would be
+     * whichever the administrator was not shown.
+     */
     public static function rate(string $letter): float
     {
         return match (strtoupper($letter)) {
-            'B'     => (float) Settings::get('tax_rate_b', 16),
+            'B'     => (float) Settings::get('vat_rate', 16),
             'E'     => (float) Settings::get('tax_rate_e', 8),
             default => 0.0,
         };

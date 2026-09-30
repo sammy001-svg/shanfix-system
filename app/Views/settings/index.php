@@ -258,7 +258,19 @@ $tabUrl = static fn(string $t): string => url('/settings?tab=' . $t);
             <label class="label" for="vat_rate">Standard VAT rate (%)</label>
             <input class="input" type="number" step="0.001" min="0" max="100" id="vat_rate" name="vat_rate"
                    value="<?= e(setting('vat_rate', '16')) ?>">
+            <span class="field-hint">Charged on every line marked standard rated.</span>
             <?= error_for($errors ?? [], 'vat_rate') ?>
+          </div>
+
+          <?php // Set here rather than compiled in, because the Finance Act
+                // moves it — the reduced rate has already been 8% and then
+                // not, and a rate in the code needs a deployment to change. ?>
+          <div class="field">
+            <label class="label" for="tax_rate_e">Reduced VAT rate (%)</label>
+            <input class="input" type="number" step="0.001" min="0" max="100" id="tax_rate_e" name="tax_rate_e"
+                   value="<?= e(setting('tax_rate_e', '8')) ?>">
+            <span class="field-hint">For lines marked reduced rate. Rarely used.</span>
+            <?= error_for($errors ?? [], 'tax_rate_e') ?>
           </div>
 
           <div class="field">

@@ -90,8 +90,24 @@ skip() {
 
 # One account per role, made here rather than borrowed from another
 # suite, so the crawl covers every role whatever order things run in.
+#
+# The list comes from Auth::ROLES rather than being written out here. It
+# used to be written out here, and it was missing 'hr' — which is why a
+# broken HR Overview page reached the person who reported it instead of
+# being caught by a crawl that walked every other role past it. A list
+# of roles kept in two places is a list that goes out of date in one.
+#
+# Administrator is not in this list because it is crawled separately,
+# below, as the account the other suites already use.
+mapfile -t CRAWL_ROLES < <($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  foreach (array_keys(App\Core\Auth::ROLES) as $r) {
+    if ($r !== "admin") { echo $r, "\n"; }
+  }
+')
+
 HASH=$(php -r 'echo password_hash("Role@2026", PASSWORD_DEFAULT);')
-for r in manager finance sales production reception staff; do
+for r in "${CRAWL_ROLES[@]}"; do
   $MYSQL -e "DELETE FROM users WHERE email='$r@shanfix.co.ke';
              INSERT INTO users (name,email,password_hash,role,is_active)
              VALUES ('Crawl $r','$r@shanfix.co.ke','$HASH','$r',1);
@@ -144,14 +160,17 @@ crawl() {
 }
 
 crawl admin Shanfix@2026
-for r in manager finance sales production reception staff; do
+for r in "${CRAWL_ROLES[@]}"; do
   if [ -n "$(q "SELECT id FROM users WHERE email='$r@shanfix.co.ke';")" ]; then
     crawl "$r" Role@2026
   fi
 done
 
-$MYSQL -e "DELETE FROM users WHERE email IN ('manager@shanfix.co.ke','finance@shanfix.co.ke',
-           'sales@shanfix.co.ke','production@shanfix.co.ke','reception@shanfix.co.ke','staff@shanfix.co.ke');"
+for r in "${CRAWL_ROLES[@]}"; do
+  $MYSQL -e "DELETE FROM user_roles WHERE user_id IN
+               (SELECT id FROM users WHERE email='$r@shanfix.co.ke');
+             DELETE FROM users WHERE email='$r@shanfix.co.ke';"
+done
 $MYSQL -e "DELETE FROM activity_log WHERE action='login_failed';"
 rm -f "$D"/crawl_*.txt
 echo ""

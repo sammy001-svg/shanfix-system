@@ -343,7 +343,146 @@ eq "a post can be approved by its own writer" "$(status_of "$QUICK")" "approved"
 q "UPDATE settings SET setting_value='1' WHERE setting_key='social_approval_required';"
 
 echo ""
-echo "=== 11. It is in the menu, under Marketing ==="
+echo "=== 11. The officer writes, the manager approves ==="
+
+# There are two social roles because approving is not the same authority
+# as writing. An officer plans, writes and schedules; a manager says yes
+# to what goes out and owns the profiles the company speaks from — and
+# the tokens behind them, which reach every follower the company has.
+OJ="$D/social_officer.txt"
+MJ="$D/social_boss.txt"
+
+as_role() {
+  local jar="$1" method="$2" path="$3"; shift 3
+  if [ "$method" = GET ]; then
+    curl -s -o /dev/null -w '%{http_code}' -b "$jar" "$BASE$path"
+  else
+    curl -s -o /dev/null -w '%{http_code}' -b "$jar" -c "$jar" -X POST "$BASE$path" "$@"
+  fi
+}
+
+role_token() {
+  curl -s -b "$1" -c "$1" "$BASE$2" \
+    | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//'
+}
+
+q "DELETE FROM user_roles WHERE user_id IN
+     (SELECT id FROM users WHERE email IN ('socialofficer@shanfix.co.ke','socialboss@shanfix.co.ke'));
+   DELETE FROM users WHERE email IN ('socialofficer@shanfix.co.ke','socialboss@shanfix.co.ke');
+   INSERT INTO users (name,email,password_hash,role,is_active) VALUES
+     ('Social Officer','socialofficer@shanfix.co.ke','$HASH','social',1),
+     ('Social Boss','socialboss@shanfix.co.ke','$HASH','social_manager',1);"
+
+OFFICER=$(q "SELECT id FROM users WHERE email='socialofficer@shanfix.co.ke';")
+BOSS=$(q "SELECT id FROM users WHERE email='socialboss@shanfix.co.ke';")
+
+q "INSERT IGNORE INTO user_roles (user_id,role) VALUES
+     ($OFFICER,'social'), ($BOSS,'social_manager'), ($BOSS,'social');"
+
+rm -f "$OJ" "$MJ"
+JAR="$OJ" login_as "socialofficer@shanfix.co.ke" "SocialPass1" >/dev/null 2>&1
+JAR="$MJ" login_as "socialboss@shanfix.co.ke" "SocialPass1" >/dev/null 2>&1
+
+# The officer does the job: the calendar, and writing a post.
+eq "an officer sees the calendar" "$(as_role "$OJ" GET /social)" "200"
+eq "and can start a post"         "$(as_role "$OJ" GET /social/new)" "200"
+
+T=$(role_token "$OJ" /social/new)
+eq "and write one" \
+   "$(as_role "$OJ" POST /social --data-urlencode "_token=$T" \
+        --data-urlencode "title=TEST Officer post" \
+        --data-urlencode "caption=Written by the officer." \
+        --data-urlencode "scheduled_for=$(date +%Y-%m-%d)T11:00" \
+        --data-urlencode "owner_id=$OFFICER" \
+        --data-urlencode "accounts[]=$FB")" "302"
+
+OP=$(newest_post)
+T=$(role_token "$OJ" "/social/$OP")
+as_role "$OJ" POST "/social/$OP/move" --data-urlencode "_token=$T" --data-urlencode "to=awaiting" >/dev/null
+eq "and put it up for approval" "$(status_of "$OP")" "awaiting"
+
+# But not approve it. Not their own, which was already the rule, and not
+# a colleague's either — a team who can all approve each other is a team
+# where the first two to agree can post anything under the company name.
+T=$(role_token "$OJ" "/social/$OP")
+as_role "$OJ" POST "/social/$OP/move" --data-urlencode "_token=$T" --data-urlencode "to=approved" >/dev/null
+eq "an officer cannot approve" "$(status_of "$OP")" "awaiting"
+
+q "DELETE FROM social_posts WHERE title='TEST Officer colleague post';"
+T=$(tok /social/new)
+post /social --data-urlencode "_token=$T" \
+     --data-urlencode "title=TEST Officer colleague post" \
+     --data-urlencode "caption=Somebody else wrote this." \
+     --data-urlencode "scheduled_for=$(date +%Y-%m-%d)T12:00" \
+     --data-urlencode "owner_id=$WRITER" \
+     --data-urlencode "accounts[]=$FB" >/dev/null
+CP=$(newest_post)
+T=$(tok "/social/$CP")
+post "/social/$CP/move" --data-urlencode "_token=$T" --data-urlencode "to=awaiting" >/dev/null
+
+T=$(role_token "$OJ" "/social/$CP")
+as_role "$OJ" POST "/social/$CP/move" --data-urlencode "_token=$T" --data-urlencode "to=approved" >/dev/null
+eq "not a colleague's either" "$(status_of "$CP")" "awaiting"
+
+# Nor touch the profiles. The page itself, and the access token behind
+# it, is not the caption writer's to change.
+eq "an officer cannot open the profiles" "$(as_role "$OJ" GET /social/accounts)" "403"
+
+T=$(role_token "$OJ" /social)
+as_role "$OJ" POST /social/accounts --data-urlencode "_token=$T" \
+     --data-urlencode "name=TEST Officer page" --data-urlencode "network=facebook" >/dev/null
+eq "nor add one"  "$(q "SELECT COUNT(*) FROM social_accounts WHERE name='TEST Officer page';")" "0"
+
+# The manager does both.
+T=$(role_token "$MJ" "/social/$OP")
+as_role "$MJ" POST "/social/$OP/move" --data-urlencode "_token=$T" --data-urlencode "to=approved" >/dev/null
+eq "a manager approves"        "$(status_of "$OP")" "approved"
+eq "and is recorded as having" \
+   "$(q "SELECT approved_by FROM social_posts WHERE id=$OP;")" "$BOSS"
+
+eq "a manager owns the profiles" "$(as_role "$MJ" GET /social/accounts)" "200"
+
+T=$(role_token "$MJ" /social/accounts)
+as_role "$MJ" POST /social/accounts --data-urlencode "_token=$T" \
+     --data-urlencode "name=TEST Manager page" --data-urlencode "network=linkedin" >/dev/null
+eq "and can add one" "$(q "SELECT COUNT(*) FROM social_accounts WHERE name='TEST Manager page';")" "1"
+
+# A manager is still not allowed to wave through their own work. The
+# wider role is about whose work you may approve, not about approving
+# without anybody else involved.
+T=$(role_token "$MJ" /social/new)
+as_role "$MJ" POST /social --data-urlencode "_token=$T" \
+     --data-urlencode "title=TEST Managers own post" \
+     --data-urlencode "caption=The manager wrote this one." \
+     --data-urlencode "scheduled_for=$(date +%Y-%m-%d)T13:00" \
+     --data-urlencode "owner_id=$BOSS" \
+     --data-urlencode "accounts[]=$FB" >/dev/null
+MP=$(newest_post)
+T=$(role_token "$MJ" "/social/$MP")
+as_role "$MJ" POST "/social/$MP/move" --data-urlencode "_token=$T" --data-urlencode "to=awaiting" >/dev/null
+T=$(role_token "$MJ" "/social/$MP")
+as_role "$MJ" POST "/social/$MP/move" --data-urlencode "_token=$T" --data-urlencode "to=approved" >/dev/null
+eq "not even their own work"  "$(status_of "$MP")" "awaiting"
+
+# Whoever gets told a post is waiting is whoever can actually act on it.
+q "DELETE FROM staff_notifications WHERE event='social_awaiting' AND entity_id=$OP;"
+eq "an officer is not asked to approve" \
+   "$(q "SELECT COUNT(*) FROM staff_notifications
+          WHERE event='social_awaiting' AND user_id=$OFFICER;")" "0"
+
+# And nobody who holds the old role today lost anything: the migration
+# gave them the manager role as well, so they carry on as before.
+has "the migration says so" \
+   "$(cat "$ROOT/database/migrations/2026_09_30_058_social_manager_role.sql")" \
+   "Nobody loses anything today"
+
+q "DELETE FROM social_accounts WHERE name IN ('TEST Officer page','TEST Manager page');
+   DELETE FROM social_posts WHERE title LIKE 'TEST Officer%' OR title LIKE 'TEST Managers%';
+   DELETE FROM user_roles WHERE user_id IN ($OFFICER,$BOSS);
+   DELETE FROM users WHERE id IN ($OFFICER,$BOSS);"
+
+echo ""
+echo "=== 12. It is in the menu, under Marketing ==="
 
 NAV=$(page /dashboard)
 has "the sidebar offers it" "$NAV" "Social media"

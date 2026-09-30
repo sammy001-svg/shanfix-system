@@ -30,8 +30,8 @@ CID=$(q "SELECT id FROM clients ORDER BY id LIMIT 1;")
 # Rates the suite relies on. Set explicitly rather than assumed, and put
 # back at the end, because they are settings and another suite or a
 # person may have moved them.
-RATE_B_WAS=$(q "SELECT setting_value FROM settings WHERE setting_key='tax_rate_b';")
-$MYSQL -e "UPDATE settings SET setting_value='16' WHERE setting_key='tax_rate_b';
+RATE_B_WAS=$(q "SELECT setting_value FROM settings WHERE setting_key='vat_rate';")
+$MYSQL -e "UPDATE settings SET setting_value='16' WHERE setting_key='vat_rate';
            UPDATE settings SET setting_value='0' WHERE setting_key='approval_required';
            DELETE FROM documents WHERE title LIKE 'eTIMS suite%';
            DELETE FROM services WHERE code IN ('ETX-STD','ETX-ZERO');"
@@ -353,15 +353,77 @@ if [ -n "$IID" ]; then
 fi
 
 echo ""
+echo "=== 9b. The rate an administrator sets is the rate charged ==="
+
+# There is one standard rate and it is the one on the settings page. It
+# briefly lived in two settings at once, which meant changing it there
+# did nothing to an invoice: the arithmetic went on using a figure
+# nobody could see or change.
+#
+# saveDocuments writes the whole tab, so the tab is put back at the end
+# — a suite that leaves the company's payment terms blank has broken
+# something real.
+setting_of() { q "SELECT setting_value FROM settings WHERE setting_key='$1';"; }
+
+for k in vat_default_mode quotation_validity_days invoice_due_days \
+         quotation_prefix invoice_prefix receipt_prefix payment_prefix \
+         expense_prefix lead_prefix client_prefix; do
+  eval "WAS_$k=\$(setting_of $k)"
+done
+WAS_qterms=$(setting_of quotation_terms)
+WAS_iterms=$(setting_of invoice_terms)
+WAS_bank=$(setting_of bank_details)
+WAS_till=$(setting_of mpesa_till)
+
+T=$(tok "/settings?tab=documents")
+post /settings/documents \
+  --data-urlencode "_token=$T" \
+  --data-urlencode "vat_rate=14" \
+  --data-urlencode "tax_rate_e=8" \
+  --data-urlencode "vat_default_mode=$WAS_vat_default_mode" \
+  --data-urlencode "quotation_validity_days=$WAS_quotation_validity_days" \
+  --data-urlencode "invoice_due_days=$WAS_invoice_due_days" \
+  --data-urlencode "quotation_prefix=$WAS_quotation_prefix" \
+  --data-urlencode "invoice_prefix=$WAS_invoice_prefix" \
+  --data-urlencode "receipt_prefix=$WAS_receipt_prefix" \
+  --data-urlencode "payment_prefix=$WAS_payment_prefix" \
+  --data-urlencode "expense_prefix=$WAS_expense_prefix" \
+  --data-urlencode "lead_prefix=$WAS_lead_prefix" \
+  --data-urlencode "client_prefix=$WAS_client_prefix" \
+  --data-urlencode "quotation_terms=$WAS_qterms" \
+  --data-urlencode "invoice_terms=$WAS_iterms" \
+  --data-urlencode "bank_details=$WAS_bank" \
+  --data-urlencode "mpesa_till=$WAS_till" > /dev/null
+
+eq "the settings page took it" "$(setting_of vat_rate)" "14"
+
+raise "eTIMS suite new rate" exclusive none 0 "Pull-up banner" 10000 B
+DR=$(docid "eTIMS suite new rate")
+eq "and the invoice charges it" "$(q "SELECT vat_amount FROM documents WHERE id=$DR;")" "1400.00"
+eq "on the line as well"        "$(q "SELECT tax_amount FROM document_items WHERE document_id=$DR;")" "1400.00"
+
+# And there is no second standard rate hiding behind it.
+eq "no duplicate rate setting" \
+   "$(q "SELECT COUNT(*) FROM settings WHERE setting_key='tax_rate_b';")" "0"
+
+# The reduced rate has somewhere to be set, because the Finance Act
+# moves it and a rate in the code needs a deployment to change.
+has "the settings page offers the reduced rate" \
+   "$(page "/settings?tab=documents")" 'name="tax_rate_e"'
+
+$MYSQL -e "UPDATE settings SET setting_value='16' WHERE setting_key='vat_rate';"
+eq "the rate is back for the next suite" "$(setting_of vat_rate)" "16"
+
+echo ""
 echo "=== 10. Tidy up ==="
 
 $MYSQL -e "DELETE FROM documents WHERE title LIKE 'eTIMS suite%';
            DELETE FROM services WHERE code IN ('ETX-STD','ETX-ZERO');
-           UPDATE settings SET setting_value='$RATE_B_WAS' WHERE setting_key='tax_rate_b';"
+           UPDATE settings SET setting_value='$RATE_B_WAS' WHERE setting_key='vat_rate';"
 
 eq "the test documents are gone" \
    "$(q "SELECT COUNT(*) FROM documents WHERE title LIKE 'eTIMS suite%';")" "0"
 eq "the standard rate is back" \
-   "$(q "SELECT setting_value FROM settings WHERE setting_key='tax_rate_b';")" "$RATE_B_WAS"
+   "$(q "SELECT setting_value FROM settings WHERE setting_key='vat_rate';")" "$RATE_B_WAS"
 
 report
