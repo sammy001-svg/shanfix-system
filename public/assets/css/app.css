@@ -1652,6 +1652,39 @@ body.has-intro .login-stage.show { opacity: 1; }
           mask-image: radial-gradient(circle at 50% 45%, #000 35%, transparent 82%);
 }
 
+/* The mark, where one has been uploaded.
+   Two elements rather than one: the wrapper carries the arrival — rise,
+   unblur, settle — and the image inside carries the light that crosses
+   it later. Both are filters, and an animation running with
+   `forwards` on the wrapper would otherwise hold the image's filter
+   down for good. */
+.intro__logoWrap {
+  position: relative; z-index: 2;
+  display: block; line-height: 0;
+  opacity: 0;
+  transform: translateY(18px) scale(.94);
+  filter: blur(10px);
+  will-change: transform, opacity, filter;
+}
+.intro__logoWrap.is-in { animation: introLogo 1.2s cubic-bezier(.16,.68,.24,1) forwards; }
+
+@keyframes introLogo {
+  0%   { opacity: 0; transform: translateY(18px) scale(.94); filter: blur(10px); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+.intro__logo {
+  display: block;
+  width: auto;
+  max-width: min(280px, 56vw);
+  max-height: clamp(52px, 10vh, 96px);
+  object-fit: contain;
+  transition: filter .3s ease;
+}
+/* The same light that crosses the letters, passing over the mark. */
+.intro__logo.is-glint { filter: brightness(1.16) drop-shadow(0 0 18px rgba(26,160,92,.5)); }
+
 /* The name. Each letter is its own span so they can arrive one after
    another, and each word is its own row so that a name too long for the
    screen breaks between its words rather than through the middle of one.
@@ -1745,6 +1778,9 @@ body.has-intro .login-stage.show { opacity: 1; }
    for a reason — vertigo, or a migraine. They get the same screen,
    assembled rather than performed, and a shorter wait. */
 @media (prefers-reduced-motion: reduce) {
+  .intro__logoWrap,
+  .intro__logoWrap.is-in { animation: none; opacity: 1; transform: none; filter: none; }
+  .intro__logo.is-glint { filter: none; }
   .intro__word > span,
   .intro__word > span.is-in { animation: none; opacity: 1; transform: none; filter: none; }
   .intro__word > span.is-glint { text-shadow: 0 0 34px rgba(255,255,255,.18); }

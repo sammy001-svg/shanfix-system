@@ -141,6 +141,15 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
   <div class="intro" id="intro" aria-hidden="true">
     <div class="intro__field"></div>
 
+    <?php // The mark leads, where the company has uploaded one. No alt
+          // text: the overlay is hidden from assistive technology
+          // entirely, and the name is in the panel underneath. ?>
+    <?php if ($brand['logo'] !== ''): ?>
+      <span class="intro__logoWrap" id="introLogo">
+        <img class="intro__logo" id="introLogoImg" src="<?= e($logoSrc) ?>" alt="">
+      </span>
+    <?php endif; ?>
+
     <h1 class="intro__name" id="introName" data-name="<?= e($introName) ?>"></h1>
     <div class="intro__rule"></div>
     <p class="intro__tagline"><?= e($introTagline) ?></p>
@@ -301,6 +310,8 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
   var nameEl = document.getElementById('introName');
   var stage = document.getElementById('loginStage');
   var skip  = document.getElementById('introSkip');
+  var logo  = document.getElementById('introLogo');
+  var logoImg = document.getElementById('introLogoImg');
 
   if (!intro || !nameEl || !stage) { return; }
 
@@ -366,25 +377,45 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
   setTimeout(reveal, 9000);
 
   if (reduced) {
+    if (logo) { logo.classList.add('is-in'); }
     letters.forEach(function (span) { span.classList.add('is-in'); });
     intro.classList.add('is-open');
     setTimeout(reveal, 1400);
     return;
   }
 
-  // 1. The letters rise and unblur, one after another.
+  // 1. The mark arrives first, and the name starts coming up underneath
+  //    it while it is still settling. Overlapped rather than queued: a
+  //    logo should not make anybody wait longer for the form.
+  var lead = 0;
+
+  if (logo) {
+    lead = 450;
+    setTimeout(function () { logo.classList.add('is-in'); }, 250);
+  }
+
+  // 2. The letters rise and unblur, one after another.
   var step = 95;
   letters.forEach(function (span, i) {
-    setTimeout(function () { span.classList.add('is-in'); }, 250 + i * step);
+    setTimeout(function () { span.classList.add('is-in'); }, 250 + lead + i * step);
   });
 
-  var settled = 250 + letters.length * step + 900;
+  var settled = 250 + lead + letters.length * step + 900;
 
-  // 2. The rule draws itself and the tagline settles in.
+  // The hold at the end gives back what the mark's entrance took, so the
+  // screen lasts the same time either way.
+  var hold = logo ? 2500 - lead : 2500;
+
+  // 3. The rule draws itself and the tagline settles in.
   setTimeout(function () { intro.classList.add('is-open'); }, settled - 350);
 
-  // 3. A light crosses the name.
+  // 4. A light crosses the mark and then the name.
   setTimeout(function () {
+    if (logoImg) {
+      logoImg.classList.add('is-glint');
+      setTimeout(function () { logoImg.classList.remove('is-glint'); }, 420);
+    }
+
     letters.forEach(function (span, i) {
       setTimeout(function () {
         span.classList.add('is-glint');
@@ -393,8 +424,8 @@ $logoSrc = inline_image($logoFile) ?? url('/brand/logo');
     });
   }, settled + 250);
 
-  // 4. Hold, then hand over.
-  setTimeout(reveal, settled + 2500);
+  // 5. Hold, then hand over.
+  setTimeout(reveal, settled + hold);
 }());
 </script>
 <?php endif; ?>

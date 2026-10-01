@@ -268,6 +268,49 @@ has "and the wrapper is not treated as a letter" "$CSS" ".intro__word > span {"
 # same screen without the movement.
 has "it respects reduced motion" "$CSS" "prefers-reduced-motion"
 
+# ── The mark ─────────────────────────────────────────────────────────
+#
+# The welcome screen ignored the logo and spelled the name instead,
+# while the panel behind it, the sidebar and every printed invoice used
+# the logo. Both ways round are checked, because most of the time there
+# is no logo and that path is the one people actually see.
+LOGO_WAS=$(q "SELECT setting_value FROM settings WHERE setting_key='company_logo';")
+
+$MYSQL -e "UPDATE settings SET setting_value='' WHERE setting_key='company_logo';"
+NOLOGO=$(curl -s "$BASE/login")
+
+case "$NOLOGO" in
+  *intro__logoWrap*) bad "no logo uploaded, no mark on the screen" "shown" "absent" ;;
+  *)                 ok  "no logo uploaded, no mark on the screen" "absent" ;;
+esac
+has "and the name still carries it" "$NOLOGO" 'data-name="Shanfix Technology"'
+
+$MYSQL -e "UPDATE settings SET setting_value='uploads/logos/smoke-mark.png' WHERE setting_key='company_logo';"
+WITHLOGO=$(curl -s "$BASE/login")
+
+has "a logo uploaded puts the mark on it" "$WITHLOGO" "intro__logoWrap"
+has "and the name comes up beneath it"    "$WITHLOGO" 'data-name="Shanfix Technology"'
+
+# Hidden from assistive technology like the rest of the overlay: the
+# panel underneath names the company in readable markup.
+has "the mark is not announced twice" "$WITHLOGO" 'class="intro__logo" id="introLogoImg" src='
+
+$MYSQL -e "UPDATE settings SET setting_value='$LOGO_WAS' WHERE setting_key='company_logo';"
+
+# The mark arrives first and the name follows underneath while it is
+# still settling, and the hold at the end gives back what that lead
+# took — a logo must not make anybody wait longer for the form.
+LAYOUT=$(cat "$ROOT/app/Views/layouts/auth.php")
+has "the mark leads"              "$LAYOUT" "lead = 450"
+has "and costs no extra wait"     "$LAYOUT" "hold = logo ? 2500 - lead : 2500"
+
+has "the mark has its own arrival" "$CSS" "@keyframes introLogo"
+has "the light crosses it too"     "$CSS" ".intro__logo.is-glint"
+
+# Two elements, not one: a `forwards` animation on the wrapper would
+# otherwise pin the image's filter down and the glint would never show.
+has "its arrival and its glint are kept apart" "$CSS" ".intro__logoWrap {"
+
 signin_admin
 
 echo ""
