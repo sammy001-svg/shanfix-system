@@ -159,6 +159,203 @@ function system_testimonials(int $limit = 6): array
     ], $rows);
 }
 
+/**
+ * The portfolio: what we have built, printed and for whom.
+ *
+ * All three read the same way and fail the same way — nothing, on any
+ * problem at all, so the page leaves the section out. That is the whole
+ * point of moving the portfolio here. The page used to carry three
+ * invented case studies for when the data was missing, which meant a
+ * visitor could not tell our work from something written to fill a gap.
+ *
+ * Pictures come back as paths to the public photograph route, which
+ * takes an image row's id rather than a filename and refuses unless the
+ * thing it belongs to is still switched on.
+ *
+ * @param string $kind  'website', 'system', or '' for both
+ * @return list<array<string,mixed>>
+ */
+function system_projects(string $kind = '', int $limit = 24): array
+{
+    if (!system_ready()) {
+        return [];
+    }
+
+    try {
+        $where = 'p.is_active = 1';
+        $args  = [];
+
+        if ($kind === 'website' || $kind === 'system') {
+            $where .= ' AND p.kind = :kind';
+            $args['kind'] = $kind;
+        }
+
+        $rows = \App\Core\Database::all(
+            "SELECT p.id, p.kind, p.title, p.client_name, p.summary, p.description,
+                    p.built_with, p.live_url, p.completed_on, p.is_featured
+               FROM site_projects p
+              WHERE {$where}
+           ORDER BY p.is_featured DESC, p.sort_order, p.id
+              LIMIT " . max(1, $limit),
+            $args
+        );
+
+        $pictures = \App\Core\Database::all(
+            "SELECT im.id, im.project_id, im.alt_text
+               FROM site_project_images im
+               JOIN site_projects p ON p.id = im.project_id
+              WHERE p.is_active = 1
+           ORDER BY im.project_id, im.is_primary DESC, im.sort_order, im.id"
+        );
+    } catch (\Throwable) {
+        return [];
+    }
+
+    $byProject = [];
+
+    foreach ($pictures as $picture) {
+        $byProject[(int) $picture['project_id']][] =
+            '/catalogue/photo/project/' . (int) $picture['id'];
+    }
+
+    return array_map(static function (array $r) use ($byProject): array {
+        $images = $byProject[(int) $r['id']] ?? [];
+
+        return [
+            'id'          => (int) $r['id'],
+            'kind'        => (string) $r['kind'],
+            'title'       => (string) $r['title'],
+            'client'      => (string) ($r['client_name'] ?? ''),
+            'summary'     => (string) ($r['summary'] ?? ''),
+            'description' => (string) ($r['description'] ?? ''),
+            // Split here rather than on the page: the page should not have
+            // to know that the admin stores these comma separated.
+            'built_with'  => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) ($r['built_with'] ?? ''))
+            ), static fn(string $t): bool => $t !== '')),
+            'url'         => (string) ($r['live_url'] ?? ''),
+            'year'        => $r['completed_on'] ? date('Y', strtotime((string) $r['completed_on'])) : '',
+            'featured'    => (int) $r['is_featured'] === 1,
+            'image'       => $images[0] ?? '',
+            'images'      => $images,
+        ];
+    }, $rows);
+}
+
+/**
+ * Printing and branding, as a gallery.
+ *
+ * A job with no photograph on it is left out. This is a gallery: an
+ * entry with nothing to look at is a gap in a grid, and the page has no
+ * better way to show it than a grey box with a caption.
+ *
+ * @return list<array<string,mixed>>
+ */
+function system_work(int $limit = 48): array
+{
+    if (!system_ready()) {
+        return [];
+    }
+
+    try {
+        $rows = \App\Core\Database::all(
+            "SELECT w.id, w.title, w.category, w.client_name, w.description,
+                    w.completed_on, w.is_featured
+               FROM site_work w
+              WHERE w.is_active = 1
+           ORDER BY w.is_featured DESC, w.sort_order, w.id
+              LIMIT " . max(1, $limit)
+        );
+
+        $pictures = \App\Core\Database::all(
+            "SELECT im.id, im.work_id
+               FROM site_work_images im
+               JOIN site_work w ON w.id = im.work_id
+              WHERE w.is_active = 1
+           ORDER BY im.work_id, im.is_primary DESC, im.sort_order, im.id"
+        );
+    } catch (\Throwable) {
+        return [];
+    }
+
+    $byWork = [];
+
+    foreach ($pictures as $picture) {
+        $byWork[(int) $picture['work_id']][] = '/catalogue/photo/work/' . (int) $picture['id'];
+    }
+
+    $out = [];
+
+    foreach ($rows as $r) {
+        $images = $byWork[(int) $r['id']] ?? [];
+
+        if ($images === []) {
+            continue;
+        }
+
+        $out[] = [
+            'id'          => (int) $r['id'],
+            'title'       => (string) $r['title'],
+            'category'    => (string) ($r['category'] ?? ''),
+            'client'      => (string) ($r['client_name'] ?? ''),
+            'description' => (string) ($r['description'] ?? ''),
+            'year'        => $r['completed_on'] ? date('Y', strtotime((string) $r['completed_on'])) : '',
+            'featured'    => (int) $r['is_featured'] === 1,
+            'image'       => $images[0],
+            'images'      => $images,
+        ];
+    }
+
+    return $out;
+}
+
+/**
+ * Who we have worked for.
+ *
+ * $featuredOnly is what the home page asks for: the strip there is a row
+ * of marks, not a directory, and a client can be on the portfolio page
+ * without being one of the few the home page leads with.
+ *
+ * A client with no logo is still returned — the portfolio page sets their
+ * name instead, which is better than dropping a real client because
+ * nobody has got hold of their logo yet. The home page, which is only
+ * logos, skips those itself.
+ *
+ * @return list<array{name:string,url:string,did:string,logo:string}>
+ */
+function system_clients(bool $featuredOnly = false, int $limit = 60): array
+{
+    if (!system_ready()) {
+        return [];
+    }
+
+    try {
+        $where = 'c.is_active = 1' . ($featuredOnly ? ' AND c.is_featured = 1' : '');
+
+        $rows = \App\Core\Database::all(
+            "SELECT c.id, c.name, c.website_url, c.what_we_did,
+                    (SELECT im.id FROM site_client_images im
+                      WHERE im.client_id = c.id
+                   ORDER BY im.is_primary DESC, im.sort_order, im.id
+                      LIMIT 1) AS logo_id
+               FROM site_clients c
+              WHERE {$where}
+           ORDER BY c.sort_order, c.name
+              LIMIT " . max(1, $limit)
+        );
+    } catch (\Throwable) {
+        return [];
+    }
+
+    return array_map(static fn(array $r): array => [
+        'name' => (string) $r['name'],
+        'url'  => (string) ($r['website_url'] ?? ''),
+        'did'  => (string) ($r['what_we_did'] ?? ''),
+        'logo' => $r['logo_id'] ? '/catalogue/photo/client/' . (int) $r['logo_id'] : '',
+    ], $rows);
+}
+
 function system_inventory(): array
 {
     $empty = ['categories' => [], 'products' => []];

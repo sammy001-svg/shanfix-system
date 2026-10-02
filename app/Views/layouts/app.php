@@ -474,11 +474,12 @@ if ($me && can('jobs.view')) {
         // ── Marketing ──────────────────────────────────────────────────────
         // Us reaching out, rather than someone reaching us.
         $showMarketing = can('social.view') || can('sms.campaign')
-                      || can('newsletter.view') || can('testimonials.manage');
+                      || can('newsletter.view') || can('testimonials.manage')
+                      || can('portfolio.manage');
       ?>
       <?php if ($showMarketing): ?>
         <details class="nav-group" data-nav-group="marketing"
-                 <?= $navOpen('/social', '/sms-campaigns', '/newsletter', '/testimonials') ? 'open' : '' ?>>
+                 <?= $navOpen('/social', '/sms-campaigns', '/newsletter', '/testimonials', '/portfolio') ? 'open' : '' ?>>
           <summary class="nav-group__label">
             <?= icon('send', 'nav-group__icon') ?>
             <span class="nav-group__text">Marketing</span>
@@ -523,6 +524,12 @@ if ($me && can('jobs.view')) {
             <?php if (can('testimonials.manage')): ?>
               <a class="nav-link <?= is_active_nav('/testimonials') ? 'is-active' : '' ?>" href="<?= url('/testimonials') ?>">
                 <?= icon('star', 'nav-link__icon') ?> Testimonials
+              </a>
+            <?php endif; ?>
+
+            <?php if (can('portfolio.manage')): ?>
+              <a class="nav-link <?= is_active_nav('/portfolio') ? 'is-active' : '' ?>" href="<?= url('/portfolio') ?>">
+                <?= icon('layers', 'nav-link__icon') ?> Portfolio
               </a>
             <?php endif; ?>
 

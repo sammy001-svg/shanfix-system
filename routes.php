@@ -35,6 +35,7 @@ use App\Controllers\JobFileController;
 use App\Controllers\LiveChatApiController;
 use App\Controllers\NewsletterController;
 use App\Controllers\MailController;
+use App\Controllers\PortfolioController;
 use App\Controllers\TestimonialController;
 use App\Controllers\LiveChatController;
 use App\Controllers\LiveChatAdminController;
@@ -1259,6 +1260,26 @@ $r->group(['auth'], function ($r) {
         $r->post('/testimonials',             [TestimonialController::class, 'save'],   ['csrf']);
         $r->post('/testimonials/{id}/toggle', [TestimonialController::class, 'toggle'], ['csrf']);
         $r->post('/testimonials/{id}/delete', [TestimonialController::class, 'delete'], ['csrf']);
+    });
+
+    // -- The portfolio the website shows
+    //
+    // One screen, three lists, and the type is carried by the route
+    // rather than by the form — so nothing a request says can decide
+    // which table is written to.
+    $r->group(['permission:portfolio.manage'], function ($r) {
+        $r->get ('/portfolio',          [PortfolioController::class, 'index']);
+        $r->post('/portfolio/projects', [PortfolioController::class, 'saveProject'], ['csrf']);
+        $r->post('/portfolio/work',     [PortfolioController::class, 'saveWork'],    ['csrf']);
+        $r->post('/portfolio/clients',  [PortfolioController::class, 'saveClient'],  ['csrf']);
+
+        $r->post('/portfolio/{type}/{id}/toggle',  [PortfolioController::class, 'toggle'],  ['csrf']);
+        $r->post('/portfolio/{type}/{id}/delete',  [PortfolioController::class, 'destroy'], ['csrf']);
+
+        $r->post('/portfolio/{type}/{id}/images/{image}/delete',
+                 [PortfolioController::class, 'deleteImage'], ['csrf']);
+        $r->post('/portfolio/{type}/{id}/images/{image}/primary',
+                 [PortfolioController::class, 'primaryImage'], ['csrf']);
     });
 
     // -- The company's own social media

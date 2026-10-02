@@ -230,6 +230,12 @@ class Auth
         // newsletter.
         'testimonials.manage' => ['admin', 'manager', 'sales', 'social', 'social_manager'],
 
+        // What the website says we have built, printed and for whom. The
+        // same job and the same people: it is published under a client's
+        // name, with their logo on it, and getting that wrong is a
+        // conversation with the client rather than a typo.
+        'portfolio.manage'  => ['admin', 'manager', 'sales', 'social', 'social_manager'],
+
         // Everybody's own email. Every role, because everybody has a
         // mailbox; what each person can open is only ever their own.
         'mail.use'          => ['admin', 'manager', 'finance', 'hr', 'sales', 'production', 'designer', 'reception', 'staff', 'social', 'social_manager'],
@@ -335,6 +341,7 @@ class Auth
         'social'        => ['Social media',     'What we post, when it goes out and how it did'],
         'newsletter'    => ['Newsletter',       'The mailing list from the website'],
         'testimonials'  => ['Testimonials',     'What the website says our clients said'],
+        'portfolio'     => ['Portfolio',        'The work the website shows, and whose logos it carries'],
         'bulksms'       => ['SMS platform',     'The product customers and partners send through'],
 
         'hr'            => ['Staff records',    'Employee records, ID numbers, bank details'],

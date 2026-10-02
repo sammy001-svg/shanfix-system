@@ -1795,6 +1795,118 @@ body.has-intro .login-stage.show { opacity: 1; }
 }
 
 /* ---------------------------------------------------------------------
+   Portfolio admin
+   A row per entry: the picture the website would lead with, what it is,
+   and the few things you do to it. Used for all three lists — projects,
+   printed jobs and clients — because they are the same job three times
+   and a second set of styles would be a second set to keep in step.
+   --------------------------------------------------------------------- */
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+.list-row:last-of-type { border-bottom: 0; }
+
+/* A hidden entry is still worth reading — it is usually hidden because
+   somebody is waiting on a client — so it is dimmed rather than greyed
+   into illegibility. */
+.list-row.is-muted { opacity: .55; }
+.list-row.is-muted:hover { opacity: 1; }
+
+.list-row__thumb {
+  width: 54px; height: 54px;
+  flex: 0 0 54px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+/* A logo is not a photograph: cropping it to a square cuts the name off
+   the side of it. */
+.list-row__thumb--contain {
+  object-fit: contain;
+  padding: 5px;
+  background: #fff;
+}
+.list-row__thumb--empty {
+  display: grid;
+  place-items: center;
+  color: var(--slate-400);
+}
+.list-row__thumb--empty svg { width: 20px; height: 20px; }
+
+.list-row__main { flex: 1; min-width: 0; }
+
+.list-row__title {
+  font-weight: 650;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.list-row__sub {
+  font-size: 12.5px;
+  color: var(--slate-500);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.list-row__actions form { display: inline; }
+
+/* The pictures on the entry being edited, opened underneath it. */
+.list-row__panel {
+  padding: 0 0 14px 66px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Set the lead picture, or remove one. Kept out of the way until the
+   pointer is on the picture, because on a grid of eight photographs
+   sixteen always-visible buttons is not a grid of photographs any more. */
+.thumb__tools {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(8, 32, 58, .82);
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.thumb:hover .thumb__tools,
+.thumb:focus-within .thumb__tools { opacity: 1; }
+
+.thumb__tools button {
+  background: none;
+  border: 0;
+  padding: 2px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, .75);
+  display: grid;
+  place-items: center;
+}
+.thumb__tools button:hover { color: #fff; }
+.thumb__tools svg { width: 13px; height: 13px; }
+
+@media (max-width: 720px) {
+  .list-row { flex-wrap: wrap; }
+  .list-row__actions { width: 100%; justify-content: flex-end; }
+  .list-row__panel { padding-left: 0; }
+}
+
+/* ---------------------------------------------------------------------
    Chat
    --------------------------------------------------------------------- */
 .chat {

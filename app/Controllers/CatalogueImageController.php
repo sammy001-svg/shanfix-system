@@ -10,7 +10,13 @@ use App\Core\Request;
 use App\Services\ImageLibrary;
 
 /**
- * Photographs of what we sell.
+ * Photographs the public is allowed to see.
+ *
+ * What we sell, and — since the portfolio moved into the system — the
+ * work we have done and the logos of the people we did it for. The rule
+ * is the same for all of them and so is the code: a marketing picture is
+ * a marketing picture, and a second copy of this for the portfolio would
+ * be a second place for a flaw in it to live.
  *
  * /files is behind the staff guard, which is right for receipts and
  * artwork and wrong for these: it meant a client browsing the catalogue

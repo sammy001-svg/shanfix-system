@@ -21,18 +21,20 @@ use App\Core\Settings;
 class ImageLibrary
 {
     /**
-     * @var array<string,array{table:string, fk:string, folder:string, max:string}>
+     * @var array<string,array{table:string, fk:string, owner:string, folder:string, max:string}>
      */
     private const KINDS = [
         'product' => [
             'table'  => 'inventory_images',
             'fk'     => 'item_id',
+            'owner'  => 'inventory_items',
             'folder' => 'products',
             'max'    => 'product_images_max',
         ],
         'service' => [
             'table'  => 'service_images',
             'fk'     => 'service_id',
+            'owner'  => 'services',
             'folder' => 'services',
             'max'    => 'service_images_max',
         ],
@@ -42,8 +44,35 @@ class ImageLibrary
         'social' => [
             'table'  => 'social_post_images',
             'fk'     => 'post_id',
+            'owner'  => 'social_posts',
             'folder' => 'social',
             'max'    => 'social_images_max',
+        ],
+
+        // The portfolio: what we built, what we printed, and the marks of
+        // the people we did it for. Same shape again, so a photograph on
+        // a public page goes through the same checks on what the file
+        // actually is as one on a stock item.
+        'project' => [
+            'table'  => 'site_project_images',
+            'fk'     => 'project_id',
+            'owner'  => 'site_projects',
+            'folder' => 'portfolio',
+            'max'    => 'project_images_max',
+        ],
+        'work' => [
+            'table'  => 'site_work_images',
+            'fk'     => 'work_id',
+            'owner'  => 'site_work',
+            'folder' => 'portfolio',
+            'max'    => 'work_images_max',
+        ],
+        'client' => [
+            'table'  => 'site_client_images',
+            'fk'     => 'client_id',
+            'owner'  => 'site_clients',
+            'folder' => 'portfolio',
+            'max'    => 'client_images_max',
         ],
     ];
 
@@ -284,7 +313,7 @@ class ImageLibrary
         }
 
         $k     = self::KINDS[$kind];
-        $owner = $kind === 'service' ? 'services' : 'inventory_items';
+        $owner = $k['owner'];
 
         return Database::first(
             "SELECT i.* FROM {$k['table']} i
