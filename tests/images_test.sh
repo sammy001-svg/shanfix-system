@@ -38,8 +38,12 @@ fi
 
 echo ""
 echo "=== Setup ==="
-T=$(tok /login)
-curl -s -o /dev/null -b "$J" -c "$J" -X POST "$B/login" --data "_token=$T&email=admin@shanfix.co.ke&password=Shanfix@2026"
+# Through the shared helper, which completes the one-time code step.
+# This used to post to /login directly and check the dashboard, and has
+# been failing every assertion in the suite since sign-in started asking
+# for a code — the POST lands on the code page and the session is never
+# signed in, so every upload below was unauthenticated.
+JAR="$J" login_as "admin@shanfix.co.ke" "Shanfix@2026"
 eq "signed in" "$(curl -s -o /dev/null -w '%{http_code}' -b "$J" "$B/dashboard")" "200"
 # Step 9 deletes this item, so the suite makes its own rather than
 # consuming a seeded one — otherwise repeated runs empty the catalogue

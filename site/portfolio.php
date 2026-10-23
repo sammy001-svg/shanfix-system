@@ -69,7 +69,7 @@ $projectCard = static function (array $p): void { ?>
     <article class="work-card" data-aos="fade-up">
         <?php if ($p['image'] !== ''): ?>
             <div class="work-card__shot">
-                <img src="<?= htmlspecialchars($p['image']) ?>"
+                <img src="<?= htmlspecialchars($p['thumb']) ?>"
                      alt="<?= htmlspecialchars($p['title']) ?>" loading="lazy">
             </div>
         <?php endif; ?>
@@ -232,7 +232,7 @@ $projectCard = static function (array $p): void { ?>
                 <figure class="gallery-item<?= $job['featured'] ? ' is-wide' : '' ?>"
                         data-category="<?= htmlspecialchars(strtolower($job['category'])) ?>"
                         data-aos="fade-up">
-                    <img src="<?= htmlspecialchars($job['image']) ?>"
+                    <img src="<?= htmlspecialchars($job['thumb']) ?>"
                          alt="<?= htmlspecialchars($job['title']) ?>" loading="lazy">
                     <figcaption class="gallery-item__caption">
                         <span class="gallery-item__title"><?= htmlspecialchars($job['title']) ?></span>

@@ -36,7 +36,7 @@ $a = $account ?? null;
   </div>
 <?php endif; ?>
 
-<div class="grid grid--2">
+<div class="grid-2">
   <form class="card" method="post" action="<?= e(url('/mail/setup')) ?>">
     <?= csrf_field() ?>
     <div class="card__head">

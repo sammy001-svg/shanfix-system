@@ -3761,3 +3761,64 @@ section[id] { scroll-margin-top: 140px; }
 .sf .sf-bottom-inner p { color: rgba(255, 255, 255, 0.55); font-size: 0.875rem; }
 .sf .sf-news-msg.is-good { color: #86efac; }
 .sf .sf-news-msg.is-bad  { color: #fca5a5; }
+
+/* ── Who we have worked for, on the home page ──────────────────────
+   A quiet row of marks above what those clients said: the two answer
+   the same question one after the other — who, and then what they
+   thought of it. Greyed back until hovered, so a wall of other
+   companies' branding does not out-shout our own page. */
+.home-clients {
+    padding: 56px 0;
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+}
+.home-clients__label {
+    text-align: center;
+    margin: 0 0 26px;
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+.home-clients__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 34px 48px;
+}
+.home-clients__item {
+    display: block;
+    line-height: 0;
+    filter: grayscale(1);
+    opacity: .62;
+    transition: filter .25s ease, opacity .25s ease, transform .25s ease;
+}
+.home-clients__item:hover {
+    filter: none;
+    opacity: 1;
+    transform: translateY(-2px);
+}
+.home-clients__item img {
+    max-height: 46px;
+    max-width: 150px;
+    width: auto;
+    object-fit: contain;
+}
+.home-clients__more {
+    display: block;
+    margin-top: 30px;
+    text-align: center;
+    font-size: .92rem;
+    font-weight: 600;
+    color: #16a34a;
+    text-decoration: none;
+}
+.home-clients__more:hover { text-decoration: underline; }
+
+@media (max-width: 640px) {
+    .home-clients { padding: 40px 0; }
+    .home-clients__row { gap: 24px 30px; }
+    .home-clients__item img { max-height: 34px; max-width: 110px; }
+}

@@ -36,6 +36,15 @@ if ($staticBanners) {
 require_once __DIR__ . '/includes/system.php';
 $testimonials = system_testimonials(6);
 
+// Who we have worked for, from Portfolio in the system — the ones
+// marked for the home page. Only those with a logo: this strip is a row
+// of marks, and a name set in text in the middle of it reads as a
+// missing image rather than as a client.
+$homeClients = array_values(array_filter(
+    system_clients(true, 14),
+    static fn(array $c): bool => $c['logo'] !== ''
+));
+
 ?>
 <?php
 $pageSEO = [
@@ -472,6 +481,33 @@ include 'includes/header.php'; ?>
                     View All Articles <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
+        </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if (!empty($homeClients)): ?>
+    <!-- Who we have worked for -->
+    <section class="home-clients">
+        <div class="container">
+            <p class="home-clients__label">Trusted by</p>
+
+            <div class="home-clients__row">
+                <?php foreach ($homeClients as $client): ?>
+                    <?php
+                      $tag  = $client['url'] !== '' ? 'a' : 'span';
+                      $attr = $client['url'] !== ''
+                        ? ' href="' . htmlspecialchars($client['url']) . '" target="_blank" rel="noopener noreferrer"'
+                        : '';
+                    ?>
+                    <<?= $tag ?> class="home-clients__item"<?= $attr ?>
+                       title="<?= htmlspecialchars(trim($client['name'] . ' — ' . $client['did'], ' —')) ?>">
+                        <img src="<?= htmlspecialchars($client['logo']) ?>"
+                             alt="<?= htmlspecialchars($client['name']) ?>" loading="lazy">
+                    </<?= $tag ?>>
+                <?php endforeach; ?>
+            </div>
+
+            <a class="home-clients__more" href="portfolio.php">See the work we did for them &rarr;</a>
         </div>
     </section>
     <?php endif; ?>

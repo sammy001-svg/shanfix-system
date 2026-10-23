@@ -31,7 +31,7 @@ $live = count(array_filter($testimonials, static fn(array $r): bool => (int) $r[
   </div>
 </div>
 
-<div class="grid grid--2">
+<div class="grid-2">
   <div class="card">
     <div class="card__head">
       <div class="card__title"><?= $t ? 'Edit testimonial' : 'Add a testimonial' ?></div>

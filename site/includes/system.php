@@ -218,8 +218,19 @@ function system_projects(string $kind = '', int $limit = 24): array
             '/catalogue/photo/project/' . (int) $picture['id'];
     }
 
-    return array_map(static function (array $r) use ($byProject): array {
+    // The same pictures again, asked for small. The route serves the
+    // thumbnail when there is one and the full picture when there is
+    // not, so a card can always use this and a lightbox the other.
+    $thumbsByProject = [];
+
+    foreach ($pictures as $picture) {
+        $thumbsByProject[(int) $picture['project_id']][] =
+            '/catalogue/photo/project/' . (int) $picture['id'] . '?size=thumb';
+    }
+
+    return array_map(static function (array $r) use ($byProject, $thumbsByProject): array {
         $images = $byProject[(int) $r['id']] ?? [];
+        $thumbs = $thumbsByProject[(int) $r['id']] ?? [];
 
         return [
             'id'          => (int) $r['id'],
@@ -238,6 +249,7 @@ function system_projects(string $kind = '', int $limit = 24): array
             'year'        => $r['completed_on'] ? date('Y', strtotime((string) $r['completed_on'])) : '',
             'featured'    => (int) $r['is_featured'] === 1,
             'image'       => $images[0] ?? '',
+            'thumb'       => $thumbs[0] ?? ($images[0] ?? ''),
             'images'      => $images,
         ];
     }, $rows);
@@ -279,10 +291,13 @@ function system_work(int $limit = 48): array
         return [];
     }
 
-    $byWork = [];
+    $byWork  = [];
+    $byThumb = [];
 
     foreach ($pictures as $picture) {
-        $byWork[(int) $picture['work_id']][] = '/catalogue/photo/work/' . (int) $picture['id'];
+        $id = (int) $picture['work_id'];
+        $byWork[$id][]  = '/catalogue/photo/work/' . (int) $picture['id'];
+        $byThumb[$id][] = '/catalogue/photo/work/' . (int) $picture['id'] . '?size=thumb';
     }
 
     $out = [];
@@ -294,6 +309,8 @@ function system_work(int $limit = 48): array
             continue;
         }
 
+        $thumbs = $byThumb[(int) $r['id']] ?? [];
+
         $out[] = [
             'id'          => (int) $r['id'],
             'title'       => (string) $r['title'],
@@ -303,6 +320,7 @@ function system_work(int $limit = 48): array
             'year'        => $r['completed_on'] ? date('Y', strtotime((string) $r['completed_on'])) : '',
             'featured'    => (int) $r['is_featured'] === 1,
             'image'       => $images[0],
+            'thumb'       => $thumbs[0] ?? $images[0],
             'images'      => $images,
         ];
     }
@@ -352,7 +370,9 @@ function system_clients(bool $featuredOnly = false, int $limit = 60): array
         'name' => (string) $r['name'],
         'url'  => (string) ($r['website_url'] ?? ''),
         'did'  => (string) ($r['what_we_did'] ?? ''),
-        'logo' => $r['logo_id'] ? '/catalogue/photo/client/' . (int) $r['logo_id'] : '',
+        'logo' => $r['logo_id']
+            ? '/catalogue/photo/client/' . (int) $r['logo_id'] . '?size=thumb'
+            : '',
     ], $rows);
 }
 

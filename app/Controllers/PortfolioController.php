@@ -115,7 +115,7 @@ class PortfolioController extends Controller
 
         $id = $this->store('site_projects', $data, $id, 'project', $title);
 
-        ImageLibrary::store('project', $id, 'images');
+        $this->storeImages('project', $id);
 
         Response::to('/portfolio?tab=projects');
     }
@@ -145,7 +145,7 @@ class PortfolioController extends Controller
 
         $id = $this->store('site_work', $data, $id, 'work', $title);
 
-        ImageLibrary::store('work', $id, 'images');
+        $this->storeImages('work', $id);
 
         Response::to('/portfolio?tab=work');
     }
@@ -183,7 +183,7 @@ class PortfolioController extends Controller
             }
         }
 
-        ImageLibrary::store('client', $id, 'images');
+        $this->storeImages('client', $id);
 
         Response::to('/portfolio?tab=clients');
     }
@@ -308,6 +308,24 @@ class PortfolioController extends Controller
             : 'Added, hidden. Switch it on when you are ready for it to be public.');
 
         return $id;
+    }
+
+    /**
+     * Take the uploads, and say so when one of them does not land.
+     *
+     * The reasons matter and they are not guessable from the screen —
+     * a file over the size limit, a cap already reached, something that
+     * is not an image whatever it is called. Dropping them leaves
+     * somebody looking at a saved entry with no picture on it and
+     * nothing at all to explain why.
+     */
+    private function storeImages(string $kind, int $ownerId): void
+    {
+        $result = ImageLibrary::store($kind, $ownerId, 'images');
+
+        foreach ($result['errors'] as $error) {
+            Session::error($error);
+        }
     }
 
     /** @return array<int,array<int,array<string,mixed>>> */
