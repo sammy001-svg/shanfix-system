@@ -1,0 +1,569 @@
+/* =====================================================================
+   Sacco Pro
+   The page sells one system, so it is built around one action: the
+   Request a demo button, repeated three times down the page because
+   people decide at different points.
+   ===================================================================== */
+
+/* Declared on both, not just the page. The demo dialog is a sibling of
+   <main> rather than a child of it — it has to be, to sit over the
+   whole screen — so a variable defined only on .sacco-page never
+   reaches it, and the button inside it loses its background entirely. */
+.sacco-page,
+.demo-modal {
+    --sacco-ink:    #0b1220;
+    --sacco-ink-2:  #111c2f;
+    --sacco-line:   rgba(255, 255, 255, .09);
+    --sacco-text:   #e6edf7;
+    --sacco-muted:  #93a4bd;
+    --sacco-green:  #16a34a;
+    --sacco-green-2:#22c55e;
+}
+
+.sacco-page {
+    background: var(--sacco-ink);
+    color: var(--sacco-text);
+}
+
+.sacco-page .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+/* The site's global stylesheet colours every heading near-black, which
+   on a dark page is a heading nobody can read. Said once here rather
+   than on each rule, because the next heading added to this page would
+   otherwise go dark too and nobody would know why. */
+.sacco-page h1,
+.sacco-page h2,
+.sacco-page h3,
+.sacco-page h4,
+.demo-modal h2,
+.demo-modal h3 { color: var(--sacco-text, #e6edf7); }
+
+.sacco-final h2 { color: #fff; }
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.sacco-hero {
+    position: relative;
+    padding: 108px 0 92px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--sacco-line);
+}
+
+/* One soft pool of light behind the heading. The rest of the page is
+   flat — this is the only place it earns its keep. */
+.sacco-hero__glow {
+    position: absolute;
+    top: -220px; left: 50%;
+    width: 900px; height: 620px;
+    margin-left: -620px;
+    background: radial-gradient(circle, rgba(34, 197, 94, .17), transparent 68%);
+    pointer-events: none;
+}
+
+.sacco-hero__inner {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.08fr .92fr;
+    gap: 56px;
+    align-items: center;
+}
+
+.sacco-tag {
+    display: inline-block;
+    font-size: .74rem;
+    font-weight: 800;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--sacco-green-2);
+    background: rgba(34, 197, 94, .12);
+    border: 1px solid rgba(34, 197, 94, .3);
+    border-radius: 999px;
+    padding: 7px 16px;
+    margin-bottom: 22px;
+}
+
+.sacco-hero h1 {
+    font-size: clamp(2.1rem, 4.6vw, 3.5rem);
+    line-height: 1.1;
+    font-weight: 800;
+    margin: 0 0 18px;
+    letter-spacing: -.02em;
+}
+.sacco-hero h1 span { color: var(--sacco-green-2); }
+
+.sacco-hero p {
+    font-size: 1.08rem;
+    line-height: 1.75;
+    color: var(--sacco-muted);
+    max-width: 540px;
+    margin: 0 0 30px;
+}
+
+.sacco-hero__actions { display: flex; flex-wrap: wrap; gap: 13px; }
+
+.sacco-hero__reassure {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    padding: 0;
+    margin: 28px 0 0;
+    font-size: .88rem;
+    color: var(--sacco-muted);
+}
+.sacco-hero__reassure li { display: flex; align-items: center; gap: 8px; }
+.sacco-hero__reassure li::before {
+    content: '';
+    width: 15px; height: 15px;
+    flex: 0 0 15px;
+    border-radius: 50%;
+    background: rgba(34, 197, 94, .18);
+    border: 1px solid rgba(34, 197, 94, .5);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.sacco-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    font: inherit;
+    font-size: .98rem;
+    font-weight: 700;
+    padding: 14px 28px;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform .18s ease, background .18s ease, border-color .18s ease;
+}
+.sacco-btn:hover { transform: translateY(-2px); }
+
+.sacco-btn--primary { background: var(--sacco-green); color: #fff; }
+.sacco-btn--primary:hover { background: var(--sacco-green-2); color: #fff; }
+
+.sacco-btn--ghost {
+    background: transparent;
+    color: var(--sacco-text);
+    border-color: rgba(255, 255, 255, .22);
+}
+.sacco-btn--ghost:hover { border-color: rgba(255, 255, 255, .5); color: #fff; }
+
+.sacco-btn--light { background: #fff; color: #0b1220; }
+.sacco-btn--light:hover { background: #f1f5f9; color: #0b1220; }
+
+.sacco-btn--block { width: 100%; }
+
+/* ── The illustration beside the heading ──────────────────────────── */
+.sacco-panel {
+    background: var(--sacco-ink-2);
+    border: 1px solid var(--sacco-line);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -28px rgba(0, 0, 0, .8);
+}
+.sacco-panel__bar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 13px 16px;
+    background: rgba(255, 255, 255, .03);
+    border-bottom: 1px solid var(--sacco-line);
+}
+.sacco-panel__bar span {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: rgba(255, 255, 255, .17);
+}
+.sacco-panel__bar em {
+    margin-left: auto;
+    font-style: normal;
+    font-size: .76rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--sacco-muted);
+}
+.sacco-panel__body { padding: 20px; display: grid; gap: 11px; }
+
+.sacco-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 11px 14px;
+    background: rgba(255, 255, 255, .035);
+    border: 1px solid var(--sacco-line);
+    border-radius: 11px;
+}
+.sacco-stat span { font-size: .84rem; color: var(--sacco-muted); }
+.sacco-stat strong { font-size: 1.06rem; font-weight: 700; }
+.sacco-stat--good strong { color: var(--sacco-green-2); }
+
+.sacco-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 9px;
+    height: 84px;
+    padding: 0 4px;
+    margin-top: 4px;
+}
+.sacco-bars i {
+    flex: 1;
+    background: linear-gradient(to top, var(--sacco-green), rgba(34, 197, 94, .25));
+    border-radius: 5px 5px 0 0;
+}
+.sacco-panel__note {
+    margin: 2px 0 0;
+    font-size: .72rem;
+    color: var(--sacco-muted);
+    text-align: right;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────── */
+.sacco-section { padding: 92px 0; }
+.sacco-section--alt {
+    background: var(--sacco-ink-2);
+    border-top: 1px solid var(--sacco-line);
+    border-bottom: 1px solid var(--sacco-line);
+}
+.sacco-narrow { max-width: 860px; }
+
+.sacco-head { max-width: 680px; margin: 0 0 48px; }
+.sacco-head h2,
+.sacco-split h2 {
+    font-size: clamp(1.6rem, 3vw, 2.3rem);
+    line-height: 1.22;
+    font-weight: 800;
+    margin: 0 0 14px;
+    letter-spacing: -.015em;
+}
+.sacco-head p { color: var(--sacco-muted); font-size: 1.04rem; line-height: 1.72; margin: 0; }
+
+.sacco-label {
+    display: block;
+    font-size: .74rem;
+    font-weight: 800;
+    letter-spacing: .17em;
+    text-transform: uppercase;
+    color: var(--sacco-green-2);
+    margin-bottom: 12px;
+}
+
+/* ── What it covers ───────────────────────────────────────────────── */
+.sacco-modules {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+    gap: 22px;
+}
+
+.sacco-module {
+    background: rgba(255, 255, 255, .035);
+    border: 1px solid var(--sacco-line);
+    border-radius: 16px;
+    padding: 28px 26px;
+    transition: transform .25s ease, border-color .25s ease;
+}
+.sacco-module:hover {
+    transform: translateY(-4px);
+    border-color: rgba(34, 197, 94, .42);
+}
+
+.sacco-module__icon {
+    display: grid;
+    place-items: center;
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    background: rgba(34, 197, 94, .13);
+    color: var(--sacco-green-2);
+    margin-bottom: 18px;
+}
+.sacco-module__icon svg { width: 22px; height: 22px; }
+
+.sacco-module h3 { font-size: 1.14rem; font-weight: 700; margin: 0 0 9px; }
+.sacco-module p  { color: var(--sacco-muted); font-size: .95rem; line-height: 1.7; margin: 0 0 15px; }
+
+.sacco-module ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+.sacco-module li {
+    position: relative;
+    padding-left: 20px;
+    font-size: .88rem;
+    color: #c6d2e4;
+}
+.sacco-module li::before {
+    content: '';
+    position: absolute;
+    left: 2px; top: .52em;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--sacco-green);
+}
+
+/* ── Why societies move ───────────────────────────────────────────── */
+.sacco-split {
+    display: grid;
+    grid-template-columns: 1.15fr .85fr;
+    gap: 58px;
+    align-items: start;
+}
+
+.sacco-lede { color: var(--sacco-muted); font-size: 1.04rem; line-height: 1.75; margin: 0 0 28px; }
+
+.sacco-wins { list-style: none; padding: 0; margin: 0; display: grid; gap: 20px; }
+.sacco-wins li { padding-left: 22px; border-left: 2px solid rgba(34, 197, 94, .45); }
+.sacco-wins strong { display: block; font-size: 1.01rem; margin-bottom: 5px; }
+.sacco-wins li { color: var(--sacco-muted); font-size: .94rem; line-height: 1.68; }
+
+.sacco-cta-card {
+    position: sticky;
+    top: 110px;
+    background: rgba(34, 197, 94, .07);
+    border: 1px solid rgba(34, 197, 94, .3);
+    border-radius: 18px;
+    padding: 32px 28px;
+}
+.sacco-cta-card h3 { font-size: 1.3rem; font-weight: 800; margin: 0 0 12px; }
+.sacco-cta-card p  { color: var(--sacco-muted); font-size: .95rem; line-height: 1.72; margin: 0 0 22px; }
+.sacco-cta-card__note {
+    margin: 14px 0 0 !important;
+    font-size: .82rem;
+    text-align: center;
+}
+
+/* ── Getting started ──────────────────────────────────────────────── */
+.sacco-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 24px;
+    counter-reset: step;
+}
+.sacco-steps li {
+    background: rgba(255, 255, 255, .035);
+    border: 1px solid var(--sacco-line);
+    border-radius: 16px;
+    padding: 26px 24px;
+}
+.sacco-steps__n {
+    display: grid;
+    place-items: center;
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--sacco-green);
+    color: #fff;
+    font-weight: 800;
+    margin-bottom: 16px;
+}
+.sacco-steps h3 { font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; }
+.sacco-steps p  { color: var(--sacco-muted); font-size: .9rem; line-height: 1.66; margin: 0; }
+
+/* ── Questions ────────────────────────────────────────────────────── */
+.sacco-faq { display: grid; gap: 12px; }
+
+.sacco-faq__item {
+    background: rgba(255, 255, 255, .035);
+    border: 1px solid var(--sacco-line);
+    border-radius: 13px;
+    padding: 4px 22px;
+}
+.sacco-faq__item summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 18px 28px 18px 0;
+    font-weight: 650;
+    font-size: 1rem;
+    position: relative;
+}
+.sacco-faq__item summary::-webkit-details-marker { display: none; }
+.sacco-faq__item summary::after {
+    content: '';
+    position: absolute;
+    right: 2px; top: 50%;
+    width: 9px; height: 9px;
+    margin-top: -6px;
+    border-right: 2px solid var(--sacco-green-2);
+    border-bottom: 2px solid var(--sacco-green-2);
+    transform: rotate(45deg);
+    transition: transform .22s ease;
+}
+.sacco-faq__item[open] summary::after { transform: rotate(-135deg); margin-top: -2px; }
+.sacco-faq__item p {
+    margin: 0 0 18px;
+    color: var(--sacco-muted);
+    font-size: .95rem;
+    line-height: 1.74;
+}
+
+/* ── Last word ────────────────────────────────────────────────────── */
+.sacco-final {
+    padding: 92px 0;
+    text-align: center;
+    background: var(--sacco-green);
+}
+.sacco-final h2 { font-size: clamp(1.6rem, 3vw, 2.3rem); font-weight: 800; margin: 0 0 14px; color: #fff; }
+.sacco-final p  { color: rgba(255, 255, 255, .9); font-size: 1.05rem; max-width: 540px; margin: 0 auto 30px; line-height: 1.7; }
+
+/* =====================================================================
+   The demo form
+   ===================================================================== */
+.demo-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+}
+.demo-modal[hidden] { display: none; }
+
+.demo-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 10, 20, .76);
+    backdrop-filter: blur(3px);
+}
+
+.demo-modal__panel {
+    position: relative;
+    width: 100%;
+    max-width: 580px;
+    max-height: 92vh;
+    overflow-y: auto;
+    background: #111c2f;
+    color: #e6edf7;
+    border: 1px solid rgba(255, 255, 255, .11);
+    border-radius: 20px;
+    box-shadow: 0 40px 80px -30px rgba(0, 0, 0, .9);
+    animation: demoIn .28s cubic-bezier(.17, .75, .28, 1);
+}
+
+@keyframes demoIn {
+    from { opacity: 0; transform: translateY(16px) scale(.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .demo-modal__panel { animation: none; }
+    .sacco-btn:hover, .sacco-module:hover { transform: none; }
+}
+
+.demo-modal__x {
+    position: absolute;
+    top: 16px; right: 16px;
+    display: grid;
+    place-items: center;
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .1);
+    color: #93a4bd;
+    cursor: pointer;
+}
+.demo-modal__x:hover { color: #fff; background: rgba(255, 255, 255, .12); }
+
+.demo-modal__body { padding: 34px 32px 30px; }
+.demo-modal__body h2 { font-size: 1.42rem; font-weight: 800; margin: 0 0 10px; padding-right: 40px; }
+.demo-modal__body > p { color: #93a4bd; font-size: .95rem; line-height: 1.68; margin: 0 0 24px; }
+
+.demo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+.demo-field--wide { grid-column: 1 / -1; }
+
+.demo-field label {
+    display: block;
+    font-size: .84rem;
+    font-weight: 650;
+    margin-bottom: 7px;
+    color: #c6d2e4;
+}
+.demo-field label span { color: #f87171; }
+
+.demo-field input,
+.demo-field select,
+.demo-field textarea {
+    width: 100%;
+    font: inherit;
+    font-size: .95rem;
+    padding: 12px 14px;
+    color: #e6edf7;
+    background: rgba(255, 255, 255, .05);
+    border: 1px solid rgba(255, 255, 255, .13);
+    border-radius: 10px;
+    transition: border-color .18s ease, background .18s ease;
+}
+.demo-field textarea { resize: vertical; min-height: 78px; }
+
+.demo-field input:focus,
+.demo-field select:focus,
+.demo-field textarea:focus {
+    outline: none;
+    border-color: var(--sacco-green-2, #22c55e);
+    background: rgba(255, 255, 255, .08);
+}
+.demo-field input::placeholder,
+.demo-field textarea::placeholder { color: #64748b; }
+
+/* Off-screen rather than display:none — a robot filling only what it
+   can see is a robot that skips a hidden field. */
+.demo-hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px; height: 1px;
+    overflow: hidden;
+}
+
+.demo-error {
+    margin: 18px 0 0;
+    padding: 11px 14px;
+    font-size: .9rem;
+    color: #fca5a5;
+    background: rgba(239, 68, 68, .12);
+    border: 1px solid rgba(239, 68, 68, .3);
+    border-radius: 9px;
+}
+
+#demoSubmit { margin-top: 22px; }
+#demoSubmit:disabled { opacity: .6; cursor: progress; transform: none; }
+
+.demo-small {
+    margin: 14px 0 0;
+    font-size: .8rem;
+    color: #64748b;
+    text-align: center;
+}
+
+.demo-done { text-align: center; padding-top: 44px; }
+.demo-done__tick {
+    display: grid;
+    place-items: center;
+    width: 62px; height: 62px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: rgba(34, 197, 94, .14);
+    border: 1px solid rgba(34, 197, 94, .4);
+    color: #22c55e;
+}
+.demo-done p { color: #93a4bd; line-height: 1.7; margin: 0 0 24px; }
+
+/* ── Narrower screens ─────────────────────────────────────────────── */
+@media (max-width: 980px) {
+    .sacco-hero__inner,
+    .sacco-split { grid-template-columns: 1fr; gap: 44px; }
+    .sacco-hero { padding: 76px 0 64px; }
+    .sacco-cta-card { position: static; }
+}
+
+@media (max-width: 640px) {
+    .sacco-section { padding: 64px 0; }
+    .sacco-final   { padding: 64px 0; }
+    .demo-grid     { grid-template-columns: 1fr; }
+    .demo-modal    { padding: 0; align-items: flex-end; }
+    .demo-modal__panel {
+        max-width: 100%;
+        max-height: 94vh;
+        border-radius: 20px 20px 0 0;
+    }
+    .demo-modal__body { padding: 28px 22px 26px; }
+    .sacco-hero__actions .sacco-btn { width: 100%; }
+}

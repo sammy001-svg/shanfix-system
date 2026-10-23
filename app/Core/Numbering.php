@@ -28,6 +28,7 @@ class Numbering
         'employee'      => 'employee_prefix',
         'equipment'     => 'equipment_prefix',
         'social_post'   => 'social_post_prefix',
+        'demo'          => 'demo_prefix',
     ];
 
     private const DEFAULTS = [
@@ -49,6 +50,7 @@ class Numbering
         'employee'      => 'EMP',
         'equipment'     => 'EQP',
         'social_post'   => 'SP',
+        'demo'          => 'DEMO',
     ];
 
     /**

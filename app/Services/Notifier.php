@@ -53,6 +53,10 @@ class Notifier
         // Client portal
         'client_otp'          => 'Verification code for the client portal',
 
+        // Somebody who asked to see one of the systems we sell, and has
+        // been given a login to it.
+        'demo_ready'          => 'Demo account ready — the link and the login',
+
         // Partners
         //
         // Registered here as well as dispatched, because this list is what

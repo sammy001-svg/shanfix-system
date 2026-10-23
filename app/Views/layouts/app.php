@@ -162,7 +162,8 @@ if ($me && can('jobs.view')) {
       <?php
         // ── Sales ──────────────────────────────────────────────────────────
         $showSales = can('leads.view') || can('clients.view')
-                  || can('requests.view') || can('letters.view');
+                  || can('requests.view') || can('letters.view')
+                  || can('demos.view');
       ?>
       <?php if ($showSales): ?>
         <details class="nav-group" data-nav-group="sales"
@@ -178,6 +179,19 @@ if ($me && can('jobs.view')) {
             <?php if (can('leads.view')): ?>
               <a class="nav-link <?= is_active_nav('/leads') ? 'is-active' : '' ?>" href="<?= url('/leads') ?>">
                 <?= icon('target', 'nav-link__icon') ?> Leads
+              </a>
+            <?php endif; ?>
+
+            <?php if (can('demos.view')): ?>
+              <?php // Somebody waiting on a login is somebody who asked to
+                    // be sold to and has not been answered, so the count
+                    // is on the link rather than inside the page. ?>
+              <?php $demosWaiting = \App\Services\DemoRequests::waiting(); ?>
+              <a class="nav-link <?= is_active_nav('/demos') ? 'is-active' : '' ?>" href="<?= url('/demos') ?>">
+                <?= icon('key', 'nav-link__icon') ?> Demo requests
+                <?php if ($demosWaiting > 0): ?>
+                  <span class="nav-link__badge"><?= (int) $demosWaiting ?></span>
+                <?php endif; ?>
               </a>
             <?php endif; ?>
 

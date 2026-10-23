@@ -146,6 +146,56 @@ if ($doc && !empty($doc['id'])) {
           </table>
         <?php endif; ?>
 
+        <?php // A demo login. Shown monospaced and spaced out, because
+              // somebody is going to copy it by hand off a phone. ?>
+        <?php if (!empty($context['username'])): ?>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="background:#F4F7FA;border:1px solid #DDE4EC;border-radius:6px;margin-bottom:20px">
+            <tr>
+              <td style="padding:18px 20px">
+                <div style="font-size:11px;color:<?= $muted ?>;text-transform:uppercase;letter-spacing:1.5px;padding-bottom:10px">
+                  Your login
+                </div>
+
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px">
+                  <tr>
+                    <td style="color:<?= $muted ?>;padding:4px 0;width:92px">Username</td>
+                    <td style="padding:4px 0">
+                      <strong style="font-family:'Courier New',Courier,monospace;color:<?= $ink ?>">
+                        <?= e($context['username']) ?>
+                      </strong>
+                    </td>
+                  </tr>
+                  <?php if (!empty($context['password'])): ?>
+                  <tr>
+                    <td style="color:<?= $muted ?>;padding:4px 0">Password</td>
+                    <td style="padding:4px 0">
+                      <strong style="font-family:'Courier New',Courier,monospace;color:<?= $ink ?>">
+                        <?= e($context['password']) ?>
+                      </strong>
+                    </td>
+                  </tr>
+                  <?php endif; ?>
+                  <?php if (!empty($context['expires'])): ?>
+                  <tr>
+                    <td style="color:<?= $muted ?>;padding:4px 0">Good until</td>
+                    <td style="padding:4px 0"><?= e($context['expires']) ?></td>
+                  </tr>
+                  <?php endif; ?>
+                </table>
+
+                <?php // Said in the message that carries it, because this
+                      // is the moment somebody is looking at it. ?>
+                <div style="font-size:12px;color:<?= $muted ?>;padding-top:12px;line-height:1.55">
+                  This login is for a demonstration account with sample data in
+                  it. Please change the password once you are in, and do not
+                  use it for anything real.
+                </div>
+              </td>
+            </tr>
+          </table>
+        <?php endif; ?>
+
         <?php if ($isPaid || $isPartial): ?>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                  style="background:#EDF8F2;border:1px solid #D5EFE0;border-radius:6px;margin-bottom:20px">

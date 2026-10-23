@@ -35,6 +35,7 @@ use App\Controllers\JobFileController;
 use App\Controllers\LiveChatApiController;
 use App\Controllers\NewsletterController;
 use App\Controllers\MailController;
+use App\Controllers\DemoRequestController;
 use App\Controllers\PortfolioController;
 use App\Controllers\TestimonialController;
 use App\Controllers\LiveChatController;
@@ -1260,6 +1261,20 @@ $r->group(['auth'], function ($r) {
         $r->post('/testimonials',             [TestimonialController::class, 'save'],   ['csrf']);
         $r->post('/testimonials/{id}/toggle', [TestimonialController::class, 'toggle'], ['csrf']);
         $r->post('/testimonials/{id}/delete', [TestimonialController::class, 'delete'], ['csrf']);
+    });
+
+    // -- People asking to see a system we sell
+    //
+    // Reading them is sales work; handing one a working login to a
+    // running system is an administrator's, and the controller asks
+    // again for that rather than leaning on the group.
+    $r->group(['permission:demos.view'], function ($r) {
+        $r->get ('/demos',      [DemoRequestController::class, 'index']);
+        $r->get ('/demos/{id}', [DemoRequestController::class, 'show']);
+
+        $r->post('/demos/{id}/accept',  [DemoRequestController::class, 'accept'],  ['csrf']);
+        $r->post('/demos/{id}/resend',  [DemoRequestController::class, 'resend'],  ['csrf']);
+        $r->post('/demos/{id}/decline', [DemoRequestController::class, 'decline'], ['csrf']);
     });
 
     // -- The portfolio the website shows

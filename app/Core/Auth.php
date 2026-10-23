@@ -236,6 +236,16 @@ class Auth
         // conversation with the client rather than a typo.
         'portfolio.manage'  => ['admin', 'manager', 'sales', 'social', 'social_manager'],
 
+        // People asking to see one of the systems we sell. Reading them
+        // is sales work, so sales read them.
+        'demos.view'        => ['admin', 'manager', 'sales'],
+
+        // Handing one a working login is not. Accepting a request sends
+        // somebody outside the company the address of a running system
+        // and the credentials to get into it, and that is an
+        // administrator's to do — which is also what was asked for.
+        'demos.manage'      => ['admin'],
+
         // Everybody's own email. Every role, because everybody has a
         // mailbox; what each person can open is only ever their own.
         'mail.use'          => ['admin', 'manager', 'finance', 'hr', 'sales', 'production', 'designer', 'reception', 'staff', 'social', 'social_manager'],
@@ -342,6 +352,7 @@ class Auth
         'newsletter'    => ['Newsletter',       'The mailing list from the website'],
         'testimonials'  => ['Testimonials',     'What the website says our clients said'],
         'portfolio'     => ['Portfolio',        'The work the website shows, and whose logos it carries'],
+        'demos'         => ['Demo requests',    'People asking to see a system, and the logins they are sent'],
         'bulksms'       => ['SMS platform',     'The product customers and partners send through'],
 
         'hr'            => ['Staff records',    'Employee records, ID numbers, bank details'],

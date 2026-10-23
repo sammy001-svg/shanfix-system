@@ -540,6 +540,47 @@ function system_price_label(array $service): string
  *               service?: string} $enquiry
  * @return int|null the lead id, or null if the system could not take it
  */
+/**
+ * Somebody on the website asking to see a system we sell.
+ *
+ * Returns the reference to quote back at them — "we have it, it is
+ * DEMO-2026-0004" reads like being dealt with — or null when the system
+ * could not take it, which the caller must treat as "keep this
+ * somewhere else", not as "tell them it worked".
+ *
+ * Like everything else here it never throws. A demo request is a sale
+ * asking to happen, and the page it came from must not break over it.
+ *
+ * @param array<string,mixed> $request
+ */
+function system_request_demo(array $request): ?string
+{
+    if (!system_ready()) {
+        return null;
+    }
+
+    try {
+        $id = \App\Services\DemoRequests::create($request);
+
+        if ($id === null) {
+            return null;
+        }
+
+        $reference = \App\Core\Database::scalar(
+            'SELECT reference FROM demo_requests WHERE id = :id',
+            ['id' => $id]
+        );
+
+        return $reference !== null ? (string) $reference : null;
+    } catch (\Throwable $e) {
+        if (class_exists(\App\Core\Logger::class)) {
+            \App\Core\Logger::warning('Demo request from the website failed: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+}
+
 function system_capture_enquiry(array $enquiry): ?int
 {
     if (!system_ready()) {
