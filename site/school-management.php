@@ -18,7 +18,8 @@ include 'includes/header.php'; ?>
                 <h1 data-aos="fade-up" data-aos-delay="100">Intelligent <span>School Management</span> Ecosystem</h1>
                 <p data-aos="fade-up" data-aos-delay="200">The most advanced platform in East Africa for automating academic workflows, financial management, and student lifecycle tracking in one unified environment.</p>
                 <div class="hero-btns" data-aos="fade-up" data-aos-delay="300">
-                    <a href="https://pos.shanfixtechnology.com/" class="btn-brand-green">Portal Login</a>
+                    <button type="button" class="btn-brand-green" data-demo-open>Request a demo</button>
+                    <a href="https://pos.shanfixtechnology.com/" class="btn-brand-outline">Portal Login</a>
                     <a href="https://pos.shanfixtechnology.com/register.php" class="btn-brand-outline">Register Institution</a>
                 </div>
             </div>
@@ -208,6 +209,25 @@ include 'includes/header.php'; ?>
         </div>
     </section>
 </main>
+
+<?php
+// The Request a demo dialog, shared with the other product pages.
+require_once __DIR__ . '/includes/demo_request.php';
+
+demo_request_modal([
+    'product'    => 'school',
+    'name'       => 'School Management',
+    'org_label'  => 'School',
+    'size_label' => 'Roughly how many pupils',
+    'sizes'      => [
+        'Under 300 pupils',
+        '300 – 800 pupils',
+        '800 – 2,000 pupils',
+        'Over 2,000 pupils',
+    ],
+    'source'     => 'school-management.php',
+]);
+?>
 
 <?php $ctaService = 'School Management System'; include 'includes/service_cta.php'; ?>
 <?php include 'includes/footer.php'; ?>

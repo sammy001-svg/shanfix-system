@@ -18,7 +18,8 @@ include 'includes/header.php'; ?>
                 <h1 data-aos="fade-up" data-aos-delay="100">The Next Generation of <span>Point of Sales</span></h1>
                 <p data-aos="fade-up" data-aos-delay="200">Empower your business with a unified POS system that synchronizes sales, inventory, and customer data in real-time across all your locations.</p>
                 <div class="hero-btns" data-aos="fade-up" data-aos-delay="300">
-                    <a href="https://pos.shanfixtechnology.com/" class="btn btn-primary">Login to POS</a>
+                    <button type="button" class="btn btn-primary" data-demo-open>Request a demo</button>
+                    <a href="https://pos.shanfixtechnology.com/" class="btn btn-secondary">Login to POS</a>
                     <a href="https://pos.shanfixtechnology.com/register.php" class="btn btn-secondary">Register Today</a>
                 </div>
                 
@@ -181,5 +182,24 @@ include 'includes/header.php'; ?>
         </div>
     </section>
 </main>
+
+<?php
+// The Request a demo dialog, shared with the other product pages.
+require_once __DIR__ . '/includes/demo_request.php';
+
+demo_request_modal([
+    'product'    => 'pos',
+    'name'       => 'Point of Sale',
+    'org_label'  => 'Business',
+    'size_label' => 'Roughly how many tills',
+    'sizes'      => [
+        'One till',
+        '2 – 5 tills',
+        '6 – 20 tills',
+        'Over 20 tills',
+    ],
+    'source'     => 'pos-solution.php',
+]);
+?>
 
 <?php include 'includes/footer.php'; ?>

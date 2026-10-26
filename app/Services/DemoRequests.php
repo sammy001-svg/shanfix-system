@@ -34,9 +34,17 @@ use App\Core\Settings;
  */
 class DemoRequests
 {
-    /** What can be asked for. One today; the column takes the next. */
+    /**
+     * What can be asked for.
+     *
+     * The name here is what the client is told they are being given a
+     * demo of, so it matches the heading on the page they asked from.
+     */
     public const PRODUCTS = [
-        'sacco' => 'Sacco Pro',
+        'sacco'  => 'Sacco Pro',
+        'school' => 'School Management',
+        'pos'    => 'Point of Sale',
+        'erp'    => 'Business ERP',
     ];
 
     public const STATUSES = [
@@ -46,13 +54,16 @@ class DemoRequests
         'expired'  => 'Expired',
     ];
 
-    /** Rough sizes, because nobody knows their membership exactly. */
-    public const SIZES = [
-        'under-500'   => 'Under 500 members',
-        '500-2000'    => '500 – 2,000 members',
-        '2000-10000'  => '2,000 – 10,000 members',
-        'over-10000'  => 'Over 10,000 members',
-    ];
+    /**
+     * How big they are, in their own units.
+     *
+     * Not a list. A sacco counts members, a school counts pupils and a
+     * shop counts tills, so each page asks its own question and the
+     * answer is stored as the words it offered. A fixed list here would
+     * have to agree with four forms in four files, for ever, and the
+     * first time it did not the size would be silently dropped.
+     */
+    public const SIZE_MAX = 40;
 
     /**
      * Take a request in.
@@ -87,7 +98,7 @@ class DemoRequests
                 'role'         => mb_substr(trim((string) ($in['role'] ?? '')), 0, 120) ?: null,
                 'email'        => mb_substr($email, 0, 190),
                 'phone'        => mb_substr($phone, 0, 40),
-                'members'      => isset(self::SIZES[$in['members'] ?? '']) ? $in['members'] : null,
+                'members'      => mb_substr(trim((string) ($in['members'] ?? '')), 0, self::SIZE_MAX) ?: null,
                 'message'      => trim((string) ($in['message'] ?? '')) ?: null,
                 'source_page'  => mb_substr(trim((string) ($in['source_page'] ?? '')), 0, 120) ?: null,
                 // Stored packed, which is what VARBINARY(16) is for, and
@@ -329,7 +340,7 @@ class DemoRequests
     {
         try {
             $requirement = 'Asked to see ' . self::productName($product) . ' on the website.' . "\n\n"
-                . ($in['members'] ?? '' ? 'Size: ' . (self::SIZES[$in['members']] ?? $in['members']) . "\n" : '')
+                . (trim((string) ($in['members'] ?? '')) !== '' ? 'Size: ' . $in['members'] . "\n" : '')
                 . ($in['role'] ?? '' ? 'Their role: ' . $in['role'] . "\n" : '')
                 . (trim((string) ($in['message'] ?? '')) !== ''
                     ? "\n" . trim((string) $in['message']) : '');

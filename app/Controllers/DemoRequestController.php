@@ -59,7 +59,6 @@ class DemoRequestController extends Controller
             'requests' => Database::all($sql, $args),
             'statuses' => DemoRequests::STATUSES,
             'products' => DemoRequests::PRODUCTS,
-            'sizes'    => DemoRequests::SIZES,
             'filters'  => ['status' => $status, 'product' => $product],
             'waiting'  => DemoRequests::waiting(),
             'canSend'  => \App\Core\Auth::can('demos.manage'),
@@ -80,7 +79,6 @@ class DemoRequestController extends Controller
             'demo'     => $demo,
             'statuses' => DemoRequests::STATUSES,
             'products' => DemoRequests::PRODUCTS,
-            'sizes'    => DemoRequests::SIZES,
             'canSend'  => \App\Core\Auth::can('demos.manage'),
             'lead'     => $demo['lead_id']
                 ? Database::first('SELECT id, lead_number, stage FROM leads WHERE id = :id',

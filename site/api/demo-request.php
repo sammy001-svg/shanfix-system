@@ -120,7 +120,10 @@ $reference = system_request_demo([
     'phone'        => $phone,
     'members'      => $members,
     'message'      => $message,
-    'source_page'  => substr((string) ($input['source'] ?? 'sacco.php'), 0, 120),
+    // Blank rather than a guess. Defaulting to one product's page
+    // meant anything posted without a source was recorded as
+    // having come from it, which is worse than not knowing.
+    'source_page'  => substr(trim((string) ($input['source'] ?? '')), 0, 120),
     'ip'           => $_SERVER['REMOTE_ADDR'] ?? '',
 ]);
 

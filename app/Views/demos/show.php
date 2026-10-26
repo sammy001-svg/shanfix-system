@@ -218,7 +218,7 @@ $open     = $demo['status'] === 'new';
           <dt>Phone</dt>
           <dd><a href="tel:<?= e(preg_replace('/[^0-9+]/', '', $demo['phone'])) ?>"><?= e($demo['phone']) ?></a></dd>
           <?php if ($demo['members']): ?>
-            <dt>Size</dt><dd><?= e($sizes[$demo['members']] ?? $demo['members']) ?></dd>
+            <dt>Size</dt><dd><?= e($demo['members']) ?></dd>
           <?php endif; ?>
           <dt>Reference</dt><dd><code><?= e($demo['reference']) ?></code></dd>
           <?php if ($demo['source_page']): ?>

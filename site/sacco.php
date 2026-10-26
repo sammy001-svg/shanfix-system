@@ -302,187 +302,25 @@ $questions = [
     </section>
 </main>
 
-<!-- ── The demo form ───────────────────────────────────────────── -->
-<div class="demo-modal" id="demoModal" hidden>
-    <div class="demo-modal__backdrop" data-demo-close></div>
+<?php
+// The Request a demo dialog, shared with the school, till and ERP
+// pages. It used to be written out here; a second page would have
+// meant a second copy of the form, the validation and the script.
+require_once __DIR__ . '/includes/demo_request.php';
 
-    <div class="demo-modal__panel" role="dialog" aria-modal="true"
-         aria-labelledby="demoTitle" aria-describedby="demoBlurb">
-        <button type="button" class="demo-modal__x" data-demo-close aria-label="Close">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-                 stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-
-        <div class="demo-modal__body" id="demoFormWrap">
-            <h2 id="demoTitle">Request a Sacco Pro demo</h2>
-            <p id="demoBlurb">
-                We will set up an account with sample data and send you the link
-                and login — by email and by text, so you have it either way.
-            </p>
-
-            <form id="demoForm" novalidate>
-                <input type="hidden" name="product" value="sacco">
-                <input type="hidden" name="source" value="sacco.php">
-
-                <!-- Robots fill in every field they find. People cannot see
-                     this one. -->
-                <div class="demo-hp" aria-hidden="true">
-                    <label>Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
-                </div>
-
-                <div class="demo-grid">
-                    <div class="demo-field">
-                        <label for="d_name">Your name <span>*</span></label>
-                        <input id="d_name" name="name" required autocomplete="name">
-                    </div>
-
-                    <div class="demo-field">
-                        <label for="d_role">Your role</label>
-                        <input id="d_role" name="role" autocomplete="organization-title"
-                               placeholder="e.g. Treasurer">
-                    </div>
-
-                    <div class="demo-field demo-field--wide">
-                        <label for="d_org">Sacco</label>
-                        <input id="d_org" name="organisation" autocomplete="organization">
-                    </div>
-
-                    <div class="demo-field">
-                        <label for="d_email">Email <span>*</span></label>
-                        <input id="d_email" name="email" type="email" required autocomplete="email">
-                    </div>
-
-                    <div class="demo-field">
-                        <label for="d_phone">Phone <span>*</span></label>
-                        <input id="d_phone" name="phone" type="tel" required autocomplete="tel"
-                               placeholder="07xx xxx xxx">
-                    </div>
-
-                    <div class="demo-field demo-field--wide">
-                        <label for="d_members">Roughly how many members</label>
-                        <select id="d_members" name="members">
-                            <option value="">Prefer not to say</option>
-                            <option value="under-500">Under 500</option>
-                            <option value="500-2000">500 – 2,000</option>
-                            <option value="2000-10000">2,000 – 10,000</option>
-                            <option value="over-10000">Over 10,000</option>
-                        </select>
-                    </div>
-
-                    <div class="demo-field demo-field--wide">
-                        <label for="d_message">Anything you particularly want to see</label>
-                        <textarea id="d_message" name="message" rows="3"
-                                  placeholder="e.g. how check-off and M-Pesa collections post"></textarea>
-                    </div>
-                </div>
-
-                <p class="demo-error" id="demoError" hidden></p>
-
-                <button type="submit" class="sacco-btn sacco-btn--primary sacco-btn--block" id="demoSubmit">
-                    Send the request
-                </button>
-
-                <p class="demo-small">
-                    We use these details to set up and send you the demo. Nothing else.
-                </p>
-            </form>
-        </div>
-
-        <div class="demo-modal__body demo-done" id="demoDone" hidden>
-            <span class="demo-done__tick" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="30" height="30" fill="none"
-                     stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>
-            </span>
-            <h2>That is with us</h2>
-            <p id="demoDoneMsg"></p>
-            <button type="button" class="sacco-btn sacco-btn--ghost" data-demo-close>Close</button>
-        </div>
-    </div>
-</div>
-
-<script>
-/* The demo form. Opened from any button marked data-demo-open, closed
-   by the backdrop, the X, or Escape — all three, because a dialog that
-   traps somebody is worse than no dialog. */
-(function () {
-    var modal  = document.getElementById('demoModal');
-    var form   = document.getElementById('demoForm');
-    var wrap   = document.getElementById('demoFormWrap');
-    var done   = document.getElementById('demoDone');
-    var msg    = document.getElementById('demoDoneMsg');
-    var err    = document.getElementById('demoError');
-    var submit = document.getElementById('demoSubmit');
-
-    if (!modal || !form) { return; }
-
-    var lastFocused = null;
-
-    function open() {
-        lastFocused = document.activeElement;
-        modal.hidden = false;
-        document.body.style.overflow = 'hidden';
-        var first = document.getElementById('d_name');
-        if (first) { setTimeout(function () { first.focus(); }, 60); }
-    }
-
-    function close() {
-        modal.hidden = true;
-        document.body.style.overflow = '';
-        if (lastFocused && lastFocused.focus) { lastFocused.focus(); }
-    }
-
-    document.querySelectorAll('[data-demo-open]').forEach(function (b) {
-        b.addEventListener('click', open);
-    });
-    document.querySelectorAll('[data-demo-close]').forEach(function (b) {
-        b.addEventListener('click', close);
-    });
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && !modal.hidden) { close(); }
-    });
-
-    form.addEventListener('submit', async function (e) {
-        e.preventDefault();
-
-        var data = {};
-        new FormData(form).forEach(function (v, k) { data[k] = typeof v === 'string' ? v.trim() : v; });
-
-        if (!data.name || !data.email || !data.phone) {
-            err.textContent = 'We need your name, email and phone — the login goes to both.';
-            err.hidden = false;
-            return;
-        }
-
-        err.hidden = true;
-        submit.disabled = true;
-        var original = submit.textContent;
-        submit.textContent = 'Sending…';
-
-        try {
-            var res = await fetch('api/demo-request.php', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify(data)
-            });
-            var out = await res.json();
-
-            if (out.success) {
-                msg.textContent = out.message;
-                wrap.hidden = true;
-                done.hidden = false;
-            } else {
-                err.textContent = out.message || 'Something went wrong. Please try again.';
-                err.hidden = false;
-            }
-        } catch (ex) {
-            err.textContent = 'We could not reach the server. Please check your connection and try again.';
-            err.hidden = false;
-        }
-
-        submit.disabled = false;
-        submit.textContent = original;
-    });
-}());
-</script>
+demo_request_modal([
+    'product'    => 'sacco',
+    'name'       => 'Sacco Pro',
+    'org_label'  => 'Sacco',
+    'size_label' => 'Roughly how many members',
+    'sizes'      => [
+        'Under 500 members',
+        '500 – 2,000 members',
+        '2,000 – 10,000 members',
+        'Over 10,000 members',
+    ],
+    'source'     => 'sacco.php',
+]);
+?>
 
 <?php include 'includes/footer.php'; ?>

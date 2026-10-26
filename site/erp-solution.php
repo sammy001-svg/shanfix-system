@@ -18,7 +18,8 @@ include 'includes/header.php'; ?>
                 <h1 data-aos="fade-up" data-aos-delay="100">Unified <span>Business ERP</span> Solutions</h1>
                 <p data-aos="fade-up" data-aos-delay="200">Streamline your entire organization with a single, powerful platform. From financial management to supply chain optimization, we provide the tools to lead your industry.</p>
                 <div class="hero-btns" data-aos="fade-up" data-aos-delay="300">
-                    <a href="contact.php" class="btn btn-primary">Request Implementation</a>
+                    <button type="button" class="btn btn-primary" data-demo-open>Request a demo</button>
+                    <a href="contact.php" class="btn btn-secondary">Request Implementation</a>
                     <a href="#modules" class="btn btn-secondary">Explore Modules</a>
                 </div>
             </div>
@@ -175,5 +176,24 @@ include 'includes/header.php'; ?>
         </div>
     </section>
 </main>
+<?php
+// The Request a demo dialog, shared with the other product pages.
+require_once __DIR__ . '/includes/demo_request.php';
+
+demo_request_modal([
+    'product'    => 'erp',
+    'name'       => 'Business ERP',
+    'org_label'  => 'Business',
+    'size_label' => 'Roughly how many people use it',
+    'sizes'      => [
+        'Under 10 people',
+        '10 – 50 people',
+        '50 – 200 people',
+        'Over 200 people',
+    ],
+    'source'     => 'erp-solution.php',
+]);
+?>
+
 <?php $ctaService = 'Business ERP Solution'; include 'includes/service_cta.php'; ?>
 <?php include 'includes/footer.php'; ?>

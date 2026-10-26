@@ -46,7 +46,8 @@ PAGE=$(site /sacco.php)
 has "it is about Sacco Pro"        "$PAGE" "Sacco Pro"
 has "there is a demo button"       "$PAGE" "data-demo-open"
 has "and a form behind it"         "$PAGE" 'id="demoForm"'
-has "posting to the endpoint"      "$PAGE" "api/demo-request.php"
+has "loading the shared script"    "$PAGE" "demo-request.js"
+has "which posts to the endpoint"  "$(cat "$ROOT/site/demo-request.js")" "api/demo-request.php"
 
 # It says what it is going to do with the phone number, on the form, at
 # the moment somebody is deciding whether to give it.
@@ -61,9 +62,54 @@ esac
 has "and points at the page" "$HEAD" 'href="sacco.php"'
 
 echo ""
+echo "=== 1b. Every system we sell can be asked for ==="
+
+# One dialog, four pages. It was written into the Sacco page first;
+# copying it would have meant four copies of the form, the validation
+# and the script, and the first fix to any of them landing in one copy.
+for spec in "sacco.php|sacco|Sacco Pro|members" \
+            "school-management.php|school|School Management|pupils" \
+            "pos-solution.php|pos|Point of Sale|tills" \
+            "erp-solution.php|erp|Business ERP|people"; do
+  PAGE="${spec%%|*}"; REST="${spec#*|}"
+  KEY="${REST%%|*}";  REST="${REST#*|}"
+  LABEL="${REST%%|*}"; UNIT="${REST#*|}"
+
+  BODY=$(site "/$PAGE")
+
+  eq  "$PAGE serves"              "$(scode "/$PAGE")" "200"
+  has "  it has a demo button"    "$BODY" "data-demo-open"
+  has "  and the shared dialog"   "$BODY" 'id="demoModal"'
+  has "  asking for $KEY"         "$BODY" "name=\"product\" value=\"$KEY\""
+  has "  named $LABEL"            "$BODY" "Request a $LABEL demo"
+
+  # Each product asks the size question in its own units. A school
+  # counts pupils and a shop counts tills; one list for all four was
+  # how the sacco's wording ended up on every page.
+  has "  counting $UNIT"          "$BODY" "$UNIT"
+done
+
+# The dialog brings its own stylesheet and script, so a page gets a
+# working one by including the partial and has nothing else to remember.
+SACCO=$(site /sacco.php)
+has "the dialog carries its styles" "$SACCO" "demo-request.css"
+has "and its script"                "$SACCO" "demo-request.js"
+
+# One copy of each, not four.
+eq "the form is written once" \
+   "$(grep -lc 'id=\"demoForm\"' "$ROOT"/site/*.php 2>/dev/null | wc -l)" "0"
+has "and lives in the shared partial" \
+   "$(cat "$ROOT/site/includes/demo_request.php")" 'id="demoForm"'
+
+# The dialog does not borrow its buttons from whichever page included
+# it — the Sacco page is dark and the next one may not be.
+has "it has buttons of its own" \
+   "$(cat "$ROOT/site/demo-request.css")" ".demo-btn"
+
+echo ""
 echo "=== 2. A request comes in ==="
 
-OUT=$(api '{"product":"sacco","name":"DEMOTEST Grace","organisation":"DEMOTEST Sacco","role":"Treasurer","email":"grace@demotest.invalid","phone":"0711000111","members":"500-2000","message":"DEMOTEST how check-off posts","source":"sacco.php"}')
+OUT=$(api '{"product":"sacco","name":"DEMOTEST Grace","organisation":"DEMOTEST Sacco","role":"Treasurer","email":"grace@demotest.invalid","phone":"0711000111","members":"500 to 2,000 members","message":"DEMOTEST how check-off posts","source":"sacco.php"}')
 
 has "the form accepts it"   "$OUT" '"success":true'
 has "and quotes a reference" "$OUT" "DEMO-"
@@ -71,6 +117,12 @@ has "and quotes a reference" "$OUT" "DEMO-"
 DID=$(q "SELECT id FROM demo_requests WHERE email='grace@demotest.invalid';")
 ne "it is stored in the system" "$DID" ""
 eq "and starts as waiting" "$(q "SELECT status FROM demo_requests WHERE id=$DID;")" "new"
+
+# The band is kept as the words the page offered. A fixed list in the
+# system would have to agree with four forms in four files, and the
+# first time it did not the size would be silently dropped.
+eq "the size is kept as it was asked" \
+   "$(q "SELECT members FROM demo_requests WHERE id=$DID;")" "500 to 2,000 members"
 
 # It becomes a lead as well, so it is on the board people actually work
 # from rather than in a list somebody has to remember to open.
