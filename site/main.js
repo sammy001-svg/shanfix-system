@@ -110,6 +110,57 @@ document.querySelectorAll('a[href*="#"]').forEach(anchor => {
   });
 });
 
+/* Where the drawer gives way to the row. Must match index.css, which
+   switches at 1180px: below that the row squeezes, its labels wrap and
+   its mega menus fall off the left of the screen. Written once here and
+   read everywhere below. */
+const NAV_DRAWER_MAX = 1179;
+
+/* Whether this device can hover at all — the fallback for browsers
+   that do not tell us how a click was made. Not the main test: an iPad
+   with a trackpad says it can hover, and is still used with a finger
+   most of the time. */
+const NAV_CAN_HOVER = window.matchMedia
+  ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  : true;
+
+/* How this particular click was made. A tap has not been shown the
+   mega menu, because there was no hover to show it; a mouse click has.
+   So a tap opens the panel and a click follows the link, on the same
+   machine, without either having to be declared in advance. */
+const navWasTapped = (e) =>
+  e.pointerType === 'touch' || e.pointerType === 'pen' || !NAV_CAN_HOVER;
+
+/* Keep an open mega menu on the screen.
+ *
+ * The panel is 900px wide and centred on whichever item opened it, so
+ * the leftmost menu hangs a third of itself off the side. Measured
+ * after it opens and pushed back by however much it is over, which
+ * works at every width rather than at the ones somebody thought to
+ * check. */
+function navKeepPanelOnScreen(dropdown) {
+  const panel = dropdown.querySelector('.mega-menu');
+  if (!panel || navInDrawerMode()) { return; }
+
+  panel.style.removeProperty('--mega-nudge');
+  panel.classList.remove('is-nudged');
+
+  const margin = 12;
+  const box = panel.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth;
+
+  let nudge = 0;
+  if (box.left < margin) { nudge = margin - box.left; }
+  else if (box.right > vw - margin) { nudge = (vw - margin) - box.right; }
+
+  if (nudge !== 0) {
+    panel.style.setProperty('--mega-nudge', Math.round(nudge) + 'px');
+    panel.classList.add('is-nudged');
+  }
+}
+
+const navInDrawerMode = () => window.innerWidth <= NAV_DRAWER_MAX;
+
 // Mobile Menu Toggle
 const mobileMenuToggle = document.getElementById('mobileMenuToggle');
 const navMenu = document.getElementById('navMenu');
@@ -121,8 +172,17 @@ if (mobileMenuToggle) {
   });
 }
 
-// Close mobile menu when clicking on a link
+// Close the drawer when a link in it is followed.
+//
+// Not the dropdown triggers. Those open a section inside the drawer
+// rather than going anywhere, and closing on them meant tapping "Our
+// Services" made the whole menu vanish — so the mega menus could not be
+// reached from the drawer at all.
 document.querySelectorAll('.nav-link').forEach(link => {
+  if (link.parentElement && link.parentElement.classList.contains('nav-item-dropdown')) {
+    return;
+  }
+
   link.addEventListener('click', () => {
     navMenu.classList.remove('active');
     mobileMenuToggle.classList.remove('active');
@@ -135,21 +195,67 @@ document.querySelectorAll('.nav-item-dropdown').forEach(dropdown => {
   if (!dropdownLink) return;
 
   dropdownLink.addEventListener('click', (e) => {
-    if (window.innerWidth <= 767) {
+    if (navInDrawerMode()) {
+      // Inside the drawer: the panel opens underneath the item.
       e.preventDefault();
-      // Close other open dropdowns
+
       document.querySelectorAll('.nav-item-dropdown').forEach(other => {
         if (other !== dropdown) other.classList.remove('active');
       });
+
       dropdown.classList.toggle('active');
+      return;
     }
+
+    if (!navWasTapped(e)) {
+      // A mouse. Hover has already shown the panel, so the click goes
+      // where the link says.
+      return;
+    }
+
+    if (dropdown.classList.contains('is-open')) {
+      // Tapped again with the panel already open: follow the link, the
+      // way every touch menu behaves.
+      return;
+    }
+
+    // The row, tapped. Without this the panel never opens at all — the
+    // CSS only shows it on hover and a finger sends none.
+    e.preventDefault();
+
+    document.querySelectorAll('.nav-item-dropdown').forEach(other => {
+      other.classList.remove('is-open');
+    });
+
+    dropdown.classList.add('is-open');
+    navKeepPanelOnScreen(dropdown);
   });
+
+  // Hover opens it too, on a machine that has one, and it needs the
+  // same treatment.
+  dropdown.addEventListener('mouseenter', () => navKeepPanelOnScreen(dropdown));
 });
 
-// Update mega menu behavior on window resize
+/* A tap anywhere else closes the open panel. Without it the only way
+   out of one is to tap its own trigger again, which nobody guesses. */
+document.addEventListener('click', (e) => {
+  if (navInDrawerMode()) { return; }
+  if (e.target.closest('.nav-item-dropdown')) { return; }
+
+  document.querySelectorAll('.nav-item-dropdown.is-open')
+    .forEach(d => d.classList.remove('is-open'));
+});
+
+// Rotating a tablet crosses the breakpoint, so whatever was open in one
+// layout is closed rather than left behind in the other.
 window.addEventListener('resize', () => {
-  if (window.innerWidth > 767) {
+  if (!navInDrawerMode()) {
     document.querySelectorAll('.nav-item-dropdown').forEach(d => d.classList.remove('active'));
+
+    if (navMenu) { navMenu.classList.remove('active'); }
+    if (mobileMenuToggle) { mobileMenuToggle.classList.remove('active'); }
+  } else {
+    document.querySelectorAll('.nav-item-dropdown').forEach(d => d.classList.remove('is-open'));
   }
 });
 

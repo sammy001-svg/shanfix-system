@@ -690,6 +690,95 @@ $MYSQL -e "UPDATE site_testimonials SET is_active=0 WHERE author='Suite Client';
 eq "and hides it when switched off" "$(get / | grep -c 'SUITEQUOTE')" "0"
 $MYSQL -e "DELETE FROM site_testimonials WHERE author LIKE 'Suite Client%';"
 
+echo ""
+echo "=== 18. The navbar on a tablet ==="
+
+# Measured before any of this was changed: the desktop row wants 1034px
+# of header and an iPad gives it 753 in portrait and 1009 in landscape.
+# The breakpoint was 767px, so every tablet got the full row — seven
+# items, three buttons and a logo — crammed into three quarters of the
+# room, with the hamburger hidden and the mega menus 134px off the left
+# edge of the screen.
+CSS=$(cat "$ROOT/site/index.css")
+JS=$(cat "$ROOT/site/main.js")
+
+# The drawer reaches every tablet now, in either orientation.
+has "the drawer covers tablets"   "$CSS" "@media (max-width: 1179px)"
+has "and the row starts above it" "$CSS" "@media (min-width: 1180px)"
+
+# Every nav rule moved with it. Two were missed on the first pass — the
+# Company panel and the stacked nav button kept phone-only breakpoints
+# while the drawer around them had moved, so on a tablet they would have
+# been positioned as though the row were showing.
+#
+# Checked by pairing a media query with the rule that follows it, which
+# is what actually matters; an earlier version of this grepped for the
+# nearest @media line anywhere above and reported pairings that were not
+# real.
+drawer_rule() {
+  grep -A 3 "@media (max-width: 1179px)" "$ROOT/site/index.css" | grep -qF "$1"
+}
+
+row_rule() {
+  grep -A 3 "@media (min-width: 1180px)" "$ROOT/site/index.css" | grep -qF "$1"
+}
+
+for rule in ".nav-menu" ".company-dropdown" ".nav-btn-small" ".mega-menu"; do
+  if drawer_rule "$rule"; then
+    ok  "  $rule follows the drawer" "1179"
+  else
+    bad "  $rule follows the drawer" "elsewhere" "inside max-width: 1179px"
+  fi
+done
+
+if row_rule ".mobile-menu-toggle"; then
+  ok  "  the hamburger hides with the row" "1180"
+else
+  bad "  the hamburger hides with the row" "elsewhere" "inside min-width: 1180px"
+fi
+
+# And nothing nav-shaped is left on the old phone-only breakpoints.
+if grep -A 3 "@media (max-width: 767px)" "$ROOT/site/index.css" | grep -qE "nav-menu|mobile-menu-toggle|company-dropdown|nav-btn-small"; then
+  bad "nothing nav-shaped is left at 767" "still there" "gone"
+else
+  ok  "nothing nav-shaped is left at 767" "gone"
+fi
+
+if grep -A 3 "@media (min-width: 768px)" "$ROOT/site/index.css" | grep -qE "nav-menu|mobile-menu-toggle"; then
+  bad "nor at 768" "still there" "gone"
+else
+  ok  "nor at 768" "gone"
+fi
+
+# The script and the stylesheet have to agree about where that is. They
+# did not: the stylesheet moved and the script kept 767 written into it
+# in two places.
+has "the script knows the same number" "$JS" "NAV_DRAWER_MAX = 1179"
+case "$JS" in
+  *767*) bad "and has no stale copy of the old one" "767 still in main.js" "gone" ;;
+  *)     ok  "and has no stale copy of the old one" "gone" ;;
+esac
+
+# A tablet has no hover. Above the old breakpoint the mega menus waited
+# for one, so a tap on "Our Services" went to the page and the panel
+# never opened at all.
+has "hover is only for devices that have one" "$CSS" "@media (hover: hover) and (pointer: fine)"
+has "and a tap opens the panel instead"       "$CSS" ".nav-item-dropdown.is-open .mega-menu"
+has "decided per interaction, not per device" "$JS"  "pointerType === 'touch'"
+
+# A panel is 900px wide and centred on whichever item opened it, so the
+# leftmost one hung a third of itself off the side. Pushed back on
+# screen after it opens, at whatever width.
+has "panels are kept on screen" "$JS"  "navKeepPanelOnScreen"
+has "with room to spare"        "$CSS" ".mega-menu.is-nudged"
+
+# Tapping a dropdown inside the drawer used to close the drawer, because
+# the close-on-link handler did not know the difference between a link
+# that goes somewhere and one that opens a section. The mega menus were
+# unreachable from the drawer entirely.
+has "a dropdown does not close the drawer" "$JS" "classList.contains('nav-item-dropdown')"
+
+echo ""
 echo "=== 17. Deployment keeps what the server owns ==="
 # --delete would otherwise take the site's credentials and anything
 # uploaded through its admin with it on the next deployment.

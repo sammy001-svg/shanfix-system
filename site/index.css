@@ -375,7 +375,10 @@ a {
   }
 }
 
-@media (max-width: 767px) {
+/* Up to 1179px, which is every tablet in either orientation. The row
+   below needs 1034px before it starts squeezing, and its mega menus
+   need 1180 before they stop falling off the left of the screen. */
+@media (max-width: 1179px) {
   .nav-menu {
     position: fixed;
     top: var(--header-height-mobile);
@@ -405,13 +408,20 @@ a {
   }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1180px) {
   .nav-menu {
     display: flex;
-    gap: 2rem; /* Added gap for proper spacing */
+    gap: 2rem;
     align-items: center;
     list-style: none;
   }
+}
+
+/* Just above the breakpoint the row has room but not much of it, so the
+   gaps come in rather than the labels wrapping onto two lines. */
+@media (min-width: 1180px) and (max-width: 1365px) {
+  .nav-menu { gap: 1.25rem; }
+  .nav-menu > li > .nav-link { white-space: nowrap; }
 }
 
 .nav-link {
@@ -450,7 +460,7 @@ a {
   padding: 0.5rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1180px) {
   .mobile-menu-toggle {
     display: none;
   }
@@ -515,10 +525,33 @@ a {
   z-index: 1000;
 }
 
-.nav-item-dropdown:hover .mega-menu {
+/* A tablet has no hover. Guarded, so a touch device never depends on
+   one — the tap handler in main.js opens these instead, and adds
+   .is-open. Without the guard, every mega menu above the drawer
+   breakpoint was unreachable on a touch screen. */
+@media (hover: hover) and (pointer: fine) {
+  .nav-item-dropdown:hover .mega-menu {
+    opacity: 1;
+    visibility: visible;
+    display: block;
+    margin-top: 0.5rem;
+    pointer-events: all;
+  }
+}
+
+/* Nudged back on screen by main.js when centring on the trigger would
+   put it off the edge. A panel is 900px wide and the leftmost trigger
+   sits 266px in, so without this the first menu loses a third of
+   itself. */
+.mega-menu.is-nudged {
+  transform: translateX(calc(-50% + var(--mega-nudge, 0px)));
+}
+
+/* Opened by tap, on any device, at any width the row is shown. */
+.nav-item-dropdown.is-open .mega-menu {
   opacity: 1;
   visibility: visible;
-  display: block; /* Show on hover */
+  display: block;
   margin-top: 0.5rem;
   pointer-events: all;
 }
@@ -615,8 +648,9 @@ a {
   line-height: 1.4;
 }
 
-/* Mobile mega menu */
-@media (max-width: 767px) {
+/* The mega menus inside the drawer. Same ceiling as the drawer itself,
+   or a tablet gets the drawer with desktop dropdown panels inside it. */
+@media (max-width: 1179px) {
   .mega-menu {
     position: static;
     transform: none;
@@ -733,7 +767,10 @@ a {
 }
 
 /* Mobile company dropdown */
-@media (max-width: 767px) {
+/* The Company panel inside the drawer. Same ceiling as the drawer, or
+   a tablet gets it positioned as a desktop dropdown while sitting in a
+   drawer. */
+@media (max-width: 1179px) {
   .company-dropdown {
     transform: none;
     left: auto;
@@ -1035,7 +1072,8 @@ a {
   white-space: nowrap;
 }
 
-@media (max-width: 767px) {
+/* A nav button stacked in the drawer goes full width. Same ceiling. */
+@media (max-width: 1179px) {
   .nav-btn-small {
     width: 100%;
     margin-top: 0.5rem;
