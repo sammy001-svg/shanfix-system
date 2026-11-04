@@ -965,7 +965,7 @@ abstract class SmsPortalBase extends Controller
                         SUM(m.status = 'delivered') AS delivered
                    FROM bulk_messages m JOIN bulk_campaigns c ON c.id = m.campaign_id
                   WHERE m.account_id = :a AND m.created_at >= :from AND m.created_at < :to
-                  GROUP BY c.id ORDER BY units DESC LIMIT 10",
+                  GROUP BY c.id, c.name ORDER BY units DESC LIMIT 10",
                 ['a' => $account['id'], 'from' => $from . ' 00:00:00',
                  'to' => date('Y-m-d', strtotime($to . ' +1 day')) . ' 00:00:00']),
             'whyFailed' => Database::all(

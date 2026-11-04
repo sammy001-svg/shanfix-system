@@ -23,46 +23,22 @@
 SET NAMES utf8mb4;
 
 -- site_project_images -------------------------------------------------
-SET @col := (SELECT COUNT(*) FROM information_schema.columns
-              WHERE table_schema = DATABASE()
-                AND table_name = 'site_project_images' AND column_name = 'file_name');
-
-SET @sql := IF(@col = 0,
-  'ALTER TABLE site_project_images
-     ADD COLUMN file_name   VARCHAR(200) DEFAULT NULL AFTER thumb_path,
-     ADD COLUMN file_size   INT UNSIGNED DEFAULT NULL AFTER file_name,
-     ADD COLUMN width       SMALLINT UNSIGNED DEFAULT NULL AFTER file_size,
-     ADD COLUMN height      SMALLINT UNSIGNED DEFAULT NULL AFTER width,
-     ADD COLUMN uploaded_by INT UNSIGNED DEFAULT NULL AFTER sort_order',
-  'DO 0');
-PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+ALTER TABLE site_project_images ADD COLUMN file_name   VARCHAR(200) DEFAULT NULL AFTER thumb_path;
+ALTER TABLE site_project_images ADD COLUMN file_size   INT UNSIGNED DEFAULT NULL AFTER file_name;
+ALTER TABLE site_project_images ADD COLUMN width       SMALLINT UNSIGNED DEFAULT NULL AFTER file_size;
+ALTER TABLE site_project_images ADD COLUMN height      SMALLINT UNSIGNED DEFAULT NULL AFTER width;
+ALTER TABLE site_project_images ADD COLUMN uploaded_by INT UNSIGNED DEFAULT NULL AFTER sort_order;
 
 -- site_work_images ----------------------------------------------------
-SET @col := (SELECT COUNT(*) FROM information_schema.columns
-              WHERE table_schema = DATABASE()
-                AND table_name = 'site_work_images' AND column_name = 'file_name');
-
-SET @sql := IF(@col = 0,
-  'ALTER TABLE site_work_images
-     ADD COLUMN file_name   VARCHAR(200) DEFAULT NULL AFTER thumb_path,
-     ADD COLUMN file_size   INT UNSIGNED DEFAULT NULL AFTER file_name,
-     ADD COLUMN width       SMALLINT UNSIGNED DEFAULT NULL AFTER file_size,
-     ADD COLUMN height      SMALLINT UNSIGNED DEFAULT NULL AFTER width,
-     ADD COLUMN uploaded_by INT UNSIGNED DEFAULT NULL AFTER sort_order',
-  'DO 0');
-PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+ALTER TABLE site_work_images ADD COLUMN file_name   VARCHAR(200) DEFAULT NULL AFTER thumb_path;
+ALTER TABLE site_work_images ADD COLUMN file_size   INT UNSIGNED DEFAULT NULL AFTER file_name;
+ALTER TABLE site_work_images ADD COLUMN width       SMALLINT UNSIGNED DEFAULT NULL AFTER file_size;
+ALTER TABLE site_work_images ADD COLUMN height      SMALLINT UNSIGNED DEFAULT NULL AFTER width;
+ALTER TABLE site_work_images ADD COLUMN uploaded_by INT UNSIGNED DEFAULT NULL AFTER sort_order;
 
 -- site_client_images --------------------------------------------------
-SET @col := (SELECT COUNT(*) FROM information_schema.columns
-              WHERE table_schema = DATABASE()
-                AND table_name = 'site_client_images' AND column_name = 'file_name');
-
-SET @sql := IF(@col = 0,
-  'ALTER TABLE site_client_images
-     ADD COLUMN file_name   VARCHAR(200) DEFAULT NULL AFTER thumb_path,
-     ADD COLUMN file_size   INT UNSIGNED DEFAULT NULL AFTER file_name,
-     ADD COLUMN width       SMALLINT UNSIGNED DEFAULT NULL AFTER file_size,
-     ADD COLUMN height      SMALLINT UNSIGNED DEFAULT NULL AFTER width,
-     ADD COLUMN uploaded_by INT UNSIGNED DEFAULT NULL AFTER sort_order',
-  'DO 0');
-PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+ALTER TABLE site_client_images ADD COLUMN file_name   VARCHAR(200) DEFAULT NULL AFTER thumb_path;
+ALTER TABLE site_client_images ADD COLUMN file_size   INT UNSIGNED DEFAULT NULL AFTER file_name;
+ALTER TABLE site_client_images ADD COLUMN width       SMALLINT UNSIGNED DEFAULT NULL AFTER file_size;
+ALTER TABLE site_client_images ADD COLUMN height      SMALLINT UNSIGNED DEFAULT NULL AFTER width;
+ALTER TABLE site_client_images ADD COLUMN uploaded_by INT UNSIGNED DEFAULT NULL AFTER sort_order;

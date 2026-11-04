@@ -115,7 +115,7 @@ final class Reports
           LEFT JOIN social_posts p         ON p.campaign_id = c.id AND p.status = 'published'
                                           AND " . self::window('p') . "
           LEFT JOIN social_post_targets t  ON t.post_id = p.id
-           GROUP BY c.id, c.name, c.goal, c.spend, c.status
+           GROUP BY c.id, c.name, c.goal, c.spend, c.status, c.starts_on
              HAVING posts > 0 OR c.status IN ('planned','running')
            ORDER BY reach DESC, c.starts_on DESC",
             ['from' => $from, 'to' => $to]

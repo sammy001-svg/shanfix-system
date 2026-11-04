@@ -179,17 +179,24 @@ class Payouts
      */
     public static function available(string $period): array
     {
+        Partners::ensureSchema();
+
         return Database::all(
             "SELECT p.*,
-                    SUM(cm.amount) AS amount,
-                    COUNT(*)       AS entries
-               FROM commissions cm
+                    cm.amount,
+                    cm.entries
+               FROM (
+                    SELECT partner_id,
+                           SUM(amount) AS amount,
+                           COUNT(*)    AS entries
+                      FROM commissions
+                     WHERE status = 'earned'
+                       AND payout_line_id IS NULL
+                       AND period = :p
+                  GROUP BY partner_id
+                    HAVING SUM(amount) > 0.009
+                    ) cm
                JOIN partners p ON p.id = cm.partner_id
-              WHERE cm.status = 'earned'
-                AND cm.payout_line_id IS NULL
-                AND cm.period = :p
-           GROUP BY p.id
-             HAVING SUM(cm.amount) > 0.009
            ORDER BY p.name",
             ['p' => $period]
         );
@@ -558,12 +565,22 @@ class Payouts
         }
 
         $partner = Database::first('SELECT * FROM partners WHERE id = :id', ['id' => $partnerId]);
-        $where   = $partner ? self::destinationFor($partner) : ['method' => null, 'destination' => null, 'name' => null];
+        $where   = $partner ? self::destinationFor($partner) : [
+            'method'           => null,
+            'destination'      => null,
+            'name'             => null,
+            'currency'         => Partners::baseCurrency(),
+            'fx_rate'          => 1.0,
+            'withholding_rate' => 0.0,
+        ];
 
         $paid = 0.0;
         $runs = [];
 
         foreach ($months as $month) {
+            $gross = round((float) $month['amount'], 2);
+            $split = self::amountsFor($gross, $where);
+
             $runId = Database::insert('payout_runs', [
                 'period'      => (string) $month['period'],
                 // Whoever pressed the button both authorised it and knows
@@ -576,14 +593,20 @@ class Payouts
             ]);
 
             $lineId = Database::insert('payout_lines', [
-                'run_id'       => $runId,
-                'partner_id'   => $partnerId,
-                'amount'       => round((float) $month['amount'], 2),
-                'entries'      => (int) $month['entries'],
-                'method'       => $where['method'],
-                'destination'  => $where['destination'],
-                'account_name' => $where['name'],
-                'status'       => 'pending',
+                'run_id'           => $runId,
+                'partner_id'       => $partnerId,
+                'amount'           => $gross,
+                'entries'          => (int) $month['entries'],
+                'method'           => $where['method'],
+                'destination'      => $where['destination'],
+                'account_name'     => $where['name'],
+                'currency'         => $where['currency'],
+                'fx_rate'          => $where['fx_rate'],
+                'withholding_rate' => $where['withholding_rate'],
+                'withheld'         => $split['withheld'],
+                'net_amount'       => $split['net_amount'],
+                'net_fx'           => $split['net_fx'],
+                'status'           => 'pending',
             ]);
 
             self::attach($lineId, $partnerId, (string) $month['period']);

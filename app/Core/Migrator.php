@@ -74,7 +74,10 @@ class Migrator
         $sql = preg_replace('/^\s*--.*$/m', '', $sql);
 
         return array_values(array_filter(
-            array_map('trim', preg_split('/;\s*[\r\n]/', (string) $sql)),
+            array_map(
+                static fn(string $s): string => rtrim(trim($s), "; \t\r\n"),
+                preg_split('/;\s*(?:[\r\n]+|$)/', (string) $sql) ?: []
+            ),
             static fn(string $s): bool => $s !== ''
         ));
     }
@@ -138,7 +141,10 @@ class Migrator
             }
         }
 
-        Database::run('INSERT INTO migrations (filename) VALUES (:f)', ['f' => $name]);
+        Database::run(
+            'INSERT INTO migrations (filename) VALUES (:f) ON DUPLICATE KEY UPDATE filename = filename',
+            ['f' => $name]
+        );
 
         return ['ok' => true, 'skipped' => $skipped];
     }

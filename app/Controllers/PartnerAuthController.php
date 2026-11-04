@@ -33,6 +33,8 @@ class PartnerAuthController extends Controller
 {
     private function assertEnabled(): void
     {
+        Partners::ensureSchema();
+
         if (!Settings::bool('partners_enabled', true)) {
             throw new HttpException(404, 'The partner portal is not available.');
         }

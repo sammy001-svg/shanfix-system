@@ -50,11 +50,17 @@ SET NAMES utf8mb4;
 ALTER TABLE partners
   ADD COLUMN country CHAR(2) NOT NULL DEFAULT 'KE'
       COMMENT 'ISO 3166-1 alpha-2. Every partner on file today is Kenyan, hence the default'
-      AFTER office_location,
-  ADD COLUMN city VARCHAR(90) NULL AFTER country,
+      AFTER office_location;
+
+ALTER TABLE partners
+  ADD COLUMN city VARCHAR(90) NULL AFTER country;
+
+ALTER TABLE partners
   ADD COLUMN timezone VARCHAR(64) NULL
       COMMENT 'IANA name. What time it is where they are, so we do not text them at 3am'
-      AFTER city,
+      AFTER city;
+
+ALTER TABLE partners
   ADD COLUMN territory VARCHAR(140) NULL
       COMMENT 'Where they are allowed to sell. Blank means no restriction'
       AFTER timezone;
@@ -68,13 +74,19 @@ CREATE INDEX idx_partners_country ON partners (country);
 ALTER TABLE partners
   ADD COLUMN tax_residency ENUM('resident','non_resident') NOT NULL DEFAULT 'resident'
       COMMENT 'Resident for Kenyan tax purposes. Decides the withholding rate'
-      AFTER kra_pin,
+      AFTER kra_pin;
+
+ALTER TABLE partners
   ADD COLUMN tax_id VARCHAR(40) NULL
       COMMENT 'Their tax number where it is not a KRA PIN — VAT no., TIN, EIN'
-      AFTER tax_residency,
+      AFTER tax_residency;
+
+ALTER TABLE partners
   ADD COLUMN tax_id_label VARCHAR(40) NULL
       COMMENT 'What that number is called where they are, so the form can say it'
-      AFTER tax_id,
+      AFTER tax_id;
+
+ALTER TABLE partners
   ADD COLUMN withholding_rate DECIMAL(5,2) NULL
       COMMENT 'Percent. NULL means use the rate for their residency; 0 is a real answer meaning do not withhold'
       AFTER tax_id_label;
@@ -87,7 +99,9 @@ ALTER TABLE partners
   ADD COLUMN partner_type ENUM('referral','reseller','implementation','affiliate')
       NOT NULL DEFAULT 'referral'
       COMMENT 'referral: introduces. reseller: sells and supports. implementation: deploys. affiliate: online only'
-      AFTER status,
+      AFTER status;
+
+ALTER TABLE partners
   ADD COLUMN tier VARCHAR(20) NOT NULL DEFAULT 'registered'
       COMMENT 'partner_tiers.code. Set by hand; the earned tier is worked out and compared against it'
       AFTER partner_type;
@@ -96,8 +110,12 @@ CREATE INDEX idx_partners_tier ON partners (tier, partner_type);
 
 -- An international arrangement is a signed contract, not a handshake.
 ALTER TABLE partners
-  ADD COLUMN agreement_ref VARCHAR(60) NULL AFTER decision_note,
-  ADD COLUMN agreement_signed_at DATE NULL AFTER agreement_ref,
+  ADD COLUMN agreement_ref VARCHAR(60) NULL AFTER decision_note;
+
+ALTER TABLE partners
+  ADD COLUMN agreement_signed_at DATE NULL AFTER agreement_ref;
+
+ALTER TABLE partners
   ADD COLUMN agreement_expires_at DATE NULL
       COMMENT 'NULL means it does not expire'
       AFTER agreement_signed_at;
@@ -120,20 +138,32 @@ ALTER TABLE payout_lines
 ALTER TABLE partners
   ADD COLUMN bank_swift VARCHAR(20) NULL
       COMMENT 'SWIFT/BIC. Needed for anything leaving the country'
-      AFTER bank_account_no,
-  ADD COLUMN bank_iban VARCHAR(40) NULL AFTER bank_swift,
+      AFTER bank_account_no;
+
+ALTER TABLE partners
+  ADD COLUMN bank_iban VARCHAR(40) NULL AFTER bank_swift;
+
+ALTER TABLE partners
   ADD COLUMN bank_routing VARCHAR(40) NULL
       COMMENT 'ABA, sort code, IFSC — whatever the destination country uses instead of an IBAN'
-      AFTER bank_iban,
+      AFTER bank_iban;
+
+ALTER TABLE partners
   ADD COLUMN bank_country CHAR(2) NULL
       COMMENT 'Where the account is, which is not always where the partner is'
-      AFTER bank_routing,
+      AFTER bank_routing;
+
+ALTER TABLE partners
   ADD COLUMN bank_address VARCHAR(200) NULL
       COMMENT 'The branch address correspondent banks ask for'
-      AFTER bank_country,
+      AFTER bank_country;
+
+ALTER TABLE partners
   ADD COLUMN pay_email VARCHAR(160) NULL
       COMMENT 'The PayPal or Wise account, which is often not their contact address'
-      AFTER bank_address,
+      AFTER bank_address;
+
+ALTER TABLE partners
   ADD COLUMN payout_currency CHAR(3) NOT NULL DEFAULT 'KES'
       COMMENT 'ISO 4217. What they are paid in; commission is always earned in KES'
       AFTER pay_email;
@@ -145,17 +175,27 @@ ALTER TABLE partners
 -- The payout may leave in something else, and the rate it left at has to
 -- survive the next rate change, so it is copied onto the line.
 ALTER TABLE payout_lines
-  ADD COLUMN currency CHAR(3) NOT NULL DEFAULT 'KES' AFTER amount,
+  ADD COLUMN currency CHAR(3) NOT NULL DEFAULT 'KES' AFTER amount;
+
+ALTER TABLE payout_lines
   ADD COLUMN fx_rate DECIMAL(16,6) NOT NULL DEFAULT 1.000000
       COMMENT 'KES per one unit of currency, as it stood when the run was built'
-      AFTER currency,
-  ADD COLUMN withholding_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER fx_rate,
+      AFTER currency;
+
+ALTER TABLE payout_lines
+  ADD COLUMN withholding_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER fx_rate;
+
+ALTER TABLE payout_lines
   ADD COLUMN withheld DECIMAL(14,2) NOT NULL DEFAULT 0.00
       COMMENT 'Deducted and remitted on their behalf, in KES'
-      AFTER withholding_rate,
+      AFTER withholding_rate;
+
+ALTER TABLE payout_lines
   ADD COLUMN net_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00
       COMMENT 'amount - withheld, in KES. What we actually send'
-      AFTER withheld,
+      AFTER withheld;
+
+ALTER TABLE payout_lines
   ADD COLUMN net_fx DECIMAL(14,2) NOT NULL DEFAULT 0.00
       COMMENT 'net_amount converted at fx_rate. What lands in their account'
       AFTER net_amount;

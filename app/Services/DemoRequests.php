@@ -319,7 +319,11 @@ class DemoRequests
 
     public static function waiting(): int
     {
-        return (int) Database::scalar("SELECT COUNT(*) FROM demo_requests WHERE status = 'new'");
+        try {
+            return (int) Database::scalar("SELECT COUNT(*) FROM demo_requests WHERE status = 'new'");
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 
     public static function productName(string $key): string

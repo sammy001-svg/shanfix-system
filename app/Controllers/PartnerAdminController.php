@@ -29,6 +29,7 @@ class PartnerAdminController extends Controller
     public function index(Request $request): void
     {
         $this->authorize('partners.view');
+        Partners::ensureSchema();
 
         $status = (string) $request->query('status', '');
         $status = in_array($status, ['pending', 'active', 'suspended', 'rejected'], true) ? $status : '';
@@ -1384,6 +1385,8 @@ class PartnerAdminController extends Controller
 
     private function find(int $id): array
     {
+        Partners::ensureSchema();
+
         $row = Database::first('SELECT * FROM partners WHERE id = :id', ['id' => $id]);
 
         if (!$row) {

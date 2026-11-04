@@ -37,6 +37,8 @@ class PartnerController extends Controller
 
     private function me(): array
     {
+        \App\Services\Partners::ensureSchema();
+
         $me = PartnerAuth::user();
 
         if (!$me) {

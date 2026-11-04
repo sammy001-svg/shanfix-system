@@ -325,7 +325,7 @@ class ClientController extends Controller
                     COALESCE(SUM(CASE WHEN d.doc_type='invoice' AND d.status NOT IN ('cancelled','paid') THEN d.balance END),0) AS outstanding
                FROM clients c
           LEFT JOIN documents d ON d.client_id = c.id
-           GROUP BY c.id
+           GROUP BY c.id, c.client_code, c.name, c.client_type, c.contact_person, c.email, c.phone, c.kra_pin, c.city, c.status
            ORDER BY c.name"
         );
 

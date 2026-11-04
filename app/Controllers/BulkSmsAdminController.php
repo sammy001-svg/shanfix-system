@@ -66,7 +66,7 @@ class BulkSmsAdminController extends Controller
                         COUNT(m.id) AS messages, COALESCE(SUM(m.units_charged),0) AS units
                    FROM bulk_messages m JOIN bulk_accounts a ON a.id = m.account_id
                   WHERE m.created_at >= :from
-                  GROUP BY a.id ORDER BY units DESC LIMIT 8",
+                  GROUP BY a.id, a.owner_type, a.owner_id, a.label ORDER BY units DESC LIMIT 8",
                 ['from' => $from . ' 00:00:00']
             ),
             'configured' => Onfon::isConfigured(),

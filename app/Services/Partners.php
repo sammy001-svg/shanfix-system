@@ -458,6 +458,8 @@ class Partners
             return 1.0;
         }
 
+        self::ensureSchema();
+
         $rate = Database::scalar(
             "SELECT rate FROM fx_rates
               WHERE currency = :c AND as_of <= :d
@@ -478,6 +480,7 @@ class Partners
         ?string $source = null,
         ?int $userId = null
     ): void {
+        self::ensureSchema();
         $currency = strtoupper(trim($currency));
 
         Database::run(
@@ -500,6 +503,8 @@ class Partners
     /** The newest rate on file for each currency we pay out in. */
     public static function latestRates(): array
     {
+        self::ensureSchema();
+
         $rows = Database::all(
             "SELECT f.currency, f.rate, f.as_of, f.source, u.name AS set_by_name
                FROM fx_rates f
@@ -526,6 +531,8 @@ class Partners
      */
     public static function currenciesMissingRates(): array
     {
+        self::ensureSchema();
+
         $rows = Database::all(
             "SELECT DISTINCT payout_currency AS currency
                FROM partners
@@ -548,6 +555,8 @@ class Partners
     /** @return array<string, array<string,mixed>> keyed by code, in order */
     public static function tiers(bool $publicOnly = false): array
     {
+        self::ensureSchema();
+
         $rows = Database::all(
             'SELECT * FROM partner_tiers'
             . ($publicOnly ? ' WHERE is_public = 1' : '')
@@ -810,15 +819,19 @@ class Partners
      */
     public static function byCountry(): array
     {
+        self::ensureSchema();
+
         return Database::all(
             "SELECT p.country,
-                    COUNT(*)                                            AS partners,
-                    SUM(p.status = 'active')                            AS active,
-                    SUM(p.status = 'pending')                           AS pending,
+                    COUNT(*)                 AS partners,
+                    SUM(p.status = 'active')  AS active,
+                    SUM(p.status = 'pending') AS pending,
                     (SELECT COUNT(*) FROM clients c
-                      WHERE c.partner_id IN (SELECT id FROM partners WHERE country = p.country)) AS customers,
-                    COALESCE(SUM((SELECT COALESCE(SUM(cm.amount), 0) FROM commissions cm
-                                   WHERE cm.partner_id = p.id AND cm.status <> 'void')), 0) AS commission
+                       JOIN partners p2 ON p2.id = c.partner_id
+                      WHERE p2.country = p.country) AS customers,
+                    (SELECT COALESCE(SUM(cm.amount), 0) FROM commissions cm
+                       JOIN partners p3 ON p3.id = cm.partner_id
+                      WHERE p3.country = p.country AND cm.status <> 'void') AS commission
                FROM partners p
            GROUP BY p.country
            ORDER BY active DESC, partners DESC"
@@ -828,6 +841,8 @@ class Partners
     /** Agreements running out in the next N days, soonest first. */
     public static function expiringAgreements(int $days = 60): array
     {
+        self::ensureSchema();
+
         return Database::all(
             "SELECT id, partner_code, name, company, country, tier,
                     agreement_ref, agreement_expires_at
@@ -838,5 +853,73 @@ class Partners
            ORDER BY agreement_expires_at",
             ['d' => $days]
         );
+    }
+
+    /** Pending partner applications for the sidebar badge. */
+    public static function waiting(): int
+    {
+        try {
+            return (int) Database::scalar("SELECT COUNT(*) FROM partners WHERE status = 'pending'", [], 0);
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    private static bool $schemaChecked = false;
+
+    /**
+     * Ensure the international-partner schema (migration 064) is present.
+     *
+     * On shared/cPanel hosting a deployment can land before php migrate.php
+     * or upgrade.php has been run. Checking once on entry and applying the
+     * partner migrations if any column or table is missing prevents a 500
+     * when staff or partners open the module.
+     */
+    public static function ensureSchema(): void
+    {
+        if (self::$schemaChecked) {
+            return;
+        }
+        self::$schemaChecked = true;
+
+        try {
+            $ready = (int) Database::scalar(
+                "SELECT COUNT(*)
+                   FROM information_schema.columns
+                  WHERE table_schema = DATABASE()
+                    AND (
+                        (table_name = 'partners'      AND column_name IN ('country', 'tier', 'payout_currency'))
+                     OR (table_name = 'payout_lines'  AND column_name = 'net_fx')
+                     OR (table_name = 'payout_runs'   AND column_name = 'withheld_total')
+                     OR (table_name = 'partner_tiers' AND column_name = 'code')
+                     OR (table_name = 'fx_rates'      AND column_name = 'rate')
+                    )",
+                [],
+                0
+            );
+
+            if ($ready >= 7) {
+                return;
+            }
+
+            $migrator = new \App\Core\Migrator();
+            foreach ([
+                '2026_09_07_029_partners.sql',
+                '2026_09_07_030_partner_accounts.sql',
+                '2026_09_07_031_partner_messages.sql',
+                '2026_09_07_032_partner_rates.sql',
+                '2026_09_08_033_partner_payouts.sql',
+                '2026_09_08_034_partner_application.sql',
+                '2026_09_08_035_partner_client_messages.sql',
+                '2026_11_04_064_international_partners.sql',
+            ] as $migration) {
+                $file = BASE_PATH . '/database/migrations/' . $migration;
+                if (is_file($file)) {
+                    $migrator->apply($file);
+                }
+            }
+        } catch (\Throwable $e) {
+            \App\Core\Logger::warning('Partners schema check failed: ' . $e->getMessage());
+        }
     }
 }

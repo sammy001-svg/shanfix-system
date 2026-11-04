@@ -380,9 +380,7 @@ if ($me && can('jobs.view')) {
         // is settled here rather than in Finance.
       ?>
       <?php if (can('partners.view')): ?>
-        <?php $partnersWaiting = (int) \App\Core\Database::scalar(
-            "SELECT COUNT(*) FROM partners WHERE status = 'pending'", [], 0
-        ); ?>
+        <?php $partnersWaiting = \App\Services\Partners::waiting(); ?>
         <details class="nav-group" data-nav-group="partners"
                  <?= $navOpen('/partners-admin', '/payouts') ? 'open' : '' ?>>
           <summary class="nav-group__label">
