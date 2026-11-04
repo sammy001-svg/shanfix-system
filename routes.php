@@ -307,6 +307,12 @@ $r->group(['auth'], function ($r) {
     $r->get('/partners-admin/tiers',        [PartnerAdminController::class, 'tiers'],     ['permission:partners.view']);
     $r->post('/partners-admin/tiers',       [PartnerAdminController::class, 'saveTiers'], ['csrf', 'permission:partners.manage']);
 
+    // What the programme is, as opposed to what each tier offers: the
+    // standard rate, the currencies we pay in, and the withholding
+    // switch. A separate action because that last one changes what every
+    // partner is paid, and should not ride along with a copy edit.
+    $r->post('/partners-admin/programme',   [PartnerAdminController::class, 'saveProgramme'], ['csrf', 'permission:partners.manage']);
+
     $r->get('/partners-admin/{id}',         [PartnerAdminController::class, 'show'],    ['permission:partners.view']);
 
     // What this partner earns on each thing. Reading is a view right;

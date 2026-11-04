@@ -1133,10 +1133,109 @@ class PartnerAdminController extends Controller
         }
 
         $this->view('partners/tiers', [
-            'title' => 'Partner tiers',
+            'title' => 'Partner programme',
             'tiers' => $tiers,
             'due'   => $due,
+
+            // The settings that decide what the programme IS. They have
+            // lived in the settings table since the module was written
+            // with nothing anywhere to edit them, so the only way to
+            // change the commission rate or switch withholding on was to
+            // open the database.
+            'settings'   => [
+                'partners_enabled'             => Settings::bool('partners_enabled', true),
+                'partner_signup_enabled'       => Settings::bool('partner_signup_enabled', true),
+                'partner_international_enabled'=> Settings::bool('partner_international_enabled', true),
+                'partner_default_rate'         => Settings::float('partner_default_rate', 10),
+                'partner_payout_currencies'    => (string) Settings::get('partner_payout_currencies', 'KES'),
+                'partner_withholding_enabled'  => Settings::bool('partner_withholding_enabled', false),
+                'partner_wht_resident'         => Settings::float('partner_wht_resident', 5),
+                'partner_wht_non_resident'     => Settings::float('partner_wht_non_resident', 20),
+                'partner_programme_headline'   => (string) Settings::get('partner_programme_headline', ''),
+                'partner_programme_intro'      => (string) Settings::get('partner_programme_intro', ''),
+                'partner_terms'                => (string) Settings::get('partner_terms', ''),
+            ],
+
+            // How many people a change to withholding would actually
+            // affect, so turning it on is not a decision made blind.
+            'activeCount' => (int) Database::scalar(
+                "SELECT COUNT(*) FROM partners WHERE status = 'active'",
+                [],
+                0
+            ),
+            'nonResident' => (int) Database::scalar(
+                "SELECT COUNT(*) FROM partners WHERE status = 'active' AND tax_residency = 'non_resident'",
+                [],
+                0
+            ),
         ]);
+    }
+
+    /**
+     * The programme's own settings.
+     *
+     * Its own action rather than part of saveTiers, because the two are
+     * different decisions with different consequences: a tier's benefits
+     * are copy on a web page, and the withholding switch changes what
+     * every partner is paid.
+     */
+    public function saveProgramme(Request $request): void
+    {
+        $this->authorize('partners.manage');
+
+        $currencies = [];
+
+        foreach (explode(',', (string) $request->input('partner_payout_currencies')) as $code) {
+            $code = strtoupper(trim($code));
+
+            if (preg_match('/^[A-Z]{3}$/', $code)) {
+                $currencies[$code] = $code;
+            }
+        }
+
+        // The base currency is not optional. Dropping it would leave
+        // every local partner with a currency we have said we do not pay
+        // in, and hold every one of their lines.
+        $base = Partners::baseCurrency();
+        $currencies = [$base => $base] + $currencies;
+
+        $wasWithholding = Settings::bool('partner_withholding_enabled', false);
+        $nowWithholding = $request->input('partner_withholding_enabled') !== null;
+
+        Settings::setMany([
+            'partners_enabled'              => $request->input('partners_enabled') !== null ? '1' : '0',
+            'partner_signup_enabled'        => $request->input('partner_signup_enabled') !== null ? '1' : '0',
+            'partner_international_enabled' => $request->input('partner_international_enabled') !== null ? '1' : '0',
+            'partner_default_rate'          => (string) max(0, min(100, (float) $request->input('partner_default_rate', 10))),
+            'partner_payout_currencies'     => implode(',', array_keys($currencies)),
+            'partner_withholding_enabled'   => $nowWithholding ? '1' : '0',
+            'partner_wht_resident'          => (string) max(0, min(100, (float) $request->input('partner_wht_resident', 5))),
+            'partner_wht_non_resident'      => (string) max(0, min(100, (float) $request->input('partner_wht_non_resident', 20))),
+            'partner_programme_headline'    => trim((string) $request->input('partner_programme_headline')),
+            'partner_programme_intro'       => trim((string) $request->input('partner_programme_intro')),
+            'partner_terms'                 => trim((string) $request->input('partner_terms')),
+        ]);
+
+        Settings::flush();
+
+        // Logged on its own, with the direction of the change, because
+        // this is the setting that decides whether partners start being
+        // paid less than they were last month.
+        if ($wasWithholding !== $nowWithholding) {
+            ActivityLog::record(
+                'partner_withholding_' . ($nowWithholding ? 'enabled' : 'disabled'),
+                'setting',
+                0,
+                'Withholding on partner commission was switched '
+                . ($nowWithholding ? 'ON' : 'OFF')
+            );
+        }
+
+        Session::success($wasWithholding !== $nowWithholding && $nowWithholding
+            ? 'Saved. Withholding is now ON — the next payout run will deduct it.'
+            : 'Saved.');
+
+        Response::to('/partners-admin/tiers');
     }
 
     public function saveTiers(Request $request): void
