@@ -153,8 +153,18 @@ $runBadge = static function (string $status): array {
                   <span class="badge badge--red"><?= e($where['problem']) ?></span>
                 <?php else: ?>
                   <span class="text-muted">
-                    <?= $where['method'] === 'mpesa' ? 'M-Pesa' : 'Bank' ?>
+                    <?= e(\App\Services\Partners::payMethodLabel((string) $where['method'])) ?>
                     &middot; <?= e($where['destination']) ?>
+                    <?php // What it will leave as, where that differs from
+                          // what is owed. Worth saying before the run is
+                          // built rather than after. ?>
+                    <?php if (!empty($where['currency'])
+                              && $where['currency'] !== \App\Services\Partners::baseCurrency()): ?>
+                      &middot; in <?= e($where['currency']) ?>
+                    <?php endif; ?>
+                    <?php if ((float) ($where['withholding_rate'] ?? 0) > 0): ?>
+                      &middot; less <?= e(rtrim(rtrim(number_format((float) $where['withholding_rate'], 2), '0'), '.')) ?>% tax
+                    <?php endif; ?>
                   </span>
                 <?php endif; ?>
               </td>

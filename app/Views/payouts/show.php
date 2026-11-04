@@ -236,8 +236,27 @@ $waiting = $counts['pending'] + $counts['sent'];
 
               <td class="text-sm">
                 <?php if ($line['method']): ?>
-                  <?= $line['method'] === 'mpesa' ? 'M-Pesa' : 'Bank' ?>
+                  <?= e(\App\Services\Partners::payMethodLabel((string) $line['method'])) ?>
                   <div class="text-xs text-muted"><?= e($line['destination']) ?></div>
+                  <?php // The gross is in the amount column. This is what
+                        // actually goes, which is the number that has to
+                        // match the bank's confirmation. ?>
+                  <?php if ((float) ($line['withheld'] ?? 0) > 0.009): ?>
+                    <div class="text-xs">
+                      less <?= e(money($line['withheld'], false)) ?> tax
+                      &rarr; <strong><?= e(money($line['net_amount'], false)) ?></strong>
+                    </div>
+                  <?php endif; ?>
+                  <?php if (!empty($line['currency'])
+                            && $line['currency'] !== \App\Services\Partners::baseCurrency()): ?>
+                    <div class="text-xs">
+                      sent as <?= e($line['currency']) ?>
+                      <?= e(number_format((float) $line['net_fx'], 2)) ?>
+                      <span class="text-muted">
+                        @ <?= e(rtrim(rtrim(number_format((float) $line['fx_rate'], 6), '0'), '.')) ?>
+                      </span>
+                    </div>
+                  <?php endif; ?>
                   <?php if ($line['account_name']): ?>
                     <div class="text-xs text-muted"><?= e($line['account_name']) ?></div>
                   <?php endif; ?>

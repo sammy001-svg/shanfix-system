@@ -854,8 +854,20 @@ $shows = static fn(array $methods): string
               <td class="num fw-700"><?= e(money($pay['amount'], false)) ?></td>
               <td class="text-sm text-muted">
                 <?php if ($pay['method']): ?>
-                  <?= $pay['method'] === 'mpesa' ? 'M-Pesa' : 'Bank' ?>
+                  <?= e(Partners::payMethodLabel((string) $pay['method'])) ?>
                   <div class="text-xs"><?= e($pay['destination']) ?></div>
+                  <?php // What left, where that is not what was earned. ?>
+                  <?php if ((float) ($pay['withheld'] ?? 0) > 0.009): ?>
+                    <div class="text-xs">
+                      less <?= e(money($pay['withheld'], false)) ?> withheld
+                    </div>
+                  <?php endif; ?>
+                  <?php if (!empty($pay['currency']) && $pay['currency'] !== Partners::baseCurrency()): ?>
+                    <div class="text-xs">
+                      sent as <?= e($pay['currency']) ?>
+                      <?= e(number_format((float) $pay['net_fx'], 2)) ?>
+                    </div>
+                  <?php endif; ?>
                 <?php else: ?>
                   —
                 <?php endif; ?>

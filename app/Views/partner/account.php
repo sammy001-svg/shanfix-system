@@ -182,16 +182,24 @@ $noPin    = $home && trim((string) $me['kra_pin']) === '';
                 // spotted before payment day rather than after. ?>
           <dt>Paid into</dt>
           <dd>
-            <?php if (($me['pay_method'] ?? '') === 'mpesa'): ?>
+            <?php $method = (string) ($me['pay_method'] ?? ''); ?>
+            <?php if ($method === 'mpesa'): ?>
               M-Pesa &middot; <?= e($me['pay_phone'] ?: $me['phone']) ?>
-            <?php elseif (($me['pay_method'] ?? '') === 'bank' && !empty($me['bank_account_no'])): ?>
+            <?php elseif (in_array($method, ['wise', 'paypal'], true) && !empty($me['pay_email'])): ?>
+              <?= e(Partners::payMethodLabel($method)) ?>
+              &middot; <?= e($me['pay_email']) ?>
+            <?php elseif (in_array($method, ['bank', 'wire'], true)
+                          && (!empty($me['bank_account_no']) || !empty($me['bank_iban']))): ?>
               <?= e($me['bank_name'] ?: 'Your bank') ?>
               <?php if (!empty($me['bank_branch'])): ?>
                 &middot; <?= e($me['bank_branch']) ?>
               <?php endif; ?>
               <div class="text-xs text-muted">
                 <?= e($me['bank_account_name'] ?: '') ?>
-                &middot; <?= e($me['bank_account_no']) ?>
+                &middot; <?= e($me['bank_iban'] ?: $me['bank_account_no']) ?>
+                <?php if ($method === 'wire' && !empty($me['bank_swift'])): ?>
+                  &middot; <?= e($me['bank_swift']) ?>
+                <?php endif; ?>
               </div>
             <?php else: ?>
               <span class="text-muted">

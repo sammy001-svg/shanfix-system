@@ -185,7 +185,10 @@ $tabUrl = static fn(string $k): string =>
                   <?php if ($pay['status'] === 'settled' && $pay['settled_at']): ?>
                     <?= e(fdate($pay['settled_at'])) ?>
                     <?php if ($pay['method']): ?>
-                      &middot; <?= $pay['method'] === 'mpesa' ? 'M-Pesa' : 'bank transfer' ?>
+                      <?php // Named properly. This used to read "M-Pesa or
+                            // bank transfer", which called a Wise payment a
+                            // bank transfer and a wire the same. ?>
+                      &middot; <?= e(\App\Services\Partners::payMethodLabel((string) $pay['method'])) ?>
                     <?php endif; ?>
                     <?php if ($pay['ref']): ?>
                       &middot; ref <?= e($pay['ref']) ?>
@@ -194,6 +197,30 @@ $tabUrl = static fn(string $k): string =>
                     It did not reach you, so it is owed to you again
                   <?php else: ?>
                     <?= (int) $pay['entries'] ?> entr<?= (int) $pay['entries'] === 1 ? 'y' : 'ies' ?>
+                  <?php endif; ?>
+
+                  <?php // ---- What was actually sent --------------------
+                        // The amount on the right is what was EARNED, gross
+                        // and in our currency. Where tax was withheld or the
+                        // money left in another currency, that is not the
+                        // figure on their bank statement, and a partner
+                        // comparing the two without being told why is a
+                        // partner who rings us. ?>
+                  <?php $withheld = (float) ($pay['withheld'] ?? 0);
+                        $payCcy   = (string) ($pay['currency'] ?? '');
+                        $base     = \App\Services\Partners::baseCurrency(); ?>
+                  <?php if ($withheld > 0.009 || ($payCcy !== '' && $payCcy !== $base)): ?>
+                    <span class="portal-list__meta">
+                      <?php if ($withheld > 0.009): ?>
+                        Less <?= e(money($withheld, false)) ?> withholding tax,
+                        paid to KRA for you<?= $payCcy !== $base ? ';' : '.' ?>
+                      <?php endif; ?>
+                      <?php if ($payCcy !== '' && $payCcy !== $base): ?>
+                        sent as <?= e($payCcy) ?>
+                        <?= e(number_format((float) $pay['net_fx'], 2)) ?>
+                        at <?= e(rtrim(rtrim(number_format((float) $pay['fx_rate'], 6), '0'), '.')) ?>
+                      <?php endif; ?>
+                    </span>
                   <?php endif; ?>
                 </span>
               </span>
