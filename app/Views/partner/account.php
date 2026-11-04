@@ -9,8 +9,16 @@
  */
 require_once APP_PATH . '/Views/partials/icons.php';
 
+use App\Services\Partners;
+
 $rateOf = static fn(float $r): string => rtrim(rtrim(number_format($r, 2), '0'), '.') . '%';
-$noPin  = trim((string) $me['kra_pin']) === '';
+
+// A KRA PIN is what a partner HERE gives us. A partner anywhere else has
+// never had one and never will, so they are asked for whatever their own
+// authority calls their tax number instead, by its own name.
+$home     = Partners::isLocal((string) ($me['country'] ?? 'KE'));
+$taxLabel = Partners::taxLabel((string) ($me['country'] ?? 'KE'));
+$noPin    = $home && trim((string) $me['kra_pin']) === '';
 ?>
 
 <div class="portal-wrap">
@@ -117,18 +125,34 @@ $noPin  = trim((string) $me['kra_pin']) === '';
           <span class="field-hint">Where your codes are sent.</span>
         </div>
 
-        <div class="field">
-          <label class="label" for="kra_pin">KRA PIN</label>
-          <div class="input-icon">
-            <?= icon('file-text') ?>
-            <input class="input <?= $noPin ? 'has-error' : '' ?>"
-                   type="text" id="kra_pin" name="kra_pin" maxlength="30"
-                   placeholder="A000000000X"
-                   value="<?= e(old('kra_pin', (string) $me['kra_pin'])) ?>">
+        <?php if ($home): ?>
+          <div class="field">
+            <label class="label" for="kra_pin">KRA PIN</label>
+            <div class="input-icon">
+              <?= icon('file-text') ?>
+              <input class="input <?= $noPin ? 'has-error' : '' ?>"
+                     type="text" id="kra_pin" name="kra_pin" maxlength="30"
+                     placeholder="A000000000X"
+                     value="<?= e(old('kra_pin', (string) $me['kra_pin'])) ?>">
+            </div>
+            <?= error_for($errors ?? [], 'kra_pin') ?>
+            <span class="field-hint">We need this to pay you.</span>
           </div>
-          <?= error_for($errors ?? [], 'kra_pin') ?>
-          <span class="field-hint">We need this to pay you.</span>
-        </div>
+        <?php else: ?>
+          <div class="field">
+            <label class="label" for="tax_id"><?= e($taxLabel) ?></label>
+            <div class="input-icon">
+              <?= icon('file-text') ?>
+              <input class="input" type="text" id="tax_id" name="tax_id" maxlength="40"
+                     value="<?= e(old('tax_id', (string) ($me['tax_id'] ?? ''))) ?>">
+            </div>
+            <?= error_for($errors ?? [], 'tax_id') ?>
+            <span class="field-hint">
+              Your tax number in <?= e(Partners::countryName((string) $me['country'])) ?>.
+              We need it for the paperwork that goes with paying you.
+            </span>
+          </div>
+        <?php endif; ?>
 
         <button class="btn btn--primary btn--block" type="submit">Save</button>
       </form>

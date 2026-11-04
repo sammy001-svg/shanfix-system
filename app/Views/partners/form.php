@@ -105,7 +105,123 @@ $val = static fn(string $k, string $d = ''): string => (string) old($k, $d);
           <label class="label" for="kra_pin">KRA PIN</label>
           <input class="input" type="text" id="kra_pin" name="kra_pin" maxlength="30"
                  value="<?= e($val('kra_pin')) ?>">
-          <span class="field-hint">Needed before they can be paid.</span>
+          <span class="field-hint">
+            Needed before a partner in Kenya can be paid. One abroad gives
+            their own country's tax number below instead.
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <?php // ---- Where in the world, and on what terms ---------------------
+        // Its own card rather than more fields in the one above: these are
+        // the answers that decide how somebody can be paid and what has to
+        // be withheld, and they are easy to leave at the default by
+        // accident when they are buried among the name fields. ?>
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">Where they are, and on what terms</div>
+      <p class="text-xs text-muted mb-0">
+        The country decides how we can pay them, in what currency, and
+        what the tax position is — so it is worth getting right now
+        rather than on payment day.
+      </p>
+    </div>
+    <div class="card__body">
+      <div class="form-grid">
+        <div class="field">
+          <label class="label" for="country">Country <span class="req">*</span></label>
+          <select class="select" id="country" name="country" required>
+            <?php foreach ($countries as $code => $name): ?>
+              <option value="<?= e($code) ?>"
+                      <?= $val('country', $home) === $code ? 'selected' : '' ?>>
+                <?= e($name) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="label" for="city">City</label>
+          <input class="input" type="text" id="city" name="city" maxlength="90"
+                 value="<?= e($val('city')) ?>">
+        </div>
+
+        <div class="field">
+          <label class="label" for="partner_type">Type</label>
+          <select class="select" id="partner_type" name="partner_type">
+            <?php foreach (\App\Services\Partners::TYPES as $code => $desc): ?>
+              <option value="<?= e($code) ?>"
+                      <?= $val('partner_type', 'referral') === $code ? 'selected' : '' ?>>
+                <?= e($desc) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="label" for="tier">Tier</label>
+          <select class="select" id="tier" name="tier">
+            <?php foreach ($tiers as $code => $t): ?>
+              <option value="<?= e($code) ?>"
+                      <?= $val('tier', 'registered') === $code ? 'selected' : '' ?>>
+                <?= e($t['name']) ?>
+                (<?= e(rtrim(rtrim(number_format((float) $t['default_rate'], 2), '0'), '.')) ?>%)
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <span class="field-hint">Nearly everybody starts at Registered.</span>
+        </div>
+
+        <div class="field">
+          <label class="label" for="territory">Territory</label>
+          <input class="input" type="text" id="territory" name="territory" maxlength="140"
+                 value="<?= e($val('territory')) ?>" placeholder="e.g. Uganda and Rwanda">
+          <span class="field-hint">Blank means no restriction.</span>
+        </div>
+
+        <div class="field">
+          <label class="label" for="payout_currency">Paid in</label>
+          <select class="select" id="payout_currency" name="payout_currency">
+            <?php foreach ($currencies as $code => $label): ?>
+              <option value="<?= e($code) ?>"
+                      <?= $val('payout_currency', $base) === $code ? 'selected' : '' ?>>
+                <?= e($code) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <span class="field-hint">
+            Commission is always earned in <?= e($base) ?>; this is what it
+            is converted to when it goes out.
+          </span>
+        </div>
+
+        <div class="field">
+          <label class="label" for="tax_id">Tax number</label>
+          <input class="input" type="text" id="tax_id" name="tax_id" maxlength="40"
+                 value="<?= e($val('tax_id')) ?>">
+          <span class="field-hint">
+            Whatever their own authority calls it — TIN, VAT number, EIN.
+          </span>
+        </div>
+
+        <div class="field">
+          <label class="label" for="tax_residency">Tax residency</label>
+          <select class="select" id="tax_residency" name="tax_residency">
+            <option value="resident"
+                    <?= $val('tax_residency', 'resident') === 'resident' ? 'selected' : '' ?>>
+              Resident for Kenyan tax
+            </option>
+            <option value="non_resident"
+                    <?= $val('tax_residency') === 'non_resident' ? 'selected' : '' ?>>
+              Non-resident
+            </option>
+          </select>
+          <span class="field-hint">
+            Not simply their country: a Kenyan-registered company owned
+            from abroad is still resident.
+          </span>
         </div>
 
         <div class="field">
@@ -113,10 +229,26 @@ $val = static fn(string $k, string $d = ''): string => (string) old($k, $d);
           <div class="input-group">
             <input class="input" type="number" id="default_rate" name="default_rate"
                    step="0.5" min="0" max="100"
-                   value="<?= e($val('default_rate', rtrim(rtrim(number_format($rate, 2), '0'), '.'))) ?>">
+                   value="<?= e($val('default_rate')) ?>">
             <span class="input-group__addon">%</span>
           </div>
-          <span class="field-hint">Used where a service does not carry its own rate.</span>
+          <span class="field-hint">
+            Leave it empty to use the rate their tier carries. Used where a
+            service does not carry its own.
+          </span>
+        </div>
+
+        <div class="field">
+          <label class="label" for="agreement_signed_at">Agreement signed</label>
+          <input class="input" type="date" id="agreement_signed_at" name="agreement_signed_at"
+                 value="<?= e($val('agreement_signed_at')) ?>">
+        </div>
+
+        <div class="field">
+          <label class="label" for="agreement_expires_at">Agreement runs until</label>
+          <input class="input" type="date" id="agreement_expires_at" name="agreement_expires_at"
+                 value="<?= e($val('agreement_expires_at')) ?>">
+          <span class="field-hint">Blank means it does not expire.</span>
         </div>
       </div>
     </div>

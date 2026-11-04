@@ -11,6 +11,7 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Services\Commission;
 use App\Services\Notifier;
+use App\Services\Partners;
 use App\Services\Payouts;
 
 /**
@@ -164,7 +165,12 @@ class PayoutController extends Controller
         $id   = $request->paramInt('id');
         $kind = (string) $request->param('kind');
 
-        if (!in_array($kind, ['mpesa', 'bank'], true)) {
+        // A payment file per method, plus the withholding schedule, which
+        // is not a payment file at all: it is what goes with the return,
+        // so it is allowed out of a draft run that has not been approved.
+        $isSchedule = $kind === 'withholding';
+
+        if (!$isSchedule && !isset(Partners::PAY_METHODS[$kind])) {
             throw new HttpException(404, 'There is no such payment file.');
         }
 
@@ -174,15 +180,19 @@ class PayoutController extends Controller
             throw new HttpException(404, 'That payout run does not exist.');
         }
 
-        if ($run['status'] === 'draft') {
+        if (!$isSchedule && $run['status'] === 'draft') {
             Session::warning('Approve the run before sending it to the bank.');
             Response::to('/payouts/' . $id);
         }
 
-        $parts = Payouts::csvParts($id, $kind);
+        $parts = $isSchedule
+            ? Payouts::withholdingParts($id)
+            : Payouts::csvParts($id, $kind);
 
         if (!$parts['rows']) {
-            Session::warning('There is nothing left to send by ' . ($kind === 'mpesa' ? 'M-Pesa' : 'bank transfer') . '.');
+            Session::warning($isSchedule
+                ? 'This run withheld nothing, so there is no schedule to download.'
+                : 'There is nothing left to send by ' . Partners::payMethodLabel($kind) . '.');
             Response::to('/payouts/' . $id);
         }
 

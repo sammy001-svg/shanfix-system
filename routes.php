@@ -297,6 +297,16 @@ $r->group(['auth'], function ($r) {
     $r->post('/partners-admin/new',         [PartnerAdminController::class, 'store'],   ['csrf', 'permission:partners.create']);
     $r->get('/partners-admin/runs',         [PartnerAdminController::class, 'run'],     ['permission:partners.view']);
 
+    // The rate a payout abroad is converted at. Reading it is a view
+    // right because sales get asked what a partner will receive; setting
+    // it changes what leaves the account, so it is finance's.
+    $r->get('/partners-admin/fx',           [PartnerAdminController::class, 'fx'],      ['permission:partners.view']);
+    $r->post('/partners-admin/fx',          [PartnerAdminController::class, 'saveFx'],  ['csrf', 'permission:partners.pay']);
+
+    // Tiers, their thresholds and the benefits published on the website.
+    $r->get('/partners-admin/tiers',        [PartnerAdminController::class, 'tiers'],     ['permission:partners.view']);
+    $r->post('/partners-admin/tiers',       [PartnerAdminController::class, 'saveTiers'], ['csrf', 'permission:partners.manage']);
+
     $r->get('/partners-admin/{id}',         [PartnerAdminController::class, 'show'],    ['permission:partners.view']);
 
     // What this partner earns on each thing. Reading is a view right;

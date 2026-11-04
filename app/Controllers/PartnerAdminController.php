@@ -14,6 +14,7 @@ use App\Core\Settings;
 use App\Core\Validator;
 use App\Services\Commission;
 use App\Services\Notifier;
+use App\Services\Partners;
 use App\Services\Payouts;
 
 /**
@@ -48,6 +49,42 @@ class PartnerAdminController extends Controller
             $params['me'] = Auth::id();
         }
 
+        // Where, and what sort. Checked against the known sets rather
+        // than passed through, so a hand-typed query string cannot widen
+        // the filter into something it was not meant to be.
+        $country = strtoupper((string) $request->query('country', ''));
+
+        if ($country === 'INTL') {
+            // One filter people actually want and no single country code
+            // can express: everybody who is not us.
+            $clause[] = 'p.country <> :home';
+            $params['home'] = Partners::homeCountry();
+        } elseif (isset(Partners::COUNTRIES[$country])) {
+            $clause[] = 'p.country = :country';
+            $params['country'] = $country;
+        } else {
+            $country = '';
+        }
+
+        $tiers = Partners::tiers();
+        $tier  = (string) $request->query('tier', '');
+
+        if (isset($tiers[$tier])) {
+            $clause[] = 'p.tier = :tier';
+            $params['tier'] = $tier;
+        } else {
+            $tier = '';
+        }
+
+        $type = (string) $request->query('type', '');
+
+        if (isset(Partners::TYPES[$type])) {
+            $clause[] = 'p.partner_type = :type';
+            $params['type'] = $type;
+        } else {
+            $type = '';
+        }
+
         $where = $clause ? ' WHERE ' . implode(' AND ', $clause) : '';
 
         $rows = Database::all(
@@ -80,12 +117,30 @@ class PartnerAdminController extends Controller
             0
         );
 
+        $counts['international'] = (int) Database::scalar(
+            'SELECT COUNT(*) FROM partners WHERE country <> :home',
+            ['home' => Partners::homeCountry()],
+            0
+        );
+
         $this->view('partners/index', [
-            'title'  => 'Partners',
-            'rows'   => $rows,
-            'status' => $status,
-            'mine'   => $mine,
-            'counts' => $counts,
+            'title'      => 'Partners',
+            'rows'       => $rows,
+            'status'     => $status,
+            'mine'       => $mine,
+            'counts'     => $counts,
+            'country'    => $country,
+            'tier'       => $tier,
+            'type'       => $type,
+            'tiers'      => $tiers,
+            'countries'  => Partners::countryOptions(),
+            'byCountry'  => Partners::byCountry(),
+            'home'       => Partners::homeCountry(),
+
+            // Two things finance wants to know before building a run,
+            // not after it has held six lines and sent nobody anything.
+            'missingFx'  => Partners::currenciesMissingRates(),
+            'expiring'   => Partners::expiringAgreements(60),
         ]);
     }
 
@@ -195,6 +250,22 @@ class PartnerAdminController extends Controller
             ),
             'managers'    => $this->salesTeam(),
             'payouts'     => Payouts::historyFor((int) $partner['id']),
+
+            // Where they are and what that costs. Worked out here rather
+            // than in the view so the view has no decisions left in it.
+            'blockers'    => Partners::blockers($partner),
+            'warnings'    => Partners::complianceWarnings($partner),
+            'payMethods'  => Partners::payMethodsFor((string) $partner['country']),
+            'currencies'  => Partners::payoutCurrencies(),
+            'countries'   => Partners::countryOptions(),
+            'tiers'       => Partners::tiers(),
+            'earnedTier'  => Partners::earnedTier((int) $partner['id']),
+            'billed12m'   => Partners::billed12m((int) $partner['id']),
+            'taxLabel'    => Partners::taxLabel((string) $partner['country']),
+            'whtRate'     => Partners::withholdingRate($partner),
+            'whtOn'       => Partners::withholdingEnabled(),
+            'fxRate'      => Partners::fxRate((string) $partner['payout_currency']),
+            'isLocal'     => Partners::isLocal((string) $partner['country']),
         ]);
     }
 
@@ -310,7 +381,9 @@ class PartnerAdminController extends Controller
             $v->redirectBack('/partners-admin/' . $partner['id'] . '?tab=details');
         }
 
-        Database::update('partners', [
+        $place = $this->placeInput($request, $partner);
+
+        Database::update('partners', $place + [
             'first_name'      => trim((string) $request->input('first_name')),
             'middle_name'     => trim((string) $request->input('middle_name')) ?: null,
             'last_name'       => trim((string) $request->input('last_name')),
@@ -324,7 +397,10 @@ class PartnerAdminController extends Controller
             'company'         => trim((string) $request->input('company')) ?: null,
             'occupation'      => trim((string) $request->input('occupation')) ?: null,
             'email'           => strtolower(trim((string) $request->input('email'))),
-            'phone'           => trim((string) $request->input('phone')),
+            'phone'           => Partners::e164(
+                (string) $request->input('phone'),
+                $place['country']
+            ),
             'kra_pin'         => trim((string) $request->input('kra_pin')) ?: null,
             'id_number'       => trim((string) $request->input('id_number')) ?: null,
             'office_location' => trim((string) $request->input('office_location')) ?: null,
@@ -361,43 +437,76 @@ class PartnerAdminController extends Controller
 
         $partner = $this->find($request->paramInt('id'));
 
+        $country = (string) ($partner['country'] ?? Partners::homeCountry());
+
+        // Only the methods that work from where we bank to where they
+        // are. M-Pesa reaches Kenyan numbers and nowhere else, and a
+        // Kenyan bank file cannot address an account in Dubai — offering
+        // either of those for an overseas partner would only produce a
+        // payment that fails at the bank days later.
+        $allowed = Partners::payMethodsFor($country);
+
         $method = (string) $request->input('pay_method');
-        $method = in_array($method, ['mpesa', 'bank'], true) ? $method : null;
+        $method = isset($allowed[$method]) ? $method : null;
 
         $v = new Validator($request->all());
         $v->maxLen('pay_phone', 30, 'M-Pesa number')
           ->maxLen('bank_name', 120, 'Bank')
           ->maxLen('bank_branch', 120, 'Branch')
           ->maxLen('bank_account_name', 160, 'Account name')
-          ->maxLen('bank_account_no', 40, 'Account number');
+          ->maxLen('bank_account_no', 40, 'Account number')
+          ->maxLen('bank_swift', 20, 'SWIFT/BIC')
+          ->maxLen('bank_iban', 40, 'IBAN')
+          ->maxLen('bank_routing', 40, 'Routing code')
+          ->maxLen('bank_address', 200, 'Bank address');
+
+        if (trim((string) $request->input('pay_email')) !== '') {
+            $v->email('pay_email', 'Payment email');
+        }
 
         if ($v->fails()) {
             $v->redirectBack('/partners-admin/' . $partner['id'] . '?tab=money');
         }
 
-        $phone   = trim((string) $request->input('pay_phone'));
-        $account = trim((string) $request->input('bank_account_no'));
+        $bankCountry = strtoupper(trim((string) $request->input('bank_country')));
+        $bankCountry = isset(Partners::COUNTRIES[$bankCountry]) ? $bankCountry : null;
 
-        // Refuse a method with nothing behind it rather than storing a
-        // half-set destination that only fails on payment day.
-        if ($method === 'mpesa' && $phone === '' && trim((string) $partner['phone']) === '') {
-            Session::error('Give an M-Pesa number, or the payment will have nowhere to go.');
-            Response::to('/partners-admin/' . $partner['id'] . '?tab=money');
-        }
+        $currency = strtoupper(trim((string) $request->input('payout_currency')));
+        $currency = isset(Partners::payoutCurrencies()[$currency])
+            ? $currency
+            : (string) ($partner['payout_currency'] ?? Partners::baseCurrency());
 
-        if ($method === 'bank' && $account === '') {
-            Session::error('Give the account number, or the payment will have nowhere to go.');
-            Response::to('/partners-admin/' . $partner['id'] . '?tab=money');
-        }
-
-        Database::update('partners', [
+        $details = [
             'pay_method'        => $method,
-            'pay_phone'         => $phone ?: null,
+            'pay_phone'         => trim((string) $request->input('pay_phone')) ?: null,
+            'pay_email'         => strtolower(trim((string) $request->input('pay_email'))) ?: null,
             'bank_name'         => trim((string) $request->input('bank_name')) ?: null,
             'bank_branch'       => trim((string) $request->input('bank_branch')) ?: null,
             'bank_account_name' => trim((string) $request->input('bank_account_name')) ?: null,
-            'bank_account_no'   => $account ?: null,
-        ], ['id' => $partner['id']]);
+            'bank_account_no'   => trim((string) $request->input('bank_account_no')) ?: null,
+            'bank_swift'        => strtoupper(trim((string) $request->input('bank_swift'))) ?: null,
+            'bank_iban'         => strtoupper(preg_replace('/\s+/', '',
+                                     (string) $request->input('bank_iban')) ?? '') ?: null,
+            'bank_routing'      => trim((string) $request->input('bank_routing')) ?: null,
+            'bank_country'      => $bankCountry,
+            'bank_address'      => trim((string) $request->input('bank_address')) ?: null,
+            'payout_currency'   => $currency,
+        ];
+
+        // Refuse a method with nothing behind it rather than storing a
+        // half-set destination that only fails on payment day. Asked of
+        // the one place that knows what each method needs, so a new way
+        // of paying somebody cannot be added without its own check — and
+        // only about the destination, so a missing tax number does not
+        // stop somebody recording a bank account.
+        $problems = Partners::destinationBlockers(array_merge($partner, $details));
+
+        if ($method !== null && $problems !== []) {
+            Session::error($problems[0] . ' — the payment would have nowhere to go.');
+            Response::to('/partners-admin/' . $partner['id'] . '?tab=money');
+        }
+
+        Database::update('partners', $details, ['id' => $partner['id']]);
 
         // Worth a line in the log on its own: this is the setting that
         // decides who receives the money.
@@ -679,10 +788,15 @@ class PartnerAdminController extends Controller
         $this->authorize('partners.create');
 
         $this->view('partners/form', [
-            'title'    => 'Register a partner',
-            'partner'  => null,
-            'managers' => $this->salesTeam(),
-            'rate'     => (float) Settings::get('partner_default_rate', 10),
+            'title'      => 'Register a partner',
+            'partner'    => null,
+            'managers'   => $this->salesTeam(),
+            'rate'       => (float) Settings::get('partner_default_rate', 10),
+            'countries'  => Partners::countryOptions(),
+            'currencies' => Partners::payoutCurrencies(),
+            'tiers'      => Partners::tiers(),
+            'home'       => Partners::homeCountry(),
+            'base'       => Partners::baseCurrency(),
         ]);
     }
 
@@ -723,7 +837,16 @@ class PartnerAdminController extends Controller
             (string) $request->input('last_name')
         );
 
-        $id = Database::insert('partners', [
+        $place = $this->placeInput($request);
+
+        // A rate of their own where one was typed, otherwise the rate that
+        // goes with their tier. Nobody should have to remember that Gold
+        // means 18%.
+        $typedRate = trim((string) $request->input('default_rate'));
+        $tierRate  = (float) (Partners::tier($place['tier'])['default_rate'] ?? 10.0);
+        $rate      = $typedRate === '' ? $tierRate : max(0, min(100, (float) $typedRate));
+
+        $id = Database::insert('partners', $place + [
             'partner_code'       => Numbering::next('partner'),
             'first_name'         => trim((string) $request->input('first_name')),
             'middle_name'        => trim((string) $request->input('middle_name')) ?: null,
@@ -732,12 +855,18 @@ class PartnerAdminController extends Controller
             'company'            => trim((string) $request->input('company')) ?: null,
             'occupation'         => trim((string) $request->input('occupation')) ?: null,
             'email'              => $email,
-            'phone'              => trim((string) $request->input('phone')),
+            // Stored in international form, because a partner in Kampala
+            // typing 0771… means +256 771…, and normalize_phone() would
+            // make it a Kenyan number that reaches a stranger.
+            'phone'              => Partners::e164(
+                (string) $request->input('phone'),
+                $place['country']
+            ),
             'kra_pin'            => trim((string) $request->input('kra_pin')) ?: null,
             'id_number'          => trim((string) $request->input('id_number')) ?: null,
             'office_location'    => trim((string) $request->input('office_location')) ?: null,
             'pitch'              => trim((string) $request->input('pitch')) ?: null,
-            'default_rate'       => max(0, min(100, (float) $request->input('default_rate', 10))),
+            'default_rate'       => $rate,
             // Registered by us, so there is nothing to decide — they are a
             // partner from the moment the form is saved.
             'status'             => 'active',
@@ -757,9 +886,9 @@ class PartnerAdminController extends Controller
             'entity_id'    => $id,
             'contact_name' => $name,
             'email'        => $email,
-            'phone'        => trim((string) $request->input('phone')),
+            'phone'        => Partners::e164((string) $request->input('phone'), $place['country']),
             'link'         => Notifier::absoluteUrl('/partners/start'),
-            'rate'         => rtrim(rtrim(number_format((float) $request->input('default_rate', 10), 2), '0'), '.') . '%',
+            'rate'         => rtrim(rtrim(number_format($rate, 2), '0'), '.') . '%',
         ], true);
 
         Notifier::processQueue(4);
@@ -844,6 +973,192 @@ class PartnerAdminController extends Controller
     }
 
     /** Everyone who may be an account manager. */
+    // -- Exchange rates ----------------------------------------------------
+
+    /**
+     * The rates partner payouts are converted at.
+     *
+     * A page of its own rather than a corner of settings, because this is
+     * a thing finance does every month and the rest of settings is not.
+     */
+    public function fx(Request $request): void
+    {
+        $this->authorize('partners.view');
+
+        $currencies = Partners::payoutCurrencies();
+        $base       = Partners::baseCurrency();
+
+        unset($currencies[$base]);
+
+        $this->view('partners/fx', [
+            'title'      => 'Exchange rates',
+            'base'       => $base,
+            'currencies' => $currencies,
+            'latest'     => Partners::latestRates(),
+            'missing'    => Partners::currenciesMissingRates(),
+            'history'    => Database::all(
+                "SELECT f.*, u.name AS set_by_name
+                   FROM fx_rates f
+              LEFT JOIN users u ON u.id = f.set_by
+                  WHERE f.currency <> :base
+               ORDER BY f.as_of DESC, f.currency
+                  LIMIT 60",
+                ['base' => $base]
+            ),
+            // Who is waiting on a rate, so entering one has a visible point.
+            'waiting'    => Database::all(
+                "SELECT payout_currency AS currency, COUNT(*) AS partners
+                   FROM partners
+                  WHERE status = 'active' AND payout_currency <> :base
+               GROUP BY payout_currency
+               ORDER BY partners DESC",
+                ['base' => $base]
+            ),
+        ]);
+    }
+
+    public function saveFx(Request $request): void
+    {
+        $this->authorize('partners.pay');
+
+        $currency = strtoupper(trim((string) $request->input('currency')));
+        $rate     = (float) str_replace(',', '', (string) $request->input('rate'));
+        $asOf     = trim((string) $request->input('as_of')) ?: date('Y-m-d');
+
+        if (!isset(Partners::payoutCurrencies()[$currency])
+            || $currency === Partners::baseCurrency()) {
+            Session::error('That is not a currency we pay out in.');
+            Response::to('/partners-admin/fx');
+        }
+
+        // A rate of zero or less would convert a real payout into nothing
+        // or into a negative, and is far more likely to be a typo than an
+        // instruction.
+        if ($rate <= 0) {
+            Session::error('The rate has to be more than zero.');
+            Response::to('/partners-admin/fx');
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $asOf)) {
+            Session::error('Give the date the rate applies from as YYYY-MM-DD.');
+            Response::to('/partners-admin/fx');
+        }
+
+        Partners::setFxRate(
+            $currency,
+            $rate,
+            $asOf,
+            trim((string) $request->input('source')) ?: null,
+            Auth::id()
+        );
+
+        // Logged because it changes what partners are paid, which is the
+        // same reason the pay details are logged.
+        ActivityLog::record(
+            'fx_rate_set',
+            'fx_rate',
+            0,
+            sprintf('%s at %s %s from %s', $currency, Partners::baseCurrency(), $rate, $asOf)
+        );
+
+        Session::success(sprintf(
+            'Saved. Payouts in %s are converted at %s %s from %s.',
+            $currency,
+            Partners::baseCurrency(),
+            rtrim(rtrim(number_format($rate, 6), '0'), '.'),
+            $asOf
+        ));
+        Response::to('/partners-admin/fx');
+    }
+
+    // -- Tiers -------------------------------------------------------------
+
+    /**
+     * The tiers, their thresholds and the benefits we publish for each.
+     *
+     * Editable here because the benefits are shown on the public partner
+     * programme page: a promise on the website that nobody in the system
+     * can change is a promise that goes stale.
+     */
+    public function tiers(Request $request): void
+    {
+        $this->authorize('partners.view');
+
+        $tiers = Partners::tiers();
+
+        // How many partners sit at each tier, and how many have outgrown
+        // it. The second number is the point of the page.
+        foreach ($tiers as $code => $tier) {
+            $tiers[$code]['partners'] = (int) Database::scalar(
+                "SELECT COUNT(*) FROM partners WHERE tier = :t AND status = 'active'",
+                ['t' => $code],
+                0
+            );
+        }
+
+        $due = [];
+
+        foreach (Database::all("SELECT * FROM partners WHERE status = 'active'") as $partner) {
+            $earned = Partners::earnedTier((int) $partner['id']);
+
+            if ($earned === null || $earned['code'] === $partner['tier']) {
+                continue;
+            }
+
+            // Only promotions. Somebody whose good year has rolled out of
+            // the window is not demoted by a report.
+            if ((int) $earned['sort'] > (int) ($tiers[$partner['tier']]['sort'] ?? 0)) {
+                $due[] = [
+                    'partner' => $partner,
+                    'earned'  => $earned,
+                    'billed'  => Partners::billed12m((int) $partner['id']),
+                ];
+            }
+        }
+
+        $this->view('partners/tiers', [
+            'title' => 'Partner tiers',
+            'tiers' => $tiers,
+            'due'   => $due,
+        ]);
+    }
+
+    public function saveTiers(Request $request): void
+    {
+        $this->authorize('partners.manage');
+
+        $input = $request->input('tiers');
+
+        if (!is_array($input)) {
+            Session::error('Nothing to save.');
+            Response::to('/partners-admin/tiers');
+        }
+
+        $known = Partners::tiers();
+        $saved = 0;
+
+        foreach ($input as $code => $fields) {
+            if (!isset($known[(string) $code]) || !is_array($fields)) {
+                continue;
+            }
+
+            Database::update('partner_tiers', [
+                'name'           => trim((string) ($fields['name'] ?? '')) ?: $known[$code]['name'],
+                'min_billed_12m' => max(0, (float) str_replace(',', '', (string) ($fields['min_billed_12m'] ?? 0))),
+                'default_rate'   => max(0, min(100, (float) ($fields['default_rate'] ?? 0))),
+                'benefits'       => trim((string) ($fields['benefits'] ?? '')) ?: null,
+                'is_public'      => !empty($fields['is_public']) ? 1 : 0,
+            ], ['code' => (string) $code]);
+
+            $saved++;
+        }
+
+        ActivityLog::record('partner_tiers_saved', 'partner_tier', 0, 'Updated ' . $saved . ' tier(s)');
+
+        Session::success('Saved. The programme page on the website shows this straight away.');
+        Response::to('/partners-admin/tiers');
+    }
+
     private function salesTeam(): array
     {
         return Database::all(
@@ -875,6 +1190,81 @@ class PartnerAdminController extends Controller
         );
 
         return $ok ? $id : null;
+    }
+
+    /**
+     * The fields that say where a partner is and what they are.
+     *
+     * Shared by create and edit rather than written out twice, because
+     * the two drifting apart is how a field ends up settable on one form
+     * and not the other — and the whole international story depends on
+     * these being right on both.
+     *
+     * Everything is checked against a known set. A country that is not in
+     * the list, a currency finance has not agreed to pay in, or a tier
+     * that does not exist all fall back to something safe rather than
+     * being written through to the database.
+     *
+     * @return array<string, mixed> columns ready for an insert or update
+     */
+    private function placeInput(Request $request, ?array $existing = null): array
+    {
+        $country = strtoupper(trim((string) $request->input('country')));
+        $country = isset(Partners::COUNTRIES[$country]) ? $country : Partners::homeCountry();
+
+        $type = (string) $request->input('partner_type');
+        $type = isset(Partners::TYPES[$type]) ? $type : 'referral';
+
+        $tiers = Partners::tiers();
+        $tier  = (string) $request->input('tier');
+        $tier  = isset($tiers[$tier]) ? $tier : (string) ($existing['tier'] ?? 'registered');
+
+        $residency = (string) $request->input('tax_residency');
+        $residency = $residency === 'non_resident' ? 'non_resident' : 'resident';
+
+        $currency = strtoupper(trim((string) $request->input('payout_currency')));
+        $currency = isset(Partners::payoutCurrencies()[$currency])
+            ? $currency
+            : Partners::baseCurrency();
+
+        // Blank is not zero. A blank box means "use the rate for their
+        // residency"; a typed 0 means "withhold nothing from this one",
+        // which is a different instruction and is why the column is
+        // nullable. See Partners::withholdingRate().
+        $wht = trim((string) $request->input('withholding_rate'));
+        $wht = $wht === '' ? null : max(0, min(100, (float) $wht));
+
+        $timezone = trim((string) $request->input('timezone'));
+
+        if ($timezone !== '' && !in_array($timezone, timezone_identifiers_list(), true)) {
+            $timezone = '';
+        }
+
+        $dates = [];
+
+        foreach (['agreement_signed_at', 'agreement_expires_at'] as $field) {
+            $raw = trim((string) $request->input($field));
+            // A half-typed date is worse than no date: it sorts, filters
+            // and compares as though it meant something.
+            $dates[$field] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) ? $raw : null;
+        }
+
+        return [
+            'country'              => $country,
+            'city'                 => trim((string) $request->input('city')) ?: null,
+            'timezone'             => $timezone ?: null,
+            'territory'            => trim((string) $request->input('territory')) ?: null,
+            'partner_type'         => $type,
+            'tier'                 => $tier,
+            'tax_residency'        => $residency,
+            'tax_id'               => trim((string) $request->input('tax_id')) ?: null,
+            'tax_id_label'         => Partners::taxLabel($country),
+            'withholding_rate'     => $wht,
+            'payout_currency'      => $currency,
+            'agreement_ref'        => trim((string) $request->input('agreement_ref')) ?: null,
+            'agreement_signed_at'  => $dates['agreement_signed_at'],
+            'agreement_expires_at' => $dates['agreement_expires_at'],
+        ];
     }
 
     private function find(int $id): array

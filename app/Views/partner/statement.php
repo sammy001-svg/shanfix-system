@@ -14,7 +14,11 @@ require_once APP_PATH . '/Views/partials/icons.php';
 $t      = strtotime($period . '-01');
 $month  = $t ? date('F Y', $t) : $period;
 $rateOf = static fn(float $r): string => rtrim(rtrim(number_format($r, 2), '0'), '.') . '%';
-$noPin  = trim((string) $me['kra_pin']) === '';
+// Only a partner here needs a KRA PIN, and only they should be told that
+// the payment is waiting on one. Telling a partner in Kampala the same
+// thing asks them for a document they cannot get and will never have.
+$noPin = \App\Services\Partners::isLocal((string) ($me['country'] ?? 'KE'))
+      && trim((string) $me['kra_pin']) === '';
 ?>
 
 <div class="print-bar no-print">
@@ -130,8 +134,62 @@ $noPin  = trim((string) $me['kra_pin']) === '';
         <span>Due to you</span>
         <span><?= e(money($due)) ?></span>
       </div>
+
+      <?php // ---- What actually left, where that differs ---------------
+            // Commission is earned gross, in our currency, because that
+            // is what the customer paid. A partner abroad is paid in
+            // theirs, and tax may have been deducted and remitted on
+            // their behalf. Both are shown, and the figure they will see
+            // on their own bank statement is the last one. ?>
+      <?php if ($payout && ((float) $payout['withheld'] > 0.009
+                            || $payout['currency'] !== $base)): ?>
+
+        <?php if ((float) $payout['withheld'] > 0.009): ?>
+          <div class="doc-totals__row">
+            <span>
+              Withholding tax
+              (<?= e(rtrim(rtrim(number_format((float) $payout['withholding_rate'], 2), '0'), '.')) ?>%),
+              paid to KRA on your behalf
+            </span>
+            <span>&minus; <?= e(money($payout['withheld'], false)) ?></span>
+          </div>
+          <div class="doc-totals__row">
+            <span>Sent to you</span>
+            <span><?= e(money($payout['net_amount'], false)) ?></span>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($payout['currency'] !== $base): ?>
+          <div class="doc-totals__row doc-totals__row--grand">
+            <span>
+              In <?= e($payout['currency']) ?>, at
+              <?= e($base) ?>
+              <?= e(rtrim(rtrim(number_format((float) $payout['fx_rate'], 6), '0'), '.')) ?>
+              per <?= e($payout['currency']) ?>
+            </span>
+            <span>
+              <?= e($payout['currency']) ?>
+              <?= e(number_format((float) $payout['net_fx'], 2)) ?>
+            </span>
+          </div>
+        <?php endif; ?>
+      <?php endif; ?>
     </div>
   </div>
+
+  <?php if ($payout && (float) $payout['withheld'] > 0.009): ?>
+    <section class="doc-section">
+      <div class="doc-section__label">About the deduction</div>
+      <div class="doc-section__body">
+        You have earned the full <?= e(money($total, false)) ?>. We are
+        required to withhold
+        <?= e(rtrim(rtrim(number_format((float) $payout['withholding_rate'], 2), '0'), '.')) ?>%
+        of commission and pay it to KRA against your own tax account, so
+        it is not money we have kept — it is money already paid on your
+        behalf. Ask us for the withholding certificate when you file.
+      </div>
+    </section>
+  <?php endif; ?>
 
   <?php if ($noPin): ?>
     <section class="doc-section">

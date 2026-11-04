@@ -106,6 +106,7 @@ $_line = static fn(string $d): string =>
           <ul>
             <li><a href="who-we-are.php">About Us</a></li>
             <li><a href="portfolio.php">Our Work</a></li>
+            <li><a href="partners.php">Partner Programme</a></li>
             <li><a href="blog.php">Blog</a></li>
             <li><a href="contact.php">Contact</a></li>
             <li><a href="/portal/login">Client Portal</a></li>

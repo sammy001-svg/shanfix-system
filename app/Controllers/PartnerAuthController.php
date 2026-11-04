@@ -13,6 +13,7 @@ use App\Core\Settings;
 use App\Core\Validator;
 use App\Services\Notifier;
 use App\Services\PartnerOtp;
+use App\Services\Partners;
 use App\Services\StaffNotifier;
 
 /**
@@ -104,6 +105,16 @@ class PartnerAuthController extends Controller
             'terms'    => (string) Settings::get('partner_terms', ''),
             'rate'     => (float) Settings::get('partner_default_rate', 10),
             'authKind' => 'partner',
+
+            // Applications arrive from the programme page on the website,
+            // which says we work beyond Kenya. The form has to be able to
+            // take somebody who does.
+            'countries'   => Partners::countryOptions(),
+            'home'        => Partners::homeCountry(),
+            'payMethods'  => Partners::PAY_METHODS,
+            'localOnly'   => array_keys(Partners::payMethodsFor(Partners::homeCountry())),
+            'tiers'       => Partners::tiers(true),
+            'international' => Settings::bool('partner_international_enabled', true),
         ], 'auth');
     }
 
@@ -115,12 +126,19 @@ class PartnerAuthController extends Controller
             throw new HttpException(404, 'We are not taking new partner applications at the moment.');
         }
 
+        // Where they are. Everything else about the application bends
+        // round this: what we can call their tax number, what sort of ID
+        // they can possibly have, and how we could ever pay them.
+        $country = strtoupper(trim((string) $request->input('country')));
+        $country = isset(Partners::COUNTRIES[$country]) ? $country : Partners::homeCountry();
+        $local   = Partners::isLocal($country);
+
         // A preference, not a promise. Staff check it before anything is
         // sent, and it cannot be changed from the portal afterwards —
         // moving where money goes is finance's call, not the account
         // holder's, so an application is the one moment they may say.
         $method = (string) $request->input('pay_method');
-        $method = in_array($method, ['mpesa', 'bank'], true) ? $method : null;
+        $method = isset(Partners::payMethodsFor($country)[$method]) ? $method : null;
 
         $v = new Validator($request->all());
         $v->require('first_name', 'First name')
@@ -128,8 +146,18 @@ class PartnerAuthController extends Controller
           ->maxLen('middle_name', 60, 'Second name')
           ->require('last_name', 'Third name')
           ->maxLen('last_name', 60, 'Third name')
-          ->require('id_number', 'ID number')
           ->maxLen('id_number', 30, 'ID number')
+          ->maxLen('tax_id', 40, 'Tax number')
+          ->maxLen('city', 90, 'City')
+          // A national ID number is a thing a partner HERE has. Requiring
+          // one of an applicant in Kampala asks for a document that does
+          // not exist, and there is no answer they can give that gets
+          // them past it.
+          ->custom(
+              'id_number',
+              !$local || trim((string) $request->input('id_number')) !== '',
+              'Your ID number is required.'
+          )
           ->require('occupation', 'What you do')
           ->maxLen('occupation', 120, 'What you do')
           ->maxLen('company', 180, 'Your business')
@@ -150,8 +178,24 @@ class PartnerAuthController extends Controller
           // perfectly good answer, and the form says so.
           ->custom(
               'bank_account_no',
-              $method !== 'bank' || trim((string) $request->input('bank_account_no')) !== '',
-              'Give the account number, or choose "tell us later".'
+              !in_array($method, ['bank', 'wire'], true)
+                  || trim((string) $request->input('bank_account_no')) !== ''
+                  || trim((string) $request->input('bank_iban')) !== '',
+              'Give the account number or IBAN, or choose "tell us later".'
+          )
+          // Same reasoning as the account number: a wire with no SWIFT
+          // code cannot be addressed, so taking one is taking a detail
+          // that fails on payment day instead of today.
+          ->custom(
+              'bank_swift',
+              $method !== 'wire' || trim((string) $request->input('bank_swift')) !== '',
+              'An international transfer needs the SWIFT/BIC code, or choose "tell us later".'
+          )
+          ->custom(
+              'pay_email',
+              !in_array($method, ['wise', 'paypal'], true)
+                  || trim((string) $request->input('pay_email')) !== '',
+              'Give the address that account is registered to, or choose "tell us later".'
           );
 
         if ($v->fails()) {
@@ -168,10 +212,16 @@ class PartnerAuthController extends Controller
         // index: a duplicate key would raise a database error on a public
         // form, and an error that appears only for real ID numbers is a
         // way to test whether one is on file.
-        $existing = Database::first(
-            'SELECT id FROM partners WHERE email = :e OR id_number = :i',
-            ['e' => $email, 'i' => $idNo]
-        );
+        // The ID is only part of the question when there is one. Without
+        // this guard, the first partner to apply from abroad stores an
+        // empty ID and every applicant from abroad after them matches it
+        // and is silently treated as a duplicate.
+        $existing = $idNo !== ''
+            ? Database::first(
+                'SELECT id FROM partners WHERE email = :e OR id_number = :i',
+                ['e' => $email, 'i' => $idNo]
+              )
+            : Database::first('SELECT id FROM partners WHERE email = :e', ['e' => $email]);
 
         // Never say whether the address is already a partner of ours. An
         // application form that answers that question is a way to find out
@@ -195,18 +245,36 @@ class PartnerAuthController extends Controller
                 'company'         => trim((string) $request->input('company')) ?: null,
                 'occupation'      => trim((string) $request->input('occupation')),
                 'email'           => $email,
-                'phone'           => trim((string) $request->input('phone')),
+                'phone'           => Partners::e164((string) $request->input('phone'), $country),
                 'kra_pin'         => trim((string) $request->input('kra_pin')) ?: null,
-                'id_number'       => $idNo,
+                'id_number'       => $idNo ?: null,
                 'office_location' => trim((string) $request->input('office_location')),
                 'pitch'           => trim((string) $request->input('pitch')),
 
+                'country'       => $country,
+                'city'          => trim((string) $request->input('city')) ?: null,
+                'tax_id'        => trim((string) $request->input('tax_id')) ?: null,
+                'tax_id_label'  => Partners::taxLabel($country),
+                // Suggested from the country and left for staff to confirm.
+                // Residency is not a thing an applicant should be asked to
+                // declare on a web form — it decides what we withhold.
+                'tax_residency' => $local ? 'resident' : 'non_resident',
+                // The currency their country usually wants, where we pay
+                // in it at all. Finance can move it before anything goes.
+                'payout_currency' => isset(Partners::payoutCurrencies()[Partners::currencyFor($country)])
+                    ? Partners::currencyFor($country)
+                    : Partners::baseCurrency(),
+
                 'pay_method'        => $method,
                 'pay_phone'         => trim((string) $request->input('pay_phone')) ?: null,
+                'pay_email'         => strtolower(trim((string) $request->input('pay_email'))) ?: null,
                 'bank_name'         => trim((string) $request->input('bank_name')) ?: null,
                 'bank_branch'       => trim((string) $request->input('bank_branch')) ?: null,
                 'bank_account_name' => trim((string) $request->input('bank_account_name')) ?: null,
                 'bank_account_no'   => trim((string) $request->input('bank_account_no')) ?: null,
+                'bank_swift'        => strtoupper(trim((string) $request->input('bank_swift'))) ?: null,
+                'bank_iban'         => strtoupper(preg_replace('/\s+/', '',
+                                         (string) $request->input('bank_iban')) ?? '') ?: null,
 
                 'default_rate' => (float) Settings::get('partner_default_rate', 10),
                 'status'       => 'pending',

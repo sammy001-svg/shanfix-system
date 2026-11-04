@@ -645,6 +645,14 @@ class PartnerController extends Controller
             'paid'    => round($paid, 2),
             'due'     => round($total - $paid, 2),
             'company' => Settings::company(),
+
+            // What actually left, for the months where that is not the
+            // same number. Commission is earned in our currency and gross;
+            // a partner abroad is paid in theirs, and tax may have been
+            // deducted on their behalf. A statement that shows only what
+            // was earned is a statement they will ring us about.
+            'payout'  => \App\Services\Payouts::lineForPeriod((int) $me['id'], $period),
+            'base'    => \App\Services\Partners::baseCurrency(),
         ], 'print');
     }
 
@@ -741,7 +749,8 @@ class PartnerController extends Controller
           ->maxLen('office_location', 200, 'Where you work from')
           ->maxLen('company', 180, 'Your business')
           ->phone('phone', 'Phone number', true)
-          ->maxLen('kra_pin', 30, 'KRA PIN');
+          ->maxLen('kra_pin', 30, 'KRA PIN')
+          ->maxLen('tax_id', 40, 'Tax number');
 
         if ($v->fails()) {
             Session::flashErrors($v->errors());
@@ -770,8 +779,18 @@ class PartnerController extends Controller
             'company'         => trim((string) $request->input('company')) ?: null,
             'occupation'      => trim((string) $request->input('occupation')) ?: null,
             'office_location' => trim((string) $request->input('office_location')) ?: null,
-            'phone'           => trim((string) $request->input('phone')),
+            // Kept in international form, so a partner abroad editing
+            // their own number does not end up with a Kenyan one.
+            'phone'           => \App\Services\Partners::e164(
+                (string) $request->input('phone'),
+                (string) ($me['country'] ?? 'KE')
+            ),
             'kra_pin'         => strtoupper(trim((string) $request->input('kra_pin'))) ?: null,
+            // A partner abroad gives their own country's tax number
+            // instead. Deliberately NOT the country itself, nor the
+            // residency: those decide what we withhold, and they are
+            // ours to set rather than theirs to choose.
+            'tax_id'          => trim((string) $request->input('tax_id')) ?: ($me['tax_id'] ?: null),
         ], ['id' => $me['id']]);
 
         ActivityLog::record(

@@ -16,7 +16,20 @@ use App\Core\Database;
  * owed — a failed line releases its commission so it is simply owed
  * again and falls into the next run.
  *
- * Commission is paid gross. Nothing is withheld here on purpose.
+ * A commission is EARNED gross, in the currency the customer paid us
+ * in, and that is what the ledger keeps. Two things can happen to it on
+ * the way out, and both belong here rather than in the ledger:
+ *
+ *   * Withholding. Tax deducted and remitted to KRA on the partner's
+ *     behalf is a fact about the payment, not about the sale, so it sits
+ *     on the line. It is off until somebody switches it on — see
+ *     migration 064.
+ *
+ *   * Conversion. A partner abroad is paid in their own currency, at the
+ *     rate that stood when the run was built. The rate is copied onto
+ *     the line for the same reason the commission rate is copied into
+ *     the ledger: a rate that moves next month must not move what we
+ *     already sent.
  */
 class Payouts
 {
@@ -28,53 +41,120 @@ class Payouts
     /**
      * The destination for a partner, or a reason we cannot pay them.
      *
-     * @return array{method: ?string, destination: ?string, name: ?string, problem: ?string}
+     * The reason comes from Partners::blockers(), which answers the same
+     * question in full. A payout line has room for one reason, so this
+     * takes the first; the partner page shows the whole list.
+     *
+     * @return array{method: ?string, destination: ?string, name: ?string,
+     *               currency: string, fx_rate: float, withholding_rate: float,
+     *               problem: ?string}
      */
     public static function destinationFor(array $partner): array
     {
-        $none = ['method' => null, 'destination' => null, 'name' => null];
+        $base = Partners::baseCurrency();
 
-        if (($partner['status'] ?? '') === 'suspended') {
-            // They may well be owed it, but a suspended account is
-            // suspended for a reason and finance should look at it before
-            // the money goes. The line can still be included by hand.
-            return $none + ['problem' => 'Partner is suspended'];
+        $none = [
+            'method'           => null,
+            'destination'      => null,
+            'name'             => null,
+            'currency'         => $base,
+            'fx_rate'          => 1.0,
+            'withholding_rate' => 0.0,
+        ];
+
+        // Everything that could stop this payment, governance first. A
+        // suspended partner may well be owed the money, but a suspended
+        // account is suspended for a reason and finance should look at it
+        // before it goes. The line can still be admitted by hand.
+        $blockers = Partners::blockers($partner);
+
+        if ($blockers !== []) {
+            return $none + ['problem' => $blockers[0]];
         }
 
-        $method = (string) ($partner['pay_method'] ?? '');
+        $method   = (string) ($partner['pay_method'] ?? '');
+        $currency = strtoupper((string) ($partner['payout_currency'] ?? $base)) ?: $base;
+        $rate     = Partners::fxRate($currency);
 
-        if ($method === 'mpesa') {
-            $phone = trim((string) ($partner['pay_phone'] ?? '')) ?: trim((string) ($partner['phone'] ?? ''));
+        if ($rate === null || $rate <= 0) {
+            // blockers() has already checked this, so reaching here means
+            // the rate was withdrawn between the two calls. Refusing is
+            // still better than converting at a number we invented.
+            return $none + ['problem' => 'No exchange rate on file for ' . $currency];
+        }
 
-            return $phone === ''
-                ? $none + ['problem' => 'No M-Pesa number on file']
-                : [
-                    'method'      => 'mpesa',
-                    'destination' => $phone,
+        // The name on the instruction. A bank, a wire and a wallet all
+        // match on the name they hold, which is not always the trading
+        // name we know them by.
+        $accountName = trim((string) ($partner['bank_account_name'] ?? ''))
+            ?: trim((string) ($partner['company'] ?? ''))
+            ?: (string) ($partner['name'] ?? '');
+
+        $found = [
+            'method'           => $method,
+            'currency'         => $currency,
+            'fx_rate'          => (float) $rate,
+            'withholding_rate' => Partners::withholdingRate($partner),
+            'problem'          => null,
+        ];
+
+        switch ($method) {
+            case 'mpesa':
+                return $found + [
+                    'destination' => trim((string) ($partner['pay_phone'] ?? ''))
+                                     ?: trim((string) ($partner['phone'] ?? '')),
                     'name'        => (string) ($partner['name'] ?? ''),
-                    'problem'     => null,
+                ];
+
+            case 'bank':
+                return $found + [
+                    'destination' => trim((string) $partner['bank_account_no']),
+                    'name'        => $accountName,
+                ];
+
+            case 'wire':
+                // An IBAN where there is one, because that is what a
+                // correspondent bank routes on; the account number is the
+                // fallback for countries that do not use IBANs.
+                return $found + [
+                    'destination' => trim((string) ($partner['bank_iban'] ?? ''))
+                                     ?: trim((string) ($partner['bank_account_no'] ?? '')),
+                    'name'        => $accountName,
+                ];
+
+            case 'wise':
+            case 'paypal':
+                return $found + [
+                    'destination' => trim((string) ($partner['pay_email'] ?? '')),
+                    'name'        => $accountName,
                 ];
         }
 
-        if ($method === 'bank') {
-            $account = trim((string) ($partner['bank_account_no'] ?? ''));
-
-            if ($account === '') {
-                return $none + ['problem' => 'No bank account number on file'];
-            }
-
-            return [
-                'method'      => 'bank',
-                'destination' => $account,
-                // The bank matches on the name it holds, which is not
-                // always the trading name we know them by.
-                'name'        => trim((string) ($partner['bank_account_name'] ?? ''))
-                                 ?: (string) ($partner['company'] ?? $partner['name'] ?? ''),
-                'problem'     => null,
-            ];
-        }
-
         return $none + ['problem' => 'No payment method chosen'];
+    }
+
+    /**
+     * What a gross amount becomes on a line: tax off, then converted.
+     *
+     * In that order, and the order matters. Withholding is a Kenyan tax
+     * on a Kenyan-sourced commission, so it is worked out in KES on the
+     * gross; only what is left crosses the border.
+     *
+     * @param  array $where the result of destinationFor()
+     * @return array{withheld: float, net_amount: float, net_fx: float}
+     */
+    public static function amountsFor(float $gross, array $where): array
+    {
+        $rate     = (float) ($where['withholding_rate'] ?? 0.0);
+        $withheld = round($gross * $rate / 100, 2);
+        $net      = round($gross - $withheld, 2);
+        $fx       = (float) ($where['fx_rate'] ?? 1.0) ?: 1.0;
+
+        return [
+            'withheld'   => $withheld,
+            'net_amount' => $net,
+            'net_fx'     => round($net / $fx, 2),
+        ];
     }
 
     // -- Building a run ----------------------------------------------------
@@ -135,24 +215,32 @@ class Payouts
                 'created_by' => $userId,
             ]);
 
-            $lines = 0;
-            $held  = 0;
-            $total = 0.0;
+            $lines    = 0;
+            $held     = 0;
+            $total    = 0.0;
+            $withheld = 0.0;
 
             foreach (self::available($period) as $partner) {
                 $amount = round((float) $partner['amount'], 2);
                 $where  = self::destinationFor($partner);
+                $split  = self::amountsFor($amount, $where);
 
                 $lineId = Database::insert('payout_lines', [
-                    'run_id'         => $runId,
-                    'partner_id'     => (int) $partner['id'],
-                    'amount'         => $amount,
-                    'entries'        => (int) $partner['entries'],
-                    'method'         => $where['method'],
-                    'destination'    => $where['destination'],
-                    'account_name'   => $where['name'],
-                    'status'         => $where['problem'] === null ? 'pending' : 'held',
-                    'failure_reason' => $where['problem'],
+                    'run_id'           => $runId,
+                    'partner_id'       => (int) $partner['id'],
+                    'amount'           => $amount,
+                    'entries'          => (int) $partner['entries'],
+                    'method'           => $where['method'],
+                    'destination'      => $where['destination'],
+                    'account_name'     => $where['name'],
+                    'currency'         => $where['currency'],
+                    'fx_rate'          => $where['fx_rate'],
+                    'withholding_rate' => $where['withholding_rate'],
+                    'withheld'         => $split['withheld'],
+                    'net_amount'       => $split['net_amount'],
+                    'net_fx'           => $split['net_fx'],
+                    'status'           => $where['problem'] === null ? 'pending' : 'held',
+                    'failure_reason'   => $where['problem'],
                 ]);
 
                 if ($where['problem'] !== null) {
@@ -163,19 +251,22 @@ class Payouts
                 self::attach($lineId, (int) $partner['id'], $period);
 
                 $lines++;
-                $total += $amount;
+                $total    += $amount;
+                $withheld += $split['withheld'];
             }
 
             Database::update('payout_runs', [
-                'total'      => round($total, 2),
-                'line_count' => $lines,
+                'total'          => round($total, 2),
+                'withheld_total' => round($withheld, 2),
+                'line_count'     => $lines,
             ], ['id' => $runId]);
 
             return [
-                'run_id' => $runId,
-                'lines'  => $lines,
-                'held'   => $held,
-                'total'  => round($total, 2),
+                'run_id'   => $runId,
+                'lines'    => $lines,
+                'held'     => $held,
+                'total'    => round($total, 2),
+                'withheld' => round($withheld, 2),
             ];
         });
     }
@@ -239,14 +330,25 @@ class Payouts
             0
         );
 
+        $split = self::amountsFor(round($amount, 2), $where);
+
         Database::update('payout_lines', [
-            'amount'         => round($amount, 2),
-            'entries'        => $n,
-            'method'         => $where['method'],
-            'destination'    => $where['destination'],
-            'account_name'   => $where['name'],
-            'status'         => 'pending',
-            'failure_reason' => null,
+            'amount'           => round($amount, 2),
+            'entries'          => $n,
+            'method'           => $where['method'],
+            'destination'      => $where['destination'],
+            'account_name'     => $where['name'],
+            // Re-read with the rest, so a line admitted a week later is
+            // converted at the rate that is current now rather than at
+            // whatever stood when the run was first built.
+            'currency'         => $where['currency'],
+            'fx_rate'          => $where['fx_rate'],
+            'withholding_rate' => $where['withholding_rate'],
+            'withheld'         => $split['withheld'],
+            'net_amount'       => $split['net_amount'],
+            'net_fx'           => $split['net_fx'],
+            'status'           => 'pending',
+            'failure_reason'   => null,
         ], ['id' => $lineId]);
 
         self::refresh((int) $line['run_id']);
@@ -529,6 +631,14 @@ class Payouts
             0
         );
 
+        // What the run holds back, for the return that follows it. Held
+        // and failed lines withhold nothing because they send nothing.
+        $withheld = (float) Database::scalar(
+            "SELECT COALESCE(SUM(withheld), 0) FROM payout_lines WHERE run_id = :r AND " . $live,
+            ['r' => $runId],
+            0
+        );
+
         $waiting = (int) Database::scalar(
             "SELECT COUNT(*) FROM payout_lines
               WHERE run_id = :r AND status IN ('pending', 'sent')",
@@ -536,7 +646,11 @@ class Payouts
             0
         );
 
-        $data = ['total' => round($total, 2), 'line_count' => $count];
+        $data = [
+            'total'          => round($total, 2),
+            'withheld_total' => round($withheld, 2),
+            'line_count'     => $count,
+        ];
 
         // A run closes when nothing is still waiting to be heard about.
         // Held lines do not hold it open: they are work for next month,
@@ -599,6 +713,26 @@ class Payouts
         );
     }
 
+    /**
+     * The payout line covering one partner's one month, if there is one.
+     *
+     * For the partner's own statement. With anything withheld or
+     * converted, what they earned and what reached their account are two
+     * different numbers, and a statement that gives only the first is a
+     * statement they will ring us about.
+     */
+    public static function lineForPeriod(int $partnerId, string $period): ?array
+    {
+        return Database::first(
+            "SELECT l.*, r.period, r.status AS run_status, r.exported_at
+               FROM payout_lines l
+               JOIN payout_runs r ON r.id = l.run_id
+              WHERE l.partner_id = :p AND r.period = :period
+           ORDER BY l.id DESC LIMIT 1",
+            ['p' => $partnerId, 'period' => $period]
+        );
+    }
+
     /** How many lines of each method are still waiting to go out. */
     public static function pendingByMethod(int $runId): array
     {
@@ -609,7 +743,9 @@ class Payouts
             ['r' => $runId]
         );
 
-        $out = ['mpesa' => 0, 'bank' => 0];
+        // Every method we can pay by, so a run with nothing but wires in
+        // it still reports them rather than silently showing two zeroes.
+        $out = array_fill_keys(array_keys(Partners::PAY_METHODS), 0);
 
         foreach ($rows as $row) {
             $out[(string) $row['method']] = (int) $row['n'];
@@ -623,26 +759,36 @@ class Payouts
     /**
      * A payment file for one method.
      *
-     * Two formats rather than one, because M-Pesa wants a phone number and
-     * the bank wants an account, a name and a branch. A single file with
-     * half its columns empty gets rejected by both.
+     * One format per method rather than one for all of them, because the
+     * things they need are genuinely different: M-Pesa wants a phone
+     * number, a local bank wants an account and a branch, a wire wants a
+     * SWIFT code and a beneficiary address, and a wallet wants an email.
+     * A single file with two-thirds of its columns empty gets rejected by
+     * all four.
      *
-     * @param  string $kind 'mpesa' or 'bank'
+     * Every file carries NET, not gross. The gross is in the ledger and
+     * on the partner's statement; the number on the payment instruction
+     * has to be the number we are actually sending, or the file and the
+     * books disagree the moment anything is withheld.
+     *
+     * @param  string $kind one of Partners::PAY_METHODS
      * @return array{headers: list<string>, rows: list<list<string>>}
      */
     public static function csvParts(int $runId, string $kind): array
     {
         $run = Database::first('SELECT * FROM payout_runs WHERE id = :id', ['id' => $runId]);
 
-        if (!$run) {
+        if (!$run || !isset(Partners::PAY_METHODS[$kind])) {
             return ['headers' => [], 'rows' => []];
         }
 
         $narration = 'Commission ' . $run['period'];
 
         $lines = Database::all(
-            "SELECT l.*, p.name, p.company, p.partner_code, p.kra_pin,
-                    p.bank_name, p.bank_branch
+            "SELECT l.*, p.name, p.company, p.partner_code, p.kra_pin, p.tax_id,
+                    p.bank_name, p.bank_branch, p.bank_swift, p.bank_iban,
+                    p.bank_routing, p.bank_country, p.bank_address,
+                    p.country, p.city, p.office_location
                FROM payout_lines l
                JOIN partners p ON p.id = l.partner_id
               WHERE l.run_id = :r AND l.method = :m
@@ -651,36 +797,169 @@ class Payouts
             ['r' => $runId, 'm' => $kind]
         );
 
-        $rows    = [];
-        $headers = $kind === 'mpesa'
-            ? ['Phone', 'Amount', 'Name', 'Reference', 'Narration']
-            : ['Account Name', 'Account Number', 'Bank', 'Branch', 'Amount', 'Reference', 'Narration'];
+        /** A line's own reference, which is what a settlement is matched on. */
+        $ref = static fn (array $l): string
+            => (string) ($l['partner_code'] ?: 'P' . $l['partner_id']);
 
-        if ($kind === 'mpesa') {
-            foreach ($lines as $line) {
-                $rows[] = [
-                    self::msisdn((string) $line['destination']),
-                    number_format((float) $line['amount'], 2, '.', ''),
-                    $line['account_name'] ?: $line['name'],
-                    $line['partner_code'] ?: ('P' . $line['partner_id']),
-                    $narration,
-                ];
-            }
-        } else {
-            foreach ($lines as $line) {
-                $rows[] = [
-                    $line['account_name'] ?: $line['name'],
-                    (string) $line['destination'],
-                    (string) $line['bank_name'],
-                    (string) $line['bank_branch'],
-                    number_format((float) $line['amount'], 2, '.', ''),
-                    $line['partner_code'] ?: ('P' . $line['partner_id']),
-                    $narration,
-                ];
-            }
+        /** Net in KES, to two places, no thousands separator. */
+        $kes = static fn (array $l): string
+            => number_format((float) $l['net_amount'], 2, '.', '');
+
+        /** Net in the currency it leaves in. */
+        $fx = static fn (array $l): string
+            => number_format((float) $l['net_fx'], 2, '.', '');
+
+        $rows    = [];
+        $headers = [];
+
+        switch ($kind) {
+            case 'mpesa':
+                $headers = ['Phone', 'Amount', 'Name', 'Reference', 'Narration'];
+
+                foreach ($lines as $line) {
+                    $rows[] = [
+                        self::msisdn((string) $line['destination']),
+                        $kes($line),
+                        $line['account_name'] ?: $line['name'],
+                        $ref($line),
+                        $narration,
+                    ];
+                }
+                break;
+
+            case 'bank':
+                $headers = ['Account Name', 'Account Number', 'Bank', 'Branch',
+                            'Amount', 'Reference', 'Narration'];
+
+                foreach ($lines as $line) {
+                    $rows[] = [
+                        $line['account_name'] ?: $line['name'],
+                        (string) $line['destination'],
+                        (string) $line['bank_name'],
+                        (string) $line['bank_branch'],
+                        $kes($line),
+                        $ref($line),
+                        $narration,
+                    ];
+                }
+                break;
+
+            case 'wire':
+                // The columns a bank asks for on an outward SWIFT
+                // instruction. Both amounts are given: the currency and
+                // figure to send, and the KES the account is debited by,
+                // which is what reconciles against our own books.
+                $headers = ['Beneficiary Name', 'IBAN / Account', 'SWIFT / BIC',
+                            'Routing Code', 'Bank Name', 'Bank Country',
+                            'Bank Address', 'Beneficiary Country',
+                            'Beneficiary Address', 'Currency', 'Amount',
+                            'Amount KES', 'FX Rate', 'Reference', 'Narration'];
+
+                foreach ($lines as $line) {
+                    $rows[] = [
+                        $line['account_name'] ?: $line['name'],
+                        (string) $line['destination'],
+                        (string) $line['bank_swift'],
+                        (string) $line['bank_routing'],
+                        (string) $line['bank_name'],
+                        Partners::countryName((string) ($line['bank_country'] ?: $line['country'])),
+                        (string) $line['bank_address'],
+                        Partners::countryName((string) $line['country']),
+                        trim((string) ($line['office_location'] ?: $line['city'])),
+                        (string) $line['currency'],
+                        $fx($line),
+                        $kes($line),
+                        rtrim(rtrim(number_format((float) $line['fx_rate'], 6, '.', ''), '0'), '.'),
+                        $ref($line),
+                        $narration,
+                    ];
+                }
+                break;
+
+            case 'wise':
+            case 'paypal':
+                // Both take a batch keyed on the recipient's address.
+                $headers = ['Email', 'Recipient Name', 'Currency', 'Amount',
+                            'Amount KES', 'FX Rate', 'Country', 'Reference', 'Narration'];
+
+                foreach ($lines as $line) {
+                    $rows[] = [
+                        (string) $line['destination'],
+                        $line['account_name'] ?: $line['name'],
+                        (string) $line['currency'],
+                        $fx($line),
+                        $kes($line),
+                        rtrim(rtrim(number_format((float) $line['fx_rate'], 6, '.', ''), '0'), '.'),
+                        Partners::countryName((string) $line['country']),
+                        $ref($line),
+                        $narration,
+                    ];
+                }
+                break;
         }
 
         return ['headers' => $headers, 'rows' => $rows];
+    }
+
+    /**
+     * What the run withheld, per partner, for the tax return.
+     *
+     * KRA wants the partner identified and the deduction stated, so this
+     * is the shape of a withholding certificate schedule rather than of
+     * a payment file: who, what number they are known by, what they
+     * earned and what was held back.
+     *
+     * Only live lines. A held or failed line sent nothing, so it withheld
+     * nothing, and listing it would overstate the return.
+     *
+     * @return array{headers: list<string>, rows: list<list<string>>, total: float}
+     */
+    public static function withholdingParts(int $runId): array
+    {
+        $run = Database::first('SELECT * FROM payout_runs WHERE id = :id', ['id' => $runId]);
+
+        if (!$run) {
+            return ['headers' => [], 'rows' => [], 'total' => 0.0];
+        }
+
+        $lines = Database::all(
+            "SELECT l.*, p.name, p.company, p.partner_code, p.kra_pin, p.tax_id,
+                    p.country, p.tax_residency
+               FROM payout_lines l
+               JOIN partners p ON p.id = l.partner_id
+              WHERE l.run_id = :r
+                AND l.status IN ('pending', 'sent', 'settled')
+                AND l.withheld > 0
+           ORDER BY p.name",
+            ['r' => $runId]
+        );
+
+        $rows  = [];
+        $total = 0.0;
+
+        foreach ($lines as $line) {
+            $rows[] = [
+                $line['partner_code'] ?: ('P' . $line['partner_id']),
+                $line['company'] ?: $line['name'],
+                (string) ($line['kra_pin'] ?: $line['tax_id']),
+                Partners::countryName((string) $line['country']),
+                $line['tax_residency'] === 'non_resident' ? 'Non-resident' : 'Resident',
+                number_format((float) $line['amount'], 2, '.', ''),
+                rtrim(rtrim(number_format((float) $line['withholding_rate'], 2, '.', ''), '0'), '.'),
+                number_format((float) $line['withheld'], 2, '.', ''),
+                number_format((float) $line['net_amount'], 2, '.', ''),
+                (string) $run['period'],
+            ];
+
+            $total += (float) $line['withheld'];
+        }
+
+        return [
+            'headers' => ['Reference', 'Payee', 'Tax PIN / ID', 'Country', 'Residency',
+                          'Gross KES', 'Rate %', 'Withheld KES', 'Net KES', 'Period'],
+            'rows'    => $rows,
+            'total'   => round($total, 2),
+        ];
     }
 
     /** The same file as one string, for anything that is not a download. */

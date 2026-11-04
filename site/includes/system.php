@@ -376,6 +376,93 @@ function system_clients(bool $featuredOnly = false, int $limit = 60): array
     ], $rows);
 }
 
+/**
+ * The partner programme, as the system holds it.
+ *
+ * Read live rather than written into the page, for the same reason the
+ * prices are: the tiers, their thresholds and the benefits we promise
+ * are edited by an administrator under Partners → Tiers, and a website
+ * that keeps its own copy is a website that eventually advertises terms
+ * we stopped offering.
+ *
+ * Falls back to something sensible and true if the system is not there,
+ * because a programme page that 500s is worse than one with no table of
+ * tiers on it. The fallback promises nothing specific — it cannot, since
+ * the numbers live in the system.
+ *
+ * @return array{open:bool, international:bool, rate:float, headline:string,
+ *                intro:string, terms:string, currency:string,
+ *                countries:int, tiers:list<array<string,mixed>>,
+ *                markets:list<string>}
+ */
+function system_partner_programme(): array
+{
+    $fallback = [
+        'open'          => true,
+        'international' => true,
+        'rate'          => 10.0,
+        'headline'      => 'Sell what we build. Keep a share of every invoice your customer pays.',
+        'intro'         => 'We build business software and we print and brand. Partners bring '
+                         . 'us the customers who need it, in Kenya and beyond, and earn on that '
+                         . 'customer for as long as they stay with us.',
+        'terms'         => '',
+        'currency'      => 'KES',
+        'countries'     => 0,
+        'tiers'         => [],
+        'markets'       => [],
+    ];
+
+    if (!system_ready()) {
+        return $fallback;
+    }
+
+    try {
+        $get = static fn(string $key, string $default = ''): string => (string)
+            \App\Core\Settings::get($key, $default);
+
+        // Only the public tiers. A tier can be switched off on the
+        // website while partners sit on it — an arrangement we still
+        // honour but no longer advertise.
+        $tiers = [];
+
+        foreach (\App\Services\Partners::tiers(true) as $tier) {
+            $tiers[] = [
+                'code'     => (string) $tier['code'],
+                'name'     => (string) $tier['name'],
+                'rate'     => (float) $tier['default_rate'],
+                'from'     => (float) $tier['min_billed_12m'],
+                'benefits' => $tier['benefit_list'],
+            ];
+        }
+
+        // Where our partners actually are. A claim with a number behind
+        // it, rather than "we work internationally" said by everybody.
+        $markets = [];
+
+        foreach (\App\Services\Partners::byCountry() as $row) {
+            if ((int) $row['active'] > 0) {
+                $markets[] = \App\Services\Partners::countryName((string) $row['country']);
+            }
+        }
+
+        return [
+            'open'          => \App\Core\Settings::bool('partner_signup_enabled', true)
+                            && \App\Core\Settings::bool('partners_enabled', true),
+            'international' => \App\Core\Settings::bool('partner_international_enabled', true),
+            'rate'          => (float) \App\Core\Settings::get('partner_default_rate', 10),
+            'headline'      => $get('partner_programme_headline', $fallback['headline']),
+            'intro'         => $get('partner_programme_intro', $fallback['intro']),
+            'terms'         => $get('partner_terms', ''),
+            'currency'      => \App\Services\Partners::baseCurrency(),
+            'countries'     => count($markets),
+            'tiers'         => $tiers,
+            'markets'       => $markets,
+        ];
+    } catch (\Throwable) {
+        return $fallback;
+    }
+}
+
 function system_inventory(): array
 {
     $empty = ['categories' => [], 'products' => []];

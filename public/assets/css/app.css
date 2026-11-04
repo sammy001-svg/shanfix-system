@@ -767,6 +767,32 @@ code, kbd, pre { font-family: var(--mono); font-size: 12.5px; }
 }
 .chip--removable button { border: 0; background: none; cursor: pointer; color: var(--slate-500); padding: 0; line-height: 1; }
 
+/* Chips used as filters, on the partner list. A row of them reads as one
+   control, which is why the gap is here and not left to the page. The
+   active one is filled rather than outlined: at this size a border
+   change alone is not enough to tell which is on. */
+.chip-row { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+
+a.chip { text-decoration: none; transition: background .12s, border-color .12s, color .12s; }
+a.chip:hover { background: var(--surface-3, var(--surface-2)); border-color: var(--slate-400); color: var(--slate-900); }
+
+a.chip.is-active,
+.chip.is-active {
+  background: var(--navy-800);
+  border-color: var(--navy-800);
+  color: #fff;
+}
+a.chip.is-active:hover { background: var(--navy-700, var(--navy-800)); color: #fff; }
+
+.chip__count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .08);
+}
+.chip.is-active .chip__count { background: rgba(255, 255, 255, .22); }
+
 /* ---------------------------------------------------------------------
    Forms
    --------------------------------------------------------------------- */

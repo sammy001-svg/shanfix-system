@@ -14,6 +14,7 @@
 require_once APP_PATH . '/Views/partials/icons.php';
 
 use App\Core\Auth;
+use App\Services\Partners;
 
 $pending = $partner['status'] === 'pending';
 $rateOf  = static fn(float $r): string => rtrim(rtrim(number_format($r, 2), '0'), '.') . '%';
@@ -37,7 +38,14 @@ $tone = static fn(string $s): string => match ($s) {
 $tabUrl = static fn(string $k): string =>
     url('/partners-admin/' . (int) $partner['id'] . ($k !== 'overview' ? '?tab=' . $k : ''));
 
-$noPin = trim((string) $partner['kra_pin']) === '';
+// What is stopping them being paid, from the one place that knows. This
+// used to be "no KRA PIN", which was the only answer the module had and
+// is an answer a partner in Dubai can never satisfy.
+$blocked = $blockers !== [] && $partner['status'] === 'active';
+
+$countryName = Partners::countryName((string) $partner['country']);
+$currency    = (string) $partner['payout_currency'];
+$crossRate   = $currency !== Partners::baseCurrency() ? $fxRate : null;
 ?>
 
 <p class="text-sm mb-12">
@@ -54,10 +62,21 @@ $noPin = trim((string) $partner['kra_pin']) === '';
       <span class="badge badge--<?= e($tone((string) $partner['status'])) ?>">
         <?= e(label_of((string) $partner['status'])) ?>
       </span>
-      <?php if ($noPin && $partner['status'] === 'active'): ?>
-        <?php // Nobody can be paid without one, so it is said where the
-              // person who chases it will see it. ?>
-        <span class="badge badge--amber">No KRA PIN</span>
+      <?php // Where they are, next to the name. On a page that now holds
+            // partners on three continents, this is part of who they are
+            // rather than a detail further down. ?>
+      <?php if (!$isLocal): ?>
+        <span class="badge badge--blue"><?= e($countryName) ?></span>
+      <?php endif; ?>
+
+      <span class="badge badge--<?= $partner['tier'] === 'gold' ? 'amber' : 'grey' ?>">
+        <?= e(Partners::tierName((string) $partner['tier'])) ?>
+      </span>
+
+      <?php if ($blocked): ?>
+        <?php // Said where the person who chases it will see it, and said
+              // as the actual reason rather than as a guess. ?>
+        <span class="badge badge--amber">Cannot be paid</span>
       <?php endif; ?>
     </div>
 
@@ -76,9 +95,51 @@ $noPin = trim((string) $partner['kra_pin']) === '';
         <dt>ID number</dt><dd><?= e($partner['id_number']) ?></dd>
       <?php endif; ?>
 
+      <dt>Country</dt>
+      <dd>
+        <?= e($countryName) ?>
+        <?php if (!empty($partner['city'])): ?>
+          &middot; <?= e($partner['city']) ?>
+        <?php endif; ?>
+        <?php if ($isLocal): ?>
+          <span class="text-muted">(home market)</span>
+        <?php endif; ?>
+      </dd>
+
       <?php if (!empty($partner['office_location'])): ?>
         <dt>Works from</dt><dd><?= e($partner['office_location']) ?></dd>
       <?php endif; ?>
+
+      <?php if (!empty($partner['territory'])): ?>
+        <dt>Territory</dt><dd><?= e($partner['territory']) ?></dd>
+      <?php endif; ?>
+
+      <?php // Only worth showing when it is not ours, which is when
+            // somebody is about to ring them at the wrong hour. ?>
+      <?php if (!empty($partner['timezone']) && $partner['timezone'] !== date_default_timezone_get()): ?>
+        <dt>Their time</dt>
+        <dd>
+          <?php try {
+                  $theirs = new DateTime('now', new DateTimeZone((string) $partner['timezone']));
+                  echo e($theirs->format('H:i')) . ' <span class="text-muted">'
+                     . e($partner['timezone']) . '</span>';
+                } catch (Exception $e) {
+                  echo e((string) $partner['timezone']);
+                } ?>
+        </dd>
+      <?php endif; ?>
+
+      <dt>Type</dt>
+      <dd>
+        <?= e(ucfirst((string) $partner['partner_type'])) ?>
+        <span class="text-muted">
+          <?php // The labels read "Referral — introduces customers to us",
+                // and the tier badge above already says the first half.
+                $desc  = (string) (Partners::TYPES[$partner['partner_type']] ?? '');
+                $parts = explode('—', $desc, 2);
+                echo e(trim($parts[1] ?? $desc)); ?>
+        </span>
+      </dd>
 
       <dt>Email</dt>
       <dd><a href="mailto:<?= e($partner['email']) ?>"><?= e($partner['email']) ?></a></dd>
@@ -126,6 +187,50 @@ $noPin = trim((string) $partner['kra_pin']) === '';
     </div>
   </div>
 </div>
+
+<?php // ---- Everything stopping a payment, in one list ------------------
+      // Above the tabs for the same reason the pending decision is: it is
+      // work waiting on somebody. The whole list rather than the first
+      // problem, so it can be fixed in one conversation instead of four
+      // trips round the payout run. ?>
+<?php if ($blocked): ?>
+  <div class="alert alert--warning mb-16">
+    <div>
+      <strong>
+        <?= count($blockers) === 1 ? 'One thing is' : count($blockers) . ' things are' ?>
+        stopping <?= e($partner['name']) ?> being paid<?= $summary['due'] > 0.009
+          ? ', and they are owed ' . e(money($summary['due'], false)) : '' ?>.
+      </strong>
+      <ul class="mb-0 mt-4">
+        <?php foreach ($blockers as $problem): ?>
+          <li><?= e($problem) ?></li>
+        <?php endforeach; ?>
+      </ul>
+      <p class="text-xs mb-0 mt-8">
+        A payout run puts them in as a held line with the first of these
+        written on it, so nothing is lost — but nothing is sent either.
+      </p>
+    </div>
+  </div>
+<?php endif; ?>
+
+<?php // ---- Worth chasing, but it does not stop the money --------------
+      // Kept apart from the list above so that "cannot be paid" stays
+      // true when it is said. A partner with no tax number on file is
+      // paid perfectly well; somebody should still go and get it. ?>
+<?php if ($warnings && $partner['status'] === 'active'): ?>
+  <div class="alert alert--info mb-16">
+    <div>
+      <strong>Worth chasing.</strong>
+      None of this stops a payment going out.
+      <ul class="mb-0 mt-4">
+        <?php foreach ($warnings as $warning): ?>
+          <li><?= e($warning) ?></li>
+        <?php endforeach; ?>
+      </ul>
+    </div>
+  </div>
+<?php endif; ?>
 
 <?php // An application waiting on a decision is the only thing on this
       // page that is actually waiting on somebody, so it sits above the
@@ -341,9 +446,18 @@ $noPin = trim((string) $partner['kra_pin']) === '';
       // thing that stops a run, and it is invisible until payment day. ?>
 <?php
 $payMethod = (string) ($partner['pay_method'] ?? '');
-$payReady  = $payMethod === 'mpesa'
-    ? (trim((string) ($partner['pay_phone'] ?? '')) !== '' || trim((string) $partner['phone']) !== '')
-    : ($payMethod === 'bank' && trim((string) ($partner['bank_account_no'] ?? '')) !== '');
+
+// Asked of the one place that knows what each method needs, rather than
+// re-derived here. The view used to work this out itself and only knew
+// about M-Pesa and a Kenyan bank.
+$payProblems = Partners::destinationBlockers($partner);
+$payReady    = $payMethod !== '' && $payProblems === [];
+
+// A field set is shown for the chosen method and hidden for the others.
+// Hidden rather than absent, so switching method does not lose what has
+// already been typed into the form.
+$shows = static fn(array $methods): string
+    => in_array($payMethod, $methods, true) ? '' : ' hidden';
 ?>
 <div class="card">
   <div class="card__head">
@@ -351,7 +465,10 @@ $payReady  = $payMethod === 'mpesa'
     <?php if (!$payReady): ?>
       <span class="badge badge--red">Cannot be paid yet</span>
     <?php else: ?>
-      <span class="badge badge--green"><?= $payMethod === 'mpesa' ? 'M-Pesa' : 'Bank transfer' ?></span>
+      <span class="badge badge--green"><?= e(Partners::payMethodLabel($payMethod)) ?></span>
+      <?php if ($currency !== Partners::baseCurrency()): ?>
+        <span class="badge badge--blue">in <?= e($currency) ?></span>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 
@@ -359,35 +476,88 @@ $payReady  = $payMethod === 'mpesa'
     <div class="card__body text-sm">
       <?php if (!$payReady): ?>
         <span class="text-muted">
-          No payment details on file, so they cannot be included in a run.
-          Finance sets these.
+          <?= $payProblems ? e($payProblems[0]) . '.' : 'No payment details on file.' ?>
+          They cannot be included in a run. Finance sets these.
         </span>
-      <?php elseif ($payMethod === 'mpesa'): ?>
-        M-Pesa &middot; <?= e($partner['pay_phone'] ?: $partner['phone']) ?>
       <?php else: ?>
-        <?= e($partner['bank_name'] ?: 'Bank') ?>
-        <?= $partner['bank_branch'] ? '&middot; ' . e($partner['bank_branch']) : '' ?>
-        <div class="text-xs text-muted mt-4">
-          <?= e($partner['bank_account_name'] ?: '') ?>
-          <?= $partner['bank_account_no'] ? '&middot; ' . e($partner['bank_account_no']) : '' ?>
-        </div>
+        <?= e(Partners::payMethodLabel($payMethod)) ?>
+        <?php if ($payMethod === 'mpesa'): ?>
+          &middot; <?= e($partner['pay_phone'] ?: $partner['phone']) ?>
+        <?php elseif (in_array($payMethod, ['wise', 'paypal'], true)): ?>
+          &middot; <?= e($partner['pay_email']) ?>
+        <?php else: ?>
+          &middot; <?= e($partner['bank_name'] ?: 'Bank') ?>
+          <div class="text-xs text-muted mt-4">
+            <?= e($partner['bank_account_name'] ?: '') ?>
+            <?php // Never the full number to somebody without the pay
+                  // right: they can see that a destination exists, not
+                  // what it is. ?>
+            <?php $acc = (string) ($partner['bank_iban'] ?: $partner['bank_account_no']); ?>
+            <?php if ($acc !== ''): ?>
+              &middot; &hellip;<?= e(substr($acc, -4)) ?>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+        <div class="text-xs text-muted mt-4">Paid in <?= e($currency) ?>.</div>
       <?php endif; ?>
     </div>
   <?php else: ?>
     <div class="card__body">
-      <form method="post" action="<?= url('/partners-admin/' . (int) $partner['id'] . '/pay-details') ?>">
+      <form method="post" action="<?= url('/partners-admin/' . (int) $partner['id'] . '/pay-details') ?>"
+            id="payForm">
         <?= csrf_field() ?>
 
-        <div class="field">
-          <label class="label" for="pay_method">Method</label>
-          <select class="select" id="pay_method" name="pay_method">
-            <option value=""      <?= $payMethod === ''      ? 'selected' : '' ?>>Not set — cannot be paid</option>
-            <option value="mpesa" <?= $payMethod === 'mpesa' ? 'selected' : '' ?>>M-Pesa</option>
-            <option value="bank"  <?= $payMethod === 'bank'  ? 'selected' : '' ?>>Bank transfer</option>
-          </select>
+        <div class="grid-2">
+          <div class="field">
+            <label class="label" for="pay_method">Method</label>
+            <select class="select" id="pay_method" name="pay_method">
+              <option value="">Not set — cannot be paid</option>
+              <?php // Only what works from where we bank to where they
+                    // are. M-Pesa reaches Kenyan numbers and nowhere
+                    // else; a Kenyan bank file cannot address an account
+                    // in Dubai. Offering either abroad would just produce
+                    // a payment that fails days later. ?>
+              <?php foreach ($payMethods as $code => $label): ?>
+                <option value="<?= e($code) ?>" <?= $payMethod === $code ? 'selected' : '' ?>>
+                  <?= e($label) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <div class="field-hint">
+              <?= e($countryName) ?>, so these are the ways we can send it.
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label" for="payout_currency">Paid in</label>
+            <select class="select" id="payout_currency" name="payout_currency">
+              <?php foreach ($currencies as $code => $label): ?>
+                <option value="<?= e($code) ?>" <?= $currency === $code ? 'selected' : '' ?>>
+                  <?= e($code) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <div class="field-hint">
+              <?php if ($crossRate !== null): ?>
+                Converted at <?= e(Partners::baseCurrency()) ?>
+                <?= e(rtrim(rtrim(number_format((float) $crossRate, 6), '0'), '.')) ?>
+                per <?= e($currency) ?>, as at the day a run is built.
+                <a href="<?= url('/partners-admin/fx') ?>">Rates</a>.
+              <?php elseif ($currency !== Partners::baseCurrency()): ?>
+                <span class="text-red">
+                  No rate on file for <?= e($currency) ?> — a run will hold
+                  their line. <a href="<?= url('/partners-admin/fx') ?>">Enter one</a>.
+                </span>
+              <?php else: ?>
+                Commission is earned in <?= e(Partners::baseCurrency()) ?>, so
+                nothing is converted.
+              <?php endif; ?>
+            </div>
+          </div>
         </div>
 
-        <div class="field">
+        <?php // ---- M-Pesa ------------------------------------------- ?>
+        <div class="field pay-fields" data-for="mpesa"<?= $shows(['mpesa']) ?>>
           <label class="label" for="pay_phone">M-Pesa number</label>
           <input class="input" type="text" id="pay_phone" name="pay_phone" maxlength="30"
                  value="<?= e($partner['pay_phone'] ?? '') ?>"
@@ -399,27 +569,95 @@ $payReady  = $payMethod === 'mpesa'
           </div>
         </div>
 
-        <div class="grid-2">
-          <div class="field">
-            <label class="label" for="bank_name">Bank</label>
-            <input class="input" type="text" id="bank_name" name="bank_name" maxlength="120"
-                   value="<?= e($partner['bank_name'] ?? '') ?>">
+        <?php // ---- Wallets ------------------------------------------ ?>
+        <div class="field pay-fields" data-for="wise paypal"<?= $shows(['wise', 'paypal']) ?>>
+          <label class="label" for="pay_email">Payment address</label>
+          <input class="input" type="email" id="pay_email" name="pay_email" maxlength="160"
+                 value="<?= e($partner['pay_email'] ?? '') ?>"
+                 placeholder="<?= e($partner['email']) ?>">
+          <div class="field-hint">
+            The address the wallet is registered to, which is often not
+            the one they write to us from.
+          </div>
+        </div>
+
+        <?php // ---- A bank, local or not ----------------------------- ?>
+        <div class="pay-fields" data-for="bank wire"<?= $shows(['bank', 'wire']) ?>>
+          <div class="grid-2">
+            <div class="field">
+              <label class="label" for="bank_name">Bank</label>
+              <input class="input" type="text" id="bank_name" name="bank_name" maxlength="120"
+                     value="<?= e($partner['bank_name'] ?? '') ?>">
+            </div>
+            <div class="field">
+              <label class="label" for="bank_branch">Branch</label>
+              <input class="input" type="text" id="bank_branch" name="bank_branch" maxlength="120"
+                     value="<?= e($partner['bank_branch'] ?? '') ?>">
+            </div>
+            <div class="field">
+              <label class="label" for="bank_account_name">Account name</label>
+              <input class="input" type="text" id="bank_account_name" name="bank_account_name" maxlength="160"
+                     value="<?= e($partner['bank_account_name'] ?? '') ?>">
+              <div class="field-hint">As the bank holds it, which is not always the trading name.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="bank_account_no">Account number</label>
+              <input class="input" type="text" id="bank_account_no" name="bank_account_no" maxlength="40"
+                     value="<?= e($partner['bank_account_no'] ?? '') ?>">
+            </div>
+          </div>
+        </div>
+
+        <?php // ---- What only a wire needs --------------------------- ?>
+        <div class="pay-fields" data-for="wire"<?= $shows(['wire']) ?>>
+          <div class="grid-2">
+            <div class="field">
+              <label class="label" for="bank_swift">
+                SWIFT / BIC
+                <span class="label__hint">required — the wire cannot be addressed without it</span>
+              </label>
+              <input class="input" type="text" id="bank_swift" name="bank_swift" maxlength="20"
+                     style="text-transform:uppercase"
+                     value="<?= e($partner['bank_swift'] ?? '') ?>">
+            </div>
+            <div class="field">
+              <label class="label" for="bank_iban">IBAN</label>
+              <input class="input" type="text" id="bank_iban" name="bank_iban" maxlength="40"
+                     style="text-transform:uppercase"
+                     value="<?= e($partner['bank_iban'] ?? '') ?>">
+              <div class="field-hint">
+                Used in preference to the account number where there is one.
+              </div>
+            </div>
+            <div class="field">
+              <label class="label" for="bank_routing">
+                Routing code
+                <span class="label__hint">ABA, sort code, IFSC</span>
+              </label>
+              <input class="input" type="text" id="bank_routing" name="bank_routing" maxlength="40"
+                     value="<?= e($partner['bank_routing'] ?? '') ?>">
+            </div>
+            <div class="field">
+              <label class="label" for="bank_country">Where the account is</label>
+              <select class="select" id="bank_country" name="bank_country">
+                <option value="">Same as the partner</option>
+                <?php foreach ($countries as $code => $name): ?>
+                  <option value="<?= e($code) ?>"
+                          <?= ($partner['bank_country'] ?? '') === $code ? 'selected' : '' ?>>
+                    <?= e($name) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+              <div class="field-hint">Not always where the partner is.</div>
+            </div>
           </div>
           <div class="field">
-            <label class="label" for="bank_branch">Branch</label>
-            <input class="input" type="text" id="bank_branch" name="bank_branch" maxlength="120"
-                   value="<?= e($partner['bank_branch'] ?? '') ?>">
-          </div>
-          <div class="field">
-            <label class="label" for="bank_account_name">Account name</label>
-            <input class="input" type="text" id="bank_account_name" name="bank_account_name" maxlength="160"
-                   value="<?= e($partner['bank_account_name'] ?? '') ?>">
-            <div class="field-hint">As the bank holds it, which is not always the trading name.</div>
-          </div>
-          <div class="field">
-            <label class="label" for="bank_account_no">Account number</label>
-            <input class="input" type="text" id="bank_account_no" name="bank_account_no" maxlength="40"
-                   value="<?= e($partner['bank_account_no'] ?? '') ?>">
+            <label class="label" for="bank_address">Bank address</label>
+            <input class="input" type="text" id="bank_address" name="bank_address" maxlength="200"
+                   value="<?= e($partner['bank_address'] ?? '') ?>">
+            <div class="field-hint">
+              The branch address a correspondent bank asks for on the instruction.
+            </div>
           </div>
         </div>
 
@@ -432,9 +670,73 @@ $payReady  = $payMethod === 'mpesa'
           </span>
         </div>
       </form>
+
+      <?php // Only the fields the chosen method needs. Progressive: with
+            // no JavaScript every field set is visible and the form still
+            // saves, which is why the server checks the method too.
+            //
+            // The nonce is not optional: there is a Content-Security-Policy
+            // on every response, and an inline script without it is dropped
+            // in silence, which looks exactly like a script that does
+            // nothing. ?>
+      <script nonce="<?= e(csp_nonce()) ?>">
+        (function () {
+          var form = document.getElementById('payForm');
+          if (!form) { return; }
+
+          var select = form.querySelector('#pay_method');
+          var sets   = form.querySelectorAll('.pay-fields');
+
+          function sync() {
+            var chosen = select.value;
+            sets.forEach(function (set) {
+              var methods = (set.getAttribute('data-for') || '').split(' ');
+              set.hidden = methods.indexOf(chosen) === -1;
+            });
+          }
+
+          select.addEventListener('change', sync);
+          sync();
+        })();
+      </script>
     </div>
   <?php endif; ?>
 </div>
+
+<?php // ---- What is held back ------------------------------------------
+      // Shown whenever withholding is on, including at zero, because
+      // "nothing is withheld from this one" is a decision somebody made
+      // and should be able to see. ?>
+<?php if ($whtOn): ?>
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">Withholding</div>
+      <span class="badge badge--<?= $whtRate > 0 ? 'amber' : 'grey' ?>">
+        <?= e(rtrim(rtrim(number_format($whtRate, 2), '0'), '.')) ?>%
+      </span>
+    </div>
+    <div class="card__body text-sm">
+      <?php if ($whtRate > 0): ?>
+        <p class="mb-4">
+          <?= e(rtrim(rtrim(number_format($whtRate, 2), '0'), '.')) ?>% is
+          deducted from each payout and remitted to KRA on their behalf.
+          They still earn the gross — it is on their statement — and the
+          payout shows both figures.
+        </p>
+        <p class="text-xs text-muted mb-0">
+          <?= $partner['withholding_rate'] !== null
+              ? 'This is a rate set for this partner specifically, which is what a double taxation treaty needs.'
+              : 'From the ' . ($partner['tax_residency'] === 'non_resident' ? 'non-resident' : 'resident')
+                . ' rate in settings. A rate can be set for this partner alone on the Details tab.' ?>
+        </p>
+      <?php else: ?>
+        <p class="mb-0 text-muted">
+          Nothing is withheld from this partner. They are paid the gross.
+        </p>
+      <?php endif; ?>
+    </div>
+  </div>
+<?php endif; ?>
 
 <?php // Commission is paid monthly, so the ledger is read monthly. Each
       // month is settled on its own, which is what lets both sides
@@ -797,9 +1099,149 @@ $payReady  = $payMethod === 'mpesa'
                    value="<?= e($partner['phone']) ?>">
           </div>
           <div class="field">
-            <label class="label" for="kra_pin">KRA PIN</label>
+            <label class="label" for="country">Country</label>
+            <select class="select" id="country" name="country">
+              <?php foreach ($countries as $code => $name): ?>
+                <option value="<?= e($code) ?>" <?= $partner['country'] === $code ? 'selected' : '' ?>>
+                  <?= e($name) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <span class="field-hint">
+              Decides how they can be paid and what we have to withhold.
+            </span>
+          </div>
+          <div class="field">
+            <label class="label" for="city">City</label>
+            <input class="input" type="text" id="city" name="city" maxlength="90"
+                   value="<?= e($partner['city'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="timezone">Time zone</label>
+            <select class="select" id="timezone" name="timezone">
+              <option value="">Not set</option>
+              <?php foreach (timezone_identifiers_list() as $tz): ?>
+                <option value="<?= e($tz) ?>" <?= ($partner['timezone'] ?? '') === $tz ? 'selected' : '' ?>>
+                  <?= e($tz) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <span class="field-hint">So nobody rings them at three in the morning.</span>
+          </div>
+          <div class="field">
+            <label class="label" for="territory">Territory</label>
+            <input class="input" type="text" id="territory" name="territory" maxlength="140"
+                   value="<?= e($partner['territory'] ?? '') ?>"
+                   placeholder="e.g. Uganda and Rwanda">
+            <span class="field-hint">Where they may sell. Blank means no restriction.</span>
+          </div>
+          <div class="field">
+            <label class="label" for="partner_type">Type</label>
+            <select class="select" id="partner_type" name="partner_type">
+              <?php foreach (Partners::TYPES as $code => $desc): ?>
+                <option value="<?= e($code) ?>"
+                        <?= $partner['partner_type'] === $code ? 'selected' : '' ?>>
+                  <?= e($desc) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label" for="tier">Tier</label>
+            <select class="select" id="tier" name="tier">
+              <?php foreach ($tiers as $code => $t): ?>
+                <option value="<?= e($code) ?>" <?= $partner['tier'] === $code ? 'selected' : '' ?>>
+                  <?= e($t['name']) ?>
+                  (<?= e(rtrim(rtrim(number_format((float) $t['default_rate'], 2), '0'), '.')) ?>%)
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <span class="field-hint">
+              <?php // The tier they have earned against the one they are on.
+                    // Nothing moves on its own: a partner can be left at a
+                    // tier they have outgrown while a contract is sorted
+                    // out, and a quiet year does not demote anybody. ?>
+              <?php if ($earnedTier && $earnedTier['code'] !== $partner['tier']): ?>
+                <strong>Has earned <?= e($earnedTier['name']) ?></strong> on
+                <?= e(money($billed12m, false)) ?> billed in twelve months.
+              <?php else: ?>
+                <?= e(money($billed12m, false)) ?> billed in the last twelve months.
+              <?php endif; ?>
+            </span>
+          </div>
+          <div class="field">
+            <label class="label" for="kra_pin">
+              KRA PIN
+              <?php if (!$isLocal): ?>
+                <span class="label__hint">only if they have one</span>
+              <?php endif; ?>
+            </label>
             <input class="input" type="text" id="kra_pin" name="kra_pin" maxlength="30"
                    value="<?= e($partner['kra_pin']) ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="tax_id"><?= e($taxLabel) ?></label>
+            <input class="input" type="text" id="tax_id" name="tax_id" maxlength="40"
+                   value="<?= e($partner['tax_id'] ?? '') ?>">
+            <span class="field-hint">
+              What the authority where they are calls their tax number.
+            </span>
+          </div>
+          <div class="field">
+            <label class="label" for="tax_residency">Tax residency</label>
+            <select class="select" id="tax_residency" name="tax_residency">
+              <option value="resident" <?= $partner['tax_residency'] === 'resident' ? 'selected' : '' ?>>
+                Resident for Kenyan tax
+              </option>
+              <option value="non_resident" <?= $partner['tax_residency'] === 'non_resident' ? 'selected' : '' ?>>
+                Non-resident
+              </option>
+            </select>
+            <span class="field-hint">
+              <?php // Not the same question as the country, which is why it
+                    // is asked separately: a Kenyan-registered company owned
+                    // from abroad is resident, and a Kenyan who has moved
+                    // away is not. ?>
+              Not simply their country — a Kenyan-registered company owned
+              from abroad is still resident.
+            </span>
+          </div>
+          <div class="field">
+            <label class="label" for="withholding_rate">
+              Withholding
+              <span class="label__hint">blank = the rate for their residency</span>
+            </label>
+            <div class="input-group">
+              <input class="input" type="number" id="withholding_rate" name="withholding_rate"
+                     step="0.01" min="0" max="100"
+                     value="<?= $partner['withholding_rate'] === null ? '' : e(rtrim(rtrim(number_format((float) $partner['withholding_rate'], 2), '0'), '.')) ?>"
+                     placeholder="<?= e(rtrim(rtrim(number_format($whtRate, 2), '0'), '.')) ?>">
+              <span class="input-group__addon">%</span>
+            </div>
+            <span class="field-hint">
+              Set it only where a treaty gives this partner a rate of its
+              own. A typed 0 means withhold nothing, which is not the same
+              as leaving it blank.
+            </span>
+          </div>
+          <div class="field">
+            <label class="label" for="agreement_ref">Agreement reference</label>
+            <input class="input" type="text" id="agreement_ref" name="agreement_ref" maxlength="60"
+                   value="<?= e($partner['agreement_ref'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="agreement_signed_at">Signed on</label>
+            <input class="input" type="date" id="agreement_signed_at" name="agreement_signed_at"
+                   value="<?= e($partner['agreement_signed_at'] ?? '') ?>">
+          </div>
+          <div class="field">
+            <label class="label" for="agreement_expires_at">Runs until</label>
+            <input class="input" type="date" id="agreement_expires_at" name="agreement_expires_at"
+                   value="<?= e($partner['agreement_expires_at'] ?? '') ?>">
+            <span class="field-hint">
+              Blank means it does not expire. An expired agreement holds
+              the payout rather than paying against nothing.
+            </span>
           </div>
           <div class="field">
             <label class="label" for="rate">Commission rate</label>

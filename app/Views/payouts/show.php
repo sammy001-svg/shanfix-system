@@ -95,6 +95,34 @@ $waiting = $counts['pending'] + $counts['sent'];
   </div>
 </div>
 
+<?php // Only shown when the run actually withheld something, so a run of
+      // Kenyan partners with withholding switched off looks exactly as it
+      // did before any of this existed.
+      $withheld = (float) ($run['withheld_total'] ?? 0); ?>
+<?php if ($withheld > 0.009): ?>
+  <div class="card mb-16">
+    <div class="card__body">
+      <div class="row-form justify-between">
+        <div>
+          <h3 class="mb-4">Withholding tax</h3>
+          <p class="text-sm text-muted mb-0">
+            <?= e(money($withheld, false)) ?> deducted from this run and
+            owed to KRA. The partners earned the gross; this is the part
+            we remit on their behalf, and each of them can see it on
+            their own statement.
+          </p>
+        </div>
+        <?php if ($canPay): ?>
+          <a class="btn btn--outline"
+             href="<?= url('/payouts/' . (int) $run['id'] . '/export/withholding') ?>">
+            <?= icon('download') ?> Withholding schedule
+          </a>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
 <?php // ---- What to do next, in the order it happens ------------------- ?>
 <?php if ($canPay && $status !== 'closed'): ?>
   <div class="card">
@@ -114,20 +142,24 @@ $waiting = $counts['pending'] + $counts['sent'];
 
       <?php else: ?>
         <p class="text-sm">
-          Download the file for each method, upload it to the bank or the
-          M-Pesa portal, then say it has gone.
+          Download the file for each method, upload it to the bank, the
+          M-Pesa portal or the wallet, then say it has gone. Each file
+          carries the <strong>net</strong> — what is actually sent — and
+          the reference the settlement comes back under.
         </p>
         <div class="row-form">
-          <?php if ($pending['mpesa'] > 0): ?>
-            <a class="btn btn--outline" href="<?= url('/payouts/' . (int) $run['id'] . '/export/mpesa') ?>">
-              <?= icon('download') ?> M-Pesa file (<?= (int) $pending['mpesa'] ?>)
-            </a>
-          <?php endif; ?>
-          <?php if ($pending['bank'] > 0): ?>
-            <a class="btn btn--outline" href="<?= url('/payouts/' . (int) $run['id'] . '/export/bank') ?>">
-              <?= icon('download') ?> Bank file (<?= (int) $pending['bank'] ?>)
-            </a>
-          <?php endif; ?>
+          <?php // One button per method that has something waiting. Written
+                // as a loop rather than two hard-coded buttons, so adding a
+                // way to pay somebody does not mean remembering this view. ?>
+          <?php foreach ($pending as $method => $n): ?>
+            <?php if ($n > 0): ?>
+              <a class="btn btn--outline"
+                 href="<?= url('/payouts/' . (int) $run['id'] . '/export/' . $method) ?>">
+                <?= icon('download') ?>
+                <?= e(\App\Services\Partners::payMethodLabel($method)) ?> file (<?= (int) $n ?>)
+              </a>
+            <?php endif; ?>
+          <?php endforeach; ?>
 
           <?php if ($status === 'approved'): ?>
             <form method="post" action="<?= url('/payouts/' . (int) $run['id'] . '/sent') ?>">
