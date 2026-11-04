@@ -779,6 +779,98 @@ has "with room to spare"        "$CSS" ".mega-menu.is-nudged"
 has "a dropdown does not close the drawer" "$JS" "classList.contains('nav-item-dropdown')"
 
 echo ""
+echo ""
+echo "=== 19. The partner programme page ==="
+
+PP=$(get /partners.php)
+
+eq  "the page is served"          "$(scode /partners.php)" "200"
+has "and it is the right one"     "$PP" "Partner Programme"
+has "with its own stylesheet"     "$PP" "partners-programme.css"
+eq  "the stylesheet is served"    "$(scode /partners-programme.css)" "200"
+eq  "as CSS, not as a 404 page"   "$(ctype /partners-programme.css)" "text/css"
+
+# Under Company, which is where somebody looks for it — next to About
+# and Contact rather than among the things we sell.
+has "it is in the Company menu"   "$(get /)" "partners.php"
+has "and in the footer"           "$(get /)" "Partner Programme"
+has "and in the sitemap"          "$(get /sitemap.xml)" "/partners.php"
+
+# The page applies through the system's own form rather than carrying a
+# second copy of it. One application path, one set of validation.
+has "applying goes to the system" "$PP" "/partners/apply"
+eq  "and that form is there"      "$(scode /partners/apply)" "200"
+
+echo ""
+echo "--- Its numbers come from the system, not from the page ---"
+
+# A tier's rate, moved in the database, has to reach the website. This
+# is the whole reason the page reads through the seam.
+WAS_RATE=$($MYSQL -N -e "SELECT default_rate FROM partner_tiers WHERE code='gold';")
+WAS_NAME=$($MYSQL -N -e "SELECT name FROM partner_tiers WHERE code='gold';")
+WAS_PUB=$($MYSQL -N -e "SELECT is_public FROM partner_tiers WHERE code='gold';")
+
+$MYSQL -e "UPDATE partner_tiers SET default_rate = 23.50, name = 'Platinum WEBTEST'
+            WHERE code = 'gold';"
+
+PP=$(get /partners.php)
+has "a changed rate reaches the page"  "$PP" "23.5%"
+has "and so does a changed name"       "$PP" "Platinum WEBTEST"
+
+# The hero quotes the top rate. It is read from the tiers rather than
+# typed, so raising the top tier raises what the page promises.
+has "the headline figure follows it"   "$PP" "Top commission rate"
+
+# A tier switched off is an arrangement we still honour and no longer
+# advertise, so it must leave the website and nothing else.
+$MYSQL -e "UPDATE partner_tiers SET is_public = 0 WHERE code = 'gold';"
+PP=$(get /partners.php)
+
+case "$PP" in
+  *"Platinum WEBTEST"*) bad "an unpublished tier leaves the page" "still shown" "gone" ;;
+  *)                    ok  "an unpublished tier leaves the page" "gone" ;;
+esac
+
+has "while the others stay"            "$PP" "Registered"
+
+$MYSQL -e "UPDATE partner_tiers
+              SET default_rate = $WAS_RATE, name = '$WAS_NAME', is_public = $WAS_PUB
+            WHERE code = 'gold';"
+
+eq "the tier is put back" "$($MYSQL -N -e "SELECT name FROM partner_tiers WHERE code='gold';")" "$WAS_NAME"
+
+echo ""
+echo "--- Closing the programme closes the page's buttons ---"
+
+# Not a 404: the page still explains the programme, it just stops
+# inviting applications, because somebody who arrives from a search
+# result should still learn what it is.
+$MYSQL -e "UPDATE settings SET setting_value='0' WHERE setting_key='partner_signup_enabled';"
+PP=$(get /partners.php)
+
+eq  "the page still serves"        "$(scode /partners.php)" "200"
+has "and still explains itself"    "$PP" "commission"
+
+case "$PP" in
+  *"/partners/apply"*) bad "but stops inviting applications" "still asking" "no apply link" ;;
+  *)                   ok  "but stops inviting applications" "no apply link" ;;
+esac
+
+has "pointing at contact instead"  "$PP" "contact.php?service=Partner"
+
+$MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key='partner_signup_enabled';"
+eq "applications are open again" "$($MYSQL -N -e "SELECT setting_value FROM settings WHERE setting_key='partner_signup_enabled';")" "1"
+
+echo ""
+echo "--- The page survives the system being gone ---"
+
+# The seam is best effort everywhere else and has to be here too: a
+# marketing page that 500s because the business system is down is worse
+# than one with no tier table on it.
+has "a fallback headline exists"   "$(cat "$ROOT/site/includes/system.php")" "system_partner_programme"
+has "and it cannot throw"          "$(cat "$ROOT/site/includes/system.php")" "catch (\Throwable)"
+
+echo ""
 echo "=== 17. Deployment keeps what the server owns ==="
 # --delete would otherwise take the site's credentials and anything
 # uploaded through its admin with it on the next deployment.

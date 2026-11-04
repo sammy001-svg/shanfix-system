@@ -446,8 +446,24 @@ class PartnerAdminController extends Controller
         // payment that fails at the bank days later.
         $allowed = Partners::payMethodsFor($country);
 
-        $method = (string) $request->input('pay_method');
-        $method = isset($allowed[$method]) ? $method : null;
+        // "None" and "something we cannot use" are different answers and
+        // must not be treated alike. Blank is a deliberate choice to have
+        // no method; anything else that is not in the list is a mistake,
+        // and quietly storing null for it would wipe a perfectly good
+        // destination — which is exactly what happens when a partner's
+        // country is changed and somebody then saves this form.
+        $chosen = trim((string) $request->input('pay_method'));
+
+        if ($chosen !== '' && !isset($allowed[$chosen])) {
+            Session::error(sprintf(
+                '%s cannot be used for a partner in %s. Nothing was changed.',
+                Partners::payMethodLabel($chosen),
+                Partners::countryName($country)
+            ));
+            Response::to('/partners-admin/' . $partner['id'] . '?tab=money');
+        }
+
+        $method = $chosen === '' ? null : $chosen;
 
         $v = new Validator($request->all());
         $v->maxLen('pay_phone', 30, 'M-Pesa number')

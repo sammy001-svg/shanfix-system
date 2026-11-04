@@ -916,6 +916,246 @@ $MYSQL -e "DELETE FROM users WHERE email='pratesales@shanfix.co.ke';
            DELETE FROM inventory_items WHERE sku='RATE-PRD';"
 
 echo ""
+echo ""
+echo "=== 34. A partner outside Kenya ==="
+
+# The module assumed Kenya in five places and each one stopped an
+# overseas partner dead. This builds one in Uganda, paid by wire in
+# dollars, and follows the money all the way to the file the bank gets.
+
+IEMAIL="ptest.intl@example.co.ke"
+$MYSQL -e "DELETE FROM partners WHERE email = '$IEMAIL';"
+
+$MYSQL -e "INSERT INTO partners
+             (partner_code, first_name, last_name, name, company, email, phone,
+              country, city, tax_id, tax_id_label, tax_residency,
+              partner_type, tier, default_rate, payout_currency,
+              pay_method, bank_name, bank_account_name, bank_account_no,
+              bank_swift, bank_country, status)
+           VALUES
+             ('PTEST-INTL', 'Joseph', 'Okello', 'Joseph Okello', 'PTEST Pearl Ltd',
+              '$IEMAIL', '+256771000999',
+              'UG', 'Kampala', 'UG999888777', 'TIN', 'non_resident',
+              'reseller', 'silver', 15.00, 'USD',
+              'wire', 'Stanbic Uganda', 'PTEST Pearl Ltd', '9030009999',
+              'SBICUGKX', 'UG', 'active');"
+
+IPID=$(q "SELECT id FROM partners WHERE email = '$IEMAIL';")
+
+eq "the partner exists"     "$(q "SELECT country FROM partners WHERE id = $IPID;")" "UG"
+eq "paid by wire, not M-Pesa" "$(q "SELECT pay_method FROM partners WHERE id = $IPID;")" "wire"
+eq "and in dollars"         "$(q "SELECT payout_currency FROM partners WHERE id = $IPID;")" "USD"
+
+signin_admin
+JAR="$D/jar_admin.txt"
+eq "their page opens"       "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$BASE/partners-admin/$IPID")" "200"
+PAGE=$(page "/partners-admin/$IPID")
+has "and says where they are" "$PAGE" "Uganda"
+
+echo ""
+echo "--- A rate nobody has entered holds the line, it does not guess ---"
+
+# Converting at a rate we were never given would mean inventing the
+# amount. The run must refuse rather than estimate.
+$MYSQL -e "DELETE FROM fx_rates WHERE currency = 'USD';"
+
+BLOCK=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  $p = App\Core\Database::first("SELECT * FROM partners WHERE id = :i", ["i" => (int) $argv[1]]);
+  echo implode(" | ", App\Services\Partners::blockers($p));
+' "$IPID")
+
+has "no rate means no payment" "$BLOCK" "No exchange rate on file for USD"
+
+# And with one, they are payable.
+$PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  App\Services\Partners::setFxRate("USD", 129.45, date("Y-m-d"), "PTEST");
+' > /dev/null
+
+BLOCK=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  $p = App\Core\Database::first("SELECT * FROM partners WHERE id = :i", ["i" => (int) $argv[1]]);
+  echo implode(" | ", App\Services\Partners::blockers($p)) ?: "payable";
+' "$IPID")
+
+eq "with a rate, they are payable" "$BLOCK" "payable"
+
+echo ""
+echo "--- A missing tax number is chased, not a blocked payment ---"
+
+# It has never stopped a payment and must not start: making it a hard
+# gate would strand partners who are paid perfectly well today.
+$MYSQL -e "UPDATE partners SET tax_id = NULL WHERE id = $IPID;"
+
+RES=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  $p = App\Core\Database::first("SELECT * FROM partners WHERE id = :i", ["i" => (int) $argv[1]]);
+  echo (App\Services\Partners::blockers($p) === [] ? "payable" : "blocked")
+     . " / " . (App\Services\Partners::complianceWarnings($p) ? "warned" : "silent");
+' "$IPID")
+
+eq "still payable, but flagged" "$RES" "payable / warned"
+$MYSQL -e "UPDATE partners SET tax_id = 'UG999888777' WHERE id = $IPID;"
+
+echo ""
+echo "--- The methods offered are the ones that would actually work ---"
+
+# M-Pesa reaches Kenyan numbers from our paybill and nowhere else, and a
+# Kenyan bank file cannot address an account in Kampala. Offering either
+# abroad only produces a payment that fails days later.
+METHODS=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  echo implode(",", array_keys(App\Services\Partners::payMethodsFor($argv[1])));
+' UG)
+
+eq "abroad: wire, Wise, PayPal"  "$METHODS" "wire,wise,paypal"
+
+METHODS=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  echo implode(",", array_keys(App\Services\Partners::payMethodsFor($argv[1])));
+' KE)
+
+eq "at home: M-Pesa and the bank" "$METHODS" "mpesa,bank"
+
+# And finance cannot set one that does not apply, even by posting it.
+T=$(tok "/partners-admin/$IPID?tab=money")
+post "/partners-admin/$IPID/pay-details" \
+  --data-urlencode "_token=$T" \
+  --data-urlencode "pay_method=mpesa" \
+  --data-urlencode "pay_phone=0712000000" > /dev/null
+
+ne "M-Pesa is refused for Uganda" "$(q "SELECT pay_method FROM partners WHERE id = $IPID;")" "mpesa"
+# And refused means refused: the wire they were already on must survive.
+# Storing null instead would silently strip a working destination, which
+# is what happens the moment somebody edits a partner's country and then
+# saves this form.
+eq "and the wire it replaced survives" "$(q "SELECT pay_method FROM partners WHERE id = $IPID;")" "wire"
+
+echo ""
+echo "--- Their phone is kept as their own country's ---"
+
+# normalize_phone() only knows Kenya and turns anything else into a
+# Kenyan number that reaches a stranger.
+E164=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  echo App\Services\Partners::e164($argv[1], $argv[2]);
+' "0771000999" "UG")
+
+eq "0771… in Uganda is +256"  "$E164" "+256771000999"
+
+E164=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  echo App\Services\Partners::e164($argv[1], $argv[2]);
+' "0712345678" "KE")
+
+eq "and 0712… here is still +254" "$E164" "+254712345678"
+
+echo ""
+echo "=== 35. Withholding comes off the payment, never off the ledger ==="
+
+# A commission earned is the gross the partner earned. Tax deducted and
+# remitted on their behalf is a fact about the PAYMENT. Keeping it off
+# the ledger is what lets a partner's statement stay honest about what
+# they earned, and what keeps the ledger derivable from the payments
+# we actually received.
+
+WHT_BEFORE=$(q "SELECT setting_value FROM settings WHERE setting_key='partner_withholding_enabled';")
+
+$MYSQL -e "UPDATE settings SET setting_value='1' WHERE setting_key='partner_withholding_enabled';
+           UPDATE settings SET setting_value='20' WHERE setting_key='partner_wht_non_resident';"
+
+SPLIT=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  App\Core\Settings::flush();
+  $p = App\Core\Database::first("SELECT * FROM partners WHERE id = :i", ["i" => (int) $argv[1]]);
+  $s = App\Services\Partners::split(100000.0, $p);
+  echo $s["rate"] . "/" . $s["withheld"] . "/" . $s["net"];
+' "$IPID")
+
+eq "a non-resident is withheld at 20%" "$SPLIT" "20/20000/80000"
+
+# A treaty can set a rate for one country that is not the general one,
+# and no table in the system knows every treaty Kenya has signed — so a
+# rate on the partner wins.
+$MYSQL -e "UPDATE partners SET withholding_rate = 7.50 WHERE id = $IPID;"
+
+SPLIT=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  App\Core\Settings::flush();
+  $p = App\Core\Database::first("SELECT * FROM partners WHERE id = :i", ["i" => (int) $argv[1]]);
+  $s = App\Services\Partners::split(100000.0, $p);
+  echo $s["rate"] . "/" . $s["withheld"] . "/" . $s["net"];
+' "$IPID")
+
+eq "a treaty rate beats the default" "$SPLIT" "7.5/7500/92500"
+
+# Zero typed is an instruction; blank is the absence of one. They are
+# different answers, which is why the column is nullable.
+$MYSQL -e "UPDATE partners SET withholding_rate = 0 WHERE id = $IPID;"
+
+SPLIT=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  App\Core\Settings::flush();
+  $p = App\Core\Database::first("SELECT * FROM partners WHERE id = :i", ["i" => (int) $argv[1]]);
+  $s = App\Services\Partners::split(100000.0, $p);
+  echo $s["withheld"];
+' "$IPID")
+
+eq "a typed zero withholds nothing" "$SPLIT" "0"
+$MYSQL -e "UPDATE partners SET withholding_rate = NULL WHERE id = $IPID;"
+
+echo ""
+echo "--- Switched off, nothing is deducted from anybody ---"
+
+# The migration ships it off on purpose: applying an upgrade must not
+# change what partners are paid.
+$MYSQL -e "UPDATE settings SET setting_value='0' WHERE setting_key='partner_withholding_enabled';"
+
+SPLIT=$($PHP -r '
+  require getenv("SHANFIX_ROOT") . "/app/bootstrap.php";
+  App\Core\Config::load(CONFIG_PATH . "/config.php");
+  App\Core\Database::connect(App\Core\Config::get("db"));
+  App\Core\Settings::flush();
+  $p = App\Core\Database::first("SELECT * FROM partners WHERE id = :i", ["i" => (int) $argv[1]]);
+  $s = App\Services\Partners::split(100000.0, $p);
+  echo $s["withheld"] . "/" . $s["net"];
+' "$IPID")
+
+eq "off means off" "$SPLIT" "0/100000"
+
+$MYSQL -e "UPDATE settings SET setting_value='$WHT_BEFORE'
+            WHERE setting_key='partner_withholding_enabled';"
+
+echo ""
+echo "=== 36. Tidy up after the overseas partner ==="
+$MYSQL -e "DELETE FROM payout_lines WHERE partner_id = $IPID;
+           DELETE FROM commissions WHERE partner_id = $IPID;
+           DELETE FROM partners WHERE email = '$IEMAIL';
+           DELETE FROM fx_rates WHERE source = 'PTEST';"
+
+eq "the overseas partner is gone" "$(q "SELECT COUNT(*) FROM partners WHERE email='$IEMAIL';")" "0"
+eq "withholding is as it was"     "$(q "SELECT setting_value FROM settings WHERE setting_key='partner_withholding_enabled';")" "$WHT_BEFORE"
+
+echo ""
 echo "=== 14. Tidy up ==="
 scrub
 restore_settings
