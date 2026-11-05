@@ -55,136 +55,152 @@ $crossRate   = $currency !== Partners::baseCurrency() ? $fxRate : null;
 <?php // Who this is, what we owe them, and who looks after them — before
       // any of the detail, because those are the three things somebody
       // opens a partner to find out. ?>
-<div class="card partner-head">
-  <div class="partner-head__id">
-    <div class="partner-head__name">
-      <h1><?= e($partner['company'] ?: $partner['name']) ?></h1>
-      <span class="badge badge--<?= e($tone((string) $partner['status'])) ?>">
-        <?= e(label_of((string) $partner['status'])) ?>
-      </span>
-      <?php // Where they are, next to the name. On a page that now holds
-            // partners on three continents, this is part of who they are
-            // rather than a detail further down. ?>
-      <?php if (!$isLocal): ?>
-        <span class="badge badge--blue"><?= e($countryName) ?></span>
-      <?php endif; ?>
+<?php // Who this is, what we owe them, and who looks after them — before
+      // any of the detail, because those are the three things somebody
+      // opens a partner to find out.
+      //
+      // This was a heading, three badges and an eleven-row definition
+      // list down one narrow column. Same facts, read as a grid, led by
+      // a monogram and the tier so a partner is recognisable before a
+      // word of it is read.
+      require_once APP_PATH . '/Views/partials/partner_bits.php'; ?>
 
-      <span class="badge badge--<?= $partner['tier'] === 'gold' ? 'amber' : 'grey' ?>">
-        <?= e(Partners::tierName((string) $partner['tier'])) ?>
-      </span>
+<div class="pnr-hero">
+  <div class="pnr-hero__who">
+    <?= partner_mark($partner, 'lg') ?>
 
-      <?php if ($blocked): ?>
-        <?php // Said where the person who chases it will see it, and said
-              // as the actual reason rather than as a guess. ?>
-        <span class="badge badge--amber">Cannot be paid</span>
-      <?php endif; ?>
-    </div>
+    <div class="pnr-hero__text">
+      <h1 class="pnr-hero__name"><?= e($partner['company'] ?: $partner['name']) ?></h1>
 
-    <dl class="partner-head__facts">
-      <?php if ($partner['company']): ?>
-        <dt>Contact</dt><dd><?= e($partner['name']) ?></dd>
-      <?php endif; ?>
-
-      <?php if (!empty($partner['occupation'])): ?>
-        <dt>Occupation</dt><dd><?= e($partner['occupation']) ?></dd>
-      <?php endif; ?>
-
-      <?php // Shown next to the name on purpose: these are the two things
-            // checked against each other before money is sent. ?>
-      <?php if (!empty($partner['id_number'])): ?>
-        <dt>ID number</dt><dd><?= e($partner['id_number']) ?></dd>
-      <?php endif; ?>
-
-      <dt>Country</dt>
-      <dd>
-        <?= e($countryName) ?>
-        <?php if (!empty($partner['city'])): ?>
-          &middot; <?= e($partner['city']) ?>
+      <div class="pnr-hero__sub">
+        <?php if ($partner['company']): ?>
+          <?= e($partner['name']) ?> &middot;
         <?php endif; ?>
-        <?php if ($isLocal): ?>
-          <span class="text-muted">(home market)</span>
+        <?= e($countryName) ?><?php if (!empty($partner['city'])): ?>, <?= e($partner['city']) ?><?php endif; ?>
+        <?php if ($partner['partner_code']): ?>
+          &middot; <?= e($partner['partner_code']) ?>
         <?php endif; ?>
-      </dd>
+      </div>
 
-      <?php if (!empty($partner['office_location'])): ?>
-        <dt>Works from</dt><dd><?= e($partner['office_location']) ?></dd>
-      <?php endif; ?>
-
-      <?php if (!empty($partner['territory'])): ?>
-        <dt>Territory</dt><dd><?= e($partner['territory']) ?></dd>
-      <?php endif; ?>
-
-      <?php // Only worth showing when it is not ours, which is when
-            // somebody is about to ring them at the wrong hour. ?>
-      <?php if (!empty($partner['timezone']) && $partner['timezone'] !== date_default_timezone_get()): ?>
-        <dt>Their time</dt>
-        <dd>
-          <?php try {
-                  $theirs = new DateTime('now', new DateTimeZone((string) $partner['timezone']));
-                  echo e($theirs->format('H:i')) . ' <span class="text-muted">'
-                     . e($partner['timezone']) . '</span>';
-                } catch (Exception $e) {
-                  echo e((string) $partner['timezone']);
-                } ?>
-        </dd>
-      <?php endif; ?>
-
-      <dt>Type</dt>
-      <dd>
-        <?= e(ucfirst((string) $partner['partner_type'])) ?>
-        <span class="text-muted">
-          <?php // The labels read "Referral — introduces customers to us",
-                // and the tier badge above already says the first half.
-                $desc  = (string) (Partners::TYPES[$partner['partner_type']] ?? '');
-                $parts = explode('—', $desc, 2);
-                echo e(trim($parts[1] ?? $desc)); ?>
+      <div class="pnr-hero__tags">
+        <span class="badge badge--<?= e($tone((string) $partner['status'])) ?>">
+          <?= e(label_of((string) $partner['status'])) ?>
         </span>
-      </dd>
 
-      <dt>Email</dt>
-      <dd><a href="mailto:<?= e($partner['email']) ?>"><?= e($partner['email']) ?></a></dd>
+        <?= partner_tier_pill((string) $partner['tier']) ?>
 
-      <dt>Phone</dt>
-      <dd><a href="tel:<?= e(preg_replace('/[^0-9+]/', '', (string) $partner['phone'])) ?>"><?= e($partner['phone']) ?></a></dd>
+        <span class="badge badge--grey"><?= e(ucfirst((string) $partner['partner_type'])) ?></span>
 
-      <?php if ($partner['partner_code']): ?>
-        <dt>Reference</dt><dd><?= e($partner['partner_code']) ?></dd>
-      <?php endif; ?>
-
-      <dt>Rate</dt>
-      <dd><?= e($rateOf((float) $partner['default_rate'])) ?>
-        <span class="text-muted">unless a service carries its own</span></dd>
-
-      <dt>Looked after by</dt>
-      <dd>
-        <?php if ($managerName !== ''): ?>
-          <?= e($managerName) ?>
-          <?php if ($partner['assigned_at']): ?>
-            <span class="text-muted">since <?= e(fdate($partner['assigned_at'])) ?></span>
-          <?php endif; ?>
-        <?php else: ?>
-          <span class="text-muted">Nobody yet</span>
+        <?php // Only when it is not ours — at home it is noise. ?>
+        <?php if (!$isLocal): ?>
+          <span class="badge badge--blue">Paid in <?= e($currency) ?></span>
         <?php endif; ?>
-      </dd>
 
-      <dt>With us since</dt>
-      <dd><?= e(fdate($partner['created_at'])) ?></dd>
-    </dl>
+        <?php if ($blocked): ?>
+          <?php // Said where the person who chases it will see it, and
+                // said as the actual reason rather than as a guess. ?>
+          <span class="badge badge--amber">Cannot be paid</span>
+        <?php endif; ?>
+      </div>
+    </div>
   </div>
 
-  <div class="partner-head__money">
-    <div class="stat <?= $summary['due'] > 0.009 ? 'stat--amber' : '' ?>">
-      <div class="stat__value"><?= e(money($summary['due'], false)) ?></div>
-      <div class="stat__label">Owed to them</div>
-    </div>
-    <div class="stat stat--green">
-      <div class="stat__value"><?= e(money($summary['paid'], false)) ?></div>
-      <div class="stat__label">Paid out</div>
-    </div>
-    <div class="stat stat--navy">
-      <div class="stat__value"><?= (int) $summary['clients'] ?></div>
-      <div class="stat__label">Customers</div>
-    </div>
+  <?php // Three figures, each with the line that gives it meaning. ?>
+  <div class="pnr-metrics">
+    <?= partner_metric(
+          money($summary['due'], false),
+          'Owed to them',
+          $summary['due'] > 0.009 ? 'Earned and not yet paid out' : 'Nothing outstanding',
+          'owed'
+        ) ?>
+    <?= partner_metric(
+          money($summary['paid'], false),
+          'Paid out',
+          $lastPaid !== null ? 'Last on ' . fdate($lastPaid) : 'Nothing sent yet',
+          'paid'
+        ) ?>
+    <?= partner_metric(
+          (string) (int) $summary['clients'],
+          ((int) $summary['clients']) === 1 ? 'Customer' : 'Customers',
+          $billed12m > 0.009
+              ? money($billed12m, false) . ' billed in 12 months'
+              : 'None introduced yet',
+          'people'
+        ) ?>
+  </div>
+
+  <?php // How far to the next tier, then the rest of the facts. Both
+        // span the full width: the tier bar is about the partner as a
+        // whole, not about the metrics beside it. ?>
+  <div style="grid-column:1/-1">
+    <?= partner_climb($billed12m, (string) $partner['tier']) ?>
+
+    <dl class="pnr-facts">
+      <?php
+      /* Built as a list so the grid stays even and a missing value never
+         leaves a hole where a column should be. */
+      $facts = [];
+
+      if (!empty($partner['occupation'])) {
+          $facts['Occupation'] = e($partner['occupation']);
+      }
+
+      $facts['Email'] = '<a href="mailto:' . e($partner['email']) . '">'
+                      . e($partner['email']) . '</a>';
+
+      $facts['Phone'] = '<a href="tel:'
+                      . e(preg_replace('/[^0-9+]/', '', (string) $partner['phone'])) . '">'
+                      . e($partner['phone']) . '</a>';
+
+      $facts['Rate'] = e($rateOf((float) $partner['default_rate']))
+                     . ' <span class="text-muted">unless a service carries its own</span>';
+
+      if (!empty($partner['territory'])) {
+          $facts['Territory'] = e($partner['territory']);
+      }
+
+      if (!empty($partner['office_location'])) {
+          $facts['Works from'] = e($partner['office_location']);
+      }
+
+      if (!empty($partner['id_number'])) {
+          $facts['ID number'] = e($partner['id_number']);
+      }
+
+      /* Only worth showing when it is not ours, which is exactly when
+         somebody is about to ring them at the wrong hour. */
+      if (!empty($partner['timezone']) && $partner['timezone'] !== date_default_timezone_get()) {
+          try {
+              $theirs = new DateTime('now', new DateTimeZone((string) $partner['timezone']));
+              $facts['Their time'] = e($theirs->format('H:i'))
+                                   . ' <span class="text-muted">' . e($partner['timezone']) . '</span>';
+          } catch (Exception $e) {
+              $facts['Their time'] = e((string) $partner['timezone']);
+          }
+      }
+
+      $facts['Looked after by'] = $managerName !== ''
+          ? e($managerName) . ($partner['assigned_at']
+              ? ' <span class="text-muted">since ' . e(fdate($partner['assigned_at'])) . '</span>'
+              : '')
+          : '<span class="text-muted">Nobody yet</span>';
+
+      $facts['With us since'] = e(fdate($partner['created_at']));
+
+      if (!empty($partner['agreement_expires_at'])) {
+          $expired = $partner['agreement_expires_at'] < date('Y-m-d');
+          $facts['Agreement until'] = ($expired ? '<span class="text-red">' : '')
+                                    . e(fdate($partner['agreement_expires_at']))
+                                    . ($expired ? ' — expired</span>' : '');
+      }
+      ?>
+      <?php foreach ($facts as $key => $value): ?>
+        <div class="pnr-fact">
+          <dt class="pnr-fact__k"><?= e($key) ?></dt>
+          <dd class="pnr-fact__v"><?= $value ?></dd>
+        </div>
+      <?php endforeach; ?>
+    </dl>
   </div>
 </div>
 

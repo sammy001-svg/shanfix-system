@@ -6821,3 +6821,293 @@ a.portal-list__row:hover { background: var(--surface-2); }
 /* Any element in the mail screens marked hidden stays hidden, whatever
    display its own class gives it. */
 .mb [hidden], .mb-compose [hidden] { display: none !important; }
+
+/* =====================================================================
+   Partners — the premium layer
+   Shared by the admin side and the partner's own portal, so a partner
+   and the person who looks after them see one product rather than two.
+
+   Solid colours throughout, as everywhere else in here. What makes this
+   read as premium is hierarchy and restraint: one big number per idea,
+   a clear identity block, generous spacing, and a tier treatment that
+   is a ring and a letterform rather than a shiny badge.
+   ===================================================================== */
+
+/* -- Tier colours -----------------------------------------------------
+   Fixed, like the brand scales: silver is silver in either theme. They
+   are muted on purpose — a gold that actually looks like gold leaf is a
+   gold that fights the green the rest of the interface is built on. */
+:root {
+  --tier-registered: #6B7F94;
+  --tier-bronze:     #A2683A;
+  --tier-silver:     #8A94A6;
+  --tier-gold:       #B6893B;
+}
+
+/* ── Identity block ───────────────────────────────────────────────── */
+.pnr-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: start;
+  padding: 24px 26px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+.pnr-hero__who { display: flex; gap: 18px; min-width: 0; }
+
+/* The monogram. A partner list is a list of names, and a name with a
+   mark beside it is findable at a glance in a way a row of text is not. */
+.pnr-mark {
+  flex: 0 0 auto;
+  width: 60px; height: 60px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--ink);
+}
+
+/* Ringed in the tier's colour, which is the whole point: the tier is
+   legible before anybody reads a word. */
+.pnr-mark--registered { box-shadow: 0 0 0 2px var(--tier-registered) inset; }
+.pnr-mark--bronze     { box-shadow: 0 0 0 2px var(--tier-bronze) inset; }
+.pnr-mark--silver     { box-shadow: 0 0 0 2px var(--tier-silver) inset; }
+.pnr-mark--gold       { box-shadow: 0 0 0 2px var(--tier-gold) inset; }
+
+.pnr-mark--lg { width: 72px; height: 72px; border-radius: 16px; font-size: 1.6rem; }
+.pnr-mark--sm { width: 36px; height: 36px; border-radius: 9px;  font-size: .82rem; }
+
+.pnr-hero__text { min-width: 0; }
+
+.pnr-hero__name {
+  margin: 0 0 4px;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -.015em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.pnr-hero__sub {
+  font-size: .88rem;
+  color: var(--slate-600);
+  margin-bottom: 10px;
+}
+
+.pnr-hero__tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* ── Tier pill ────────────────────────────────────────────────────── */
+.pnr-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 11px 3px 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--slate-700);
+}
+
+.pnr-tier__dot {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: .56rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.pnr-tier--registered .pnr-tier__dot { background: var(--tier-registered); }
+.pnr-tier--bronze     .pnr-tier__dot { background: var(--tier-bronze); }
+.pnr-tier--silver     .pnr-tier__dot { background: var(--tier-silver); }
+.pnr-tier--gold       .pnr-tier__dot { background: var(--tier-gold); }
+
+.pnr-tier--gold { border-color: var(--tier-gold); color: var(--ink); }
+
+/* ── Metrics ──────────────────────────────────────────────────────── */
+/* One idea per card, with the context line that stops a bare 0.00 from
+   looking like a bug. */
+.pnr-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.pnr-hero .pnr-metrics { grid-template-columns: repeat(3, minmax(132px, 164px)); }
+
+.pnr-metric {
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  border-left: 3px solid var(--border-strong);
+}
+
+/* A metric that goes somewhere. Only the partner's own portal uses
+   this: on the admin side the figures sit beside the tabs that already
+   lead to the same places. */
+a.pnr-metric--link {
+  display: block;
+  text-decoration: none;
+  transition: border-color .12s, background .12s;
+}
+a.pnr-metric--link:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.pnr-metric--owed   { border-left-color: var(--amber-700); }
+.pnr-metric--paid   { border-left-color: var(--green-600); }
+.pnr-metric--people { border-left-color: var(--navy-500); }
+
+.pnr-metric__value {
+  font-size: 1.32rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.15;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.pnr-metric__label {
+  margin-top: 3px;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+}
+
+.pnr-metric__note {
+  margin-top: 5px;
+  font-size: .74rem;
+  line-height: 1.4;
+  color: var(--slate-600);
+}
+
+/* ── Progress to the next tier ────────────────────────────────────── */
+/* Solid fill, like every other bar in here. */
+.pnr-climb {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.pnr-climb__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  font-size: .8rem;
+  margin-bottom: 7px;
+}
+
+.pnr-climb__to { color: var(--slate-600); }
+.pnr-climb__to strong { color: var(--ink); }
+
+.pnr-climb__bar {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.pnr-climb__fill {
+  height: 100%;
+  background: var(--green-600);
+  border-radius: 3px;
+}
+
+.pnr-climb__fill--gold { background: var(--tier-gold); }
+
+/* ── Fact grid ────────────────────────────────────────────────────── */
+/* Replaces an eleven-row definition list. The same facts, read in two
+   or three columns instead of one long scroll of grey. */
+.pnr-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 2px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.pnr-fact { padding: 7px 14px 7px 0; min-width: 0; }
+
+/* The grid is a <dl>, and a browser gives every <dd> a 40px indent of
+   its own. Left alone it pushes each value out from under its label and
+   the columns stop reading as columns. */
+.pnr-facts dd, .pnr-fact__v { margin: 0; }
+
+.pnr-fact__k {
+  display: block;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--slate-500);
+  margin-bottom: 2px;
+}
+
+.pnr-fact__v {
+  font-size: .89rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.pnr-fact__v .text-muted { color: var(--slate-500); }
+
+/* ── A partner in a list ──────────────────────────────────────────── */
+.pnr-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pnr-row__text { min-width: 0; }
+
+.pnr-row__name {
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pnr-row__name:hover { color: var(--green-400); }
+
+.pnr-row__meta {
+  font-size: .76rem;
+  color: var(--slate-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Narrower ─────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .pnr-hero { grid-template-columns: 1fr; gap: 18px; }
+  .pnr-hero .pnr-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pnr-mark--lg { width: 56px; height: 56px; font-size: 1.25rem; }
+  .pnr-hero__name { font-size: 1.25rem; }
+}
+
+@media (max-width: 560px) {
+  .pnr-hero { padding: 18px; }
+  .pnr-hero .pnr-metrics { grid-template-columns: 1fr; }
+  .pnr-hero__who { gap: 13px; }
+
+  /* The target and the running total share a row down to here, where
+     they start crowding each other. Below it they stack. */
+  .pnr-climb__head { flex-direction: column; align-items: flex-start; gap: 3px; }
+}

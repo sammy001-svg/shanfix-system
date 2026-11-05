@@ -7,23 +7,93 @@
  * behind that figure.
  */
 require_once APP_PATH . '/Views/partials/icons.php';
+require_once APP_PATH . '/Views/partials/partner_bits.php';
+
+use App\Services\Partners;
 
 $due    = (float) $summary['due'];
 $owed   = $due > 0.009;
 $rate   = (float) $me['default_rate'];
 $rateOf = static fn(float $r): string => rtrim(rtrim(number_format($r, 2), '0'), '.') . '%';
+
+$currency = (string) ($me['payout_currency'] ?? Partners::baseCurrency());
+$abroad   = !Partners::isLocal((string) ($me['country'] ?? 'KE'));
 ?>
 
 <div class="portal-wrap">
 
-  <div class="portal-hello">
-    <h1 class="portal-h1">Hello, <?= e(explode(' ', trim($me['name']))[0]) ?>.</h1>
-    <p class="portal-lede">
-      <?php if ($me['company']): ?>
-        Signed in as <strong><?= e($me['company']) ?></strong>.
-      <?php endif; ?>
-      Your rate is <strong><?= e($rateOf($rate)) ?></strong> unless a service says otherwise.
-    </p>
+  <?php // Who they are to us, said the same way we say it on our own
+        // side of the desk — the same monogram, the same tier pill. A
+        // partner should not have to wonder whether the "Silver" we
+        // mentioned on the phone is the Silver on their dashboard. ?>
+  <div class="pnr-hero">
+    <div class="pnr-hero__who">
+      <?= partner_mark($me, 'lg') ?>
+
+      <div class="pnr-hero__text">
+        <h1 class="pnr-hero__name">Hello, <?= e(explode(' ', trim($me['name']))[0]) ?>.</h1>
+
+        <div class="pnr-hero__sub">
+          <?php if ($me['company']): ?>
+            Signed in as <strong><?= e($me['company']) ?></strong> &middot;
+          <?php endif; ?>
+          Your rate is <strong><?= e($rateOf($rate)) ?></strong>
+          unless a service says otherwise.
+        </div>
+
+        <div class="pnr-hero__tags">
+          <?= partner_tier_pill((string) ($me['tier'] ?? 'registered')) ?>
+
+          <?php if (!empty($me['partner_type'])): ?>
+            <span class="badge badge--grey"><?= e(ucfirst((string) $me['partner_type'])) ?></span>
+          <?php endif; ?>
+
+          <?php // Only worth saying where it is not the obvious answer. ?>
+          <?php if ($abroad || $currency !== Partners::baseCurrency()): ?>
+            <span class="badge badge--blue">Paid in <?= e($currency) ?></span>
+          <?php endif; ?>
+
+          <?php if (!empty($me['partner_code'])): ?>
+            <span class="badge badge--grey"><?= e($me['partner_code']) ?></span>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
+
+    <?php // What they have made, with the context line. A new partner
+          // seeing three zeroes should be able to tell that is the
+          // truth rather than a page that failed to load. ?>
+    <div class="pnr-metrics">
+      <?= partner_metric(
+            money($summary['due'], false),
+            'Waiting for you',
+            $owed ? 'Paid out next month' : 'Nothing outstanding',
+            'owed',
+            url('/partners/earnings')
+          ) ?>
+      <?= partner_metric(
+            money($summary['paid'], false),
+            'Paid to you',
+            $summary['paid'] > 0.009 ? 'Across every payout so far' : 'Nothing sent yet',
+            'paid',
+            url('/partners/earnings?show=paid')
+          ) ?>
+      <?= partner_metric(
+            (string) (int) $summary['clients'],
+            ((int) $summary['clients']) === 1 ? 'Customer' : 'Customers',
+            ((int) $summary['clients']) > 0
+                ? 'Yours for as long as they stay'
+                : 'Introduce your first',
+            'people',
+            url('/partners/customers')
+          ) ?>
+    </div>
+
+    <?php // How close the next tier is. The same bar an administrator
+          // sees, from the same figure, so the two never disagree. ?>
+    <div style="grid-column:1/-1">
+      <?= partner_climb((float) ($billed12m ?? 0), (string) ($me['tier'] ?? 'registered')) ?>
+    </div>
   </div>
 
   <?php // What we owe them. Navy in both themes, like the client's balance:
@@ -65,22 +135,6 @@ $rateOf = static fn(float $r): string => rtrim(rtrim(number_format($r, 2), '0'),
     </section>
   <?php endif; ?>
 
-  <div class="portal-stats">
-    <a class="portal-stat" href="<?= url('/partners/earnings') ?>">
-      <span class="portal-stat__figure"><?= e(money($summary['earned'], false)) ?></span>
-      <span class="portal-stat__label">Earned in total</span>
-    </a>
-
-    <a class="portal-stat" href="<?= url('/partners/earnings?show=paid') ?>">
-      <span class="portal-stat__figure"><?= e(money($summary['paid'], false)) ?></span>
-      <span class="portal-stat__label">Paid out to you</span>
-    </a>
-
-    <a class="portal-stat" href="<?= url('/partners/customers') ?>">
-      <span class="portal-stat__figure"><?= (int) $summary['clients'] ?></span>
-      <span class="portal-stat__label">Your customers</span>
-    </a>
-  </div>
 
   <div class="portal-cols">
     <section class="portal-card portal-card--flush">

@@ -262,6 +262,16 @@ class PartnerAdminController extends Controller
             'tiers'       => Partners::tiers(),
             'earnedTier'  => Partners::earnedTier((int) $partner['id']),
             'billed12m'   => Partners::billed12m((int) $partner['id']),
+
+            // When money last actually reached them. "Paid out: 0.00" on
+            // its own reads like a fault; "nothing sent yet" does not.
+            'lastPaid'    => Database::scalar(
+                "SELECT MAX(l.settled_at)
+                   FROM payout_lines l
+                  WHERE l.partner_id = :p AND l.status = 'settled'",
+                ['p' => $partner['id']],
+                null
+            ),
             'taxLabel'    => Partners::taxLabel((string) $partner['country']),
             'whtRate'     => Partners::withholdingRate($partner),
             'whtOn'       => Partners::withholdingEnabled(),

@@ -9,6 +9,7 @@
  * than one long list of tabs.
  */
 require_once APP_PATH . '/Views/partials/icons.php';
+require_once APP_PATH . '/Views/partials/partner_bits.php';
 
 use App\Services\Partners;
 
@@ -232,11 +233,20 @@ $flag = static fn(?string $code): string => Partners::countryName($code);
             <?php $abroad = !Partners::isLocal((string) $p['country']); ?>
             <tr>
               <td>
-                <a class="table__primary" href="<?= url('/partners-admin/' . (int) $p['id']) ?>">
-                  <?= e($p['company'] ?: $p['name']) ?>
-                </a>
-                <div class="table__muted">
-                  <?= e($p['partner_code'] ?: $p['name']) ?> &middot; <?= e($p['email']) ?>
+                <?php // The monogram, ringed in the partner's tier colour.
+                      // A list of names is hard to scan; a list of marks
+                      // is not, and the ring means the tier is legible
+                      // before the tier column is reached. ?>
+                <div class="pnr-row">
+                  <?= partner_mark($p, 'sm') ?>
+                  <div class="pnr-row__text">
+                    <a class="pnr-row__name" href="<?= url('/partners-admin/' . (int) $p['id']) ?>">
+                      <?= e($p['company'] ?: $p['name']) ?>
+                    </a>
+                    <div class="pnr-row__meta">
+                      <?= e($p['partner_code'] ?: $p['name']) ?> &middot; <?= e($p['email']) ?>
+                    </div>
+                  </div>
                 </div>
               </td>
               <td class="text-xs">
@@ -246,10 +256,8 @@ $flag = static fn(?string $code): string => Partners::countryName($code);
                 <?php endif; ?>
               </td>
               <td class="text-xs">
-                <span class="badge badge--<?= $p['tier'] === 'gold' ? 'amber' : 'grey' ?>">
-                  <?= e(Partners::tierName((string) $p['tier'])) ?>
-                </span>
-                <div class="table__muted"><?= e(ucfirst((string) $p['partner_type'])) ?></div>
+                <?= partner_tier_pill((string) $p['tier']) ?>
+                <div class="table__muted mt-4"><?= e(ucfirst((string) $p['partner_type'])) ?></div>
               </td>
               <td class="num"><?= e(rtrim(rtrim(number_format((float) $p['default_rate'], 2), '0'), '.')) ?>%</td>
               <td class="text-xs">

@@ -87,6 +87,12 @@ class PartnerController extends Controller
             'recent'    => $recent,
             'customers' => $customers,
             'company'   => Settings::company(),
+
+            // What their customers have been invoiced in twelve months.
+            // The tier bar is drawn from it, and it is the same figure
+            // the admin side uses, so a partner and their account
+            // manager are never looking at two different numbers.
+            'billed12m' => \App\Services\Partners::billed12m((int) $me['id']),
         ], 'partner');
     }
 
